@@ -249,45 +249,48 @@ exports.createManualDraft = onCall(
 // No secrets required — Reddit RSS feeds are public.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const RSS_FEEDS = [
-  { url: 'https://www.reddit.com/r/forhire/.rss',       source: 'r/forhire'       },
-  { url: 'https://www.reddit.com/r/smallbusiness/.rss', source: 'r/smallbusiness' },
+// Reddit subreddits to pull leads from
+const SUBREDDITS = [
+  { sub: 'forhire',       source: 'r/forhire'       },
+  { sub: 'smallbusiness', source: 'r/smallbusiness' },
 ];
 
 exports.fetchRssFeeds = onCall(
   { cors: true, timeoutSeconds: 30, memory: '256MiB' },
   async () => {
-    const parser = new Parser({
-      // Reddit requires a non-default user-agent
-      headers: { 'User-Agent': 'outreach-dashboard/1.0' },
-      customFields: { item: ['author', 'media:thumbnail'] },
-    });
+    // Reddit's JSON API is more reliable than RSS from a server environment.
+    // User-agent must follow Reddit's required format or requests return 429/403.
+    const headers = {
+      'User-Agent': 'outreach-dashboard/1.0 (by /u/outreach_bot)',
+      'Accept': 'application/json',
+    };
 
-    // Fetch all feeds in parallel; failed feeds are skipped gracefully
+    // Fetch all subreddits in parallel; failed ones are skipped gracefully
     const results = await Promise.allSettled(
-      RSS_FEEDS.map(({ url }) => parser.parseURL(url))
+      SUBREDDITS.map(({ sub }) =>
+        axios.get(`https://www.reddit.com/r/${sub}/new.json?limit=15`, { headers, timeout: 10_000 })
+      )
     );
 
     const items = [];
 
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.warn(`[fetchRssFeeds] ${RSS_FEEDS[index].url} failed:`, result.reason.message);
+        console.warn(`[fetchRssFeeds] r/${SUBREDDITS[index].sub} failed:`, result.reason.message);
         return;
       }
 
-      const { source } = RSS_FEEDS[index];
+      const { source } = SUBREDDITS[index];
+      const posts = result.value.data?.data?.children ?? [];
 
-      result.value.items.slice(0, 15).forEach((item) => {
+      posts.forEach(({ data: post }) => {
         items.push({
-          id:       item.guid  ?? item.link,
-          title:    item.title ?? '(no title)',
-          link:     item.link  ?? '',
-          // Reddit puts the username in the author field
-          author:   item.author ?? item.creator ?? '',
-          // contentSnippet strips HTML; fall back to raw content
-          content:  item.contentSnippet ?? item.content ?? '',
-          pubDate:  item.pubDate ?? '',
+          id:      post.id,
+          title:   post.title   ?? '(no title)',
+          link:    `https://www.reddit.com${post.permalink}`,
+          author:  post.author  ?? '',
+          content: post.selftext?.slice(0, 300) ?? '',
+          pubDate: new Date(post.created_utc * 1000).toISOString(),
           source,
         });
       });

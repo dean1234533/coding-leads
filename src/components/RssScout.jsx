@@ -166,25 +166,25 @@ export default function RssScout({ onCopyToForm }) {
   // Active filter: 'all' | 'r/forhire' | 'r/smallbusiness'
   const [filter, setFilter] = useState('all');
 
-  // Fetch feeds on mount via Firebase Function (avoids Reddit CORS)
-  useEffect(() => {
-    async function loadFeeds() {
-      setLoading(true);
-      setError(null);
-      try {
-        const fns = getFunctions(app);
-        const fetchRssFeeds = httpsCallable(fns, 'fetchRssFeeds');
-        const result = await fetchRssFeeds();
-        setPosts(result.data.items);
-      } catch (err) {
-        console.error('[RssScout]', err);
-        setError(err?.message ?? 'Failed to load feeds.');
-      } finally {
-        setLoading(false);
-      }
+  // Extracted so it can be called on mount AND by the Refresh button
+  const loadFeeds = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const fns = getFunctions(app);
+      const fetchRssFeeds = httpsCallable(fns, 'fetchRssFeeds');
+      const result = await fetchRssFeeds();
+      setPosts(result.data.items);
+    } catch (err) {
+      console.error('[RssScout]', err);
+      setError(err?.message ?? 'Failed to load feeds.');
+    } finally {
+      setLoading(false);
     }
-    loadFeeds();
   }, []);
+
+  // Auto-load on mount
+  useEffect(() => { loadFeeds(); }, [loadFeeds]);
 
   /**
    * Called when the user clicks "Copy to Lead Form" on a post.
@@ -218,21 +218,40 @@ export default function RssScout({ onCopyToForm }) {
           </p>
         </div>
 
-        {/* Source filter tabs */}
-        <div className="flex items-center gap-1 rounded-lg border border-gray-800 bg-gray-950 p-1">
-          {['all', 'r/forhire', 'r/smallbusiness'].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-                filter === f
-                  ? 'bg-gray-800 text-gray-100'
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
+        <div className="flex items-center gap-2">
+          {/* Refresh button */}
+          <button
+            onClick={loadFeeds}
+            disabled={loading}
+            title="Refresh posts"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-400 transition hover:border-gray-600 hover:text-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <svg
+              className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
-              {f === 'all' ? 'All' : f}
-            </button>
-          ))}
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {loading ? 'Loading...' : 'Refresh'}
+          </button>
+
+          {/* Source filter tabs */}
+          <div className="flex items-center gap-1 rounded-lg border border-gray-800 bg-gray-950 p-1">
+            {['all', 'r/forhire', 'r/smallbusiness'].map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                  filter === f
+                    ? 'bg-gray-800 text-gray-100'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {f === 'all' ? 'All' : f}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
