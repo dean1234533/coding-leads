@@ -103,7 +103,15 @@ function LeadCard({ lead, onCopy, isCopied }) {
               d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
           </svg>
           <span className="font-medium text-indigo-300">{lead.ownerName}</span>
-          <span className="text-gray-600">— owner</span>
+          {lead.ownerNameSource && (
+            <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
+              lead.ownerNameSource === 'Companies House'
+                ? 'bg-emerald-500/10 text-emerald-500'
+                : 'bg-gray-700 text-gray-400'
+            }`}>
+              {lead.ownerNameSource}
+            </span>
+          )}
         </div>
       ) : (
         <div className="flex items-center gap-1.5 text-xs text-gray-600">
@@ -111,7 +119,7 @@ function LeadCard({ lead, onCopy, isCopied }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
           </svg>
-          <span className="italic">Owner name not found — verify manually</span>
+          <span className="italic">Owner name not found</span>
         </div>
       )}
 

@@ -281,70 +281,155 @@ function opportunityLabel(place) {
 }
 
 /**
- * Attempts to find the business owner's name from their website.
- * Tries three sources in order:
- *   1. JSON-LD structured data (owner / founder / Person schema)
- *   2. <meta name="author"> tag
- *   3. Common text patterns ("Owner: Jane Smith", "Hi, I'm ...", etc.)
- * Returns null on any failure — never throws.
+ * Looks up the business owner/director via the Companies House API (UK).
+ * Returns the active director's formatted name, or null if not found.
+ * This is the primary owner-name source — authoritative for registered UK companies.
  */
-async function findOwnerName(websiteUrl) {
-  if (!websiteUrl) return null;
+async function findOwnerFromCompaniesHouse(businessName) {
+  const apiKey = process.env.COMPANIES_HOUSE_KEY;
+  if (!apiKey) return null;
+
   try {
-    const res = await axios.get(websiteUrl, {
-      timeout: 6_000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; BusinessLeadBot/1.0)',
-        Accept: 'text/html',
-      },
-      maxRedirects: 3,
-      // Only download the first 200KB — enough to find head/schema data
-      maxContentLength: 200_000,
-    });
+    // Search for the company by name
+    const searchRes = await axios.get(
+      'https://api.company-information.service.gov.uk/search/companies',
+      {
+        params:  { q: businessName, items_per_page: 3 },
+        auth:    { username: apiKey, password: '' },
+        timeout: 6_000,
+      }
+    );
 
-    const html = typeof res.data === 'string' ? res.data : '';
+    const company = searchRes.data.items?.find(
+      c => c.company_status === 'active'
+    ) ?? searchRes.data.items?.[0];
 
-    // ── 1. JSON-LD structured data ──────────────────────────────────────────
-    const scriptTags = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
-    for (const [, jsonStr] of scriptTags) {
-      try {
-        const schemas = [].concat(JSON.parse(jsonStr));
-        for (const s of schemas) {
-          const name =
-            s?.owner?.name ||
-            s?.founder?.name ||
-            s?.employee?.name ||
-            (s?.['@type'] === 'Person' && s?.name) ||
-            null;
-          if (name && typeof name === 'string') return name.trim();
-        }
-      } catch { /* malformed JSON — skip */ }
+    if (!company?.company_number) return null;
+
+    // Fetch the active officers (directors) for that company
+    const officersRes = await axios.get(
+      `https://api.company-information.service.gov.uk/company/${company.company_number}/officers`,
+      {
+        params:  { items_per_page: 10 },
+        auth:    { username: apiKey, password: '' },
+        timeout: 6_000,
+      }
+    );
+
+    const officers = officersRes.data.items ?? [];
+
+    // Prefer active directors/members; fall back to any active officer
+    const director = officers.find(o =>
+      !o.resigned_on &&
+      ['director', 'llp-member', 'llp-designated-member', 'corporate-director'].includes(o.officer_role)
+    ) ?? officers.find(o => !o.resigned_on);
+
+    if (!director) return null;
+
+    // Companies House returns names as "SURNAME, Firstname Middlename"
+    const els = director.name_elements;
+    if (els?.forename && els?.surname) {
+      const first = els.forename.split(' ')[0];
+      const sur   = els.surname;
+      return `${cap(first)} ${cap(sur)}`;
     }
 
-    // ── 2. Meta author tag ──────────────────────────────────────────────────
-    const metaAuthor = html.match(/<meta[^>]+name=["']author["'][^>]+content=["']([^"']{2,60})["']/i)
-                    || html.match(/<meta[^>]+content=["']([^"']{2,60})["'][^>]+name=["']author["']/i);
-    if (metaAuthor?.[1]) return metaAuthor[1].trim();
-
-    // ── 3. Common natural-language patterns ─────────────────────────────────
-    const TEXT_PATTERNS = [
-      /\b(?:owner|proprietor|founder|director|principal|ceo|manager)\b[\s:,–-]+([A-Z][a-zÀ-ÿ'-]+ [A-Z][a-zÀ-ÿ'-]+)/,
-      /\bmy name is ([A-Z][a-zÀ-ÿ'-]+ [A-Z][a-zÀ-ÿ'-]+)/i,
-      /\bhi,?\s+i['']m ([A-Z][a-zÀ-ÿ'-]+ [A-Z][a-zÀ-ÿ'-]+)/i,
-      /\bhello,?\s+i['']m ([A-Z][a-zÀ-ÿ'-]+ [A-Z][a-zÀ-ÿ'-]+)/i,
-      /\bi['']m ([A-Z][a-zÀ-ÿ'-]+ [A-Z][a-zÀ-ÿ'-]+),?\s+(?:the\s+)?(?:owner|founder|director)/i,
-    ];
-    // Strip tags before pattern matching so we don't match across HTML attributes
-    const textOnly = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-    for (const pattern of TEXT_PATTERNS) {
-      const m = textOnly.match(pattern);
-      if (m?.[1]) return m[1].trim();
+    // Fallback: parse the raw name string ("SMITH, John David" → "John Smith")
+    const parts = (director.name ?? '').split(',').map(s => s.trim());
+    if (parts.length >= 2) {
+      const surname   = cap(parts[0]);
+      const firstname = cap(parts[1].split(' ')[0]);
+      return `${firstname} ${surname}`;
     }
 
-    return null;
+    return cap(director.name) || null;
   } catch {
     return null;
   }
+}
+
+/** Title-cases a string ("SMITH" → "Smith", "mcdonald" → "Mcdonald") */
+function cap(str = '') {
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+/**
+ * Fallback: scrapes the business website looking for owner name signals.
+ * Tries the homepage plus common About/Team/Contact sub-pages.
+ * Returns null on any failure — never throws.
+ */
+async function findOwnerFromWebsite(websiteUrl) {
+  if (!websiteUrl) return null;
+
+  const FETCH_OPTS = {
+    timeout: 5_000,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml',
+    },
+    maxRedirects: 3,
+    maxContentLength: 300_000,
+  };
+
+  const base = new URL(websiteUrl).origin;
+  const pagesToTry = [
+    websiteUrl,
+    `${base}/about`,
+    `${base}/about-us`,
+    `${base}/our-story`,
+    `${base}/team`,
+    `${base}/contact`,
+  ];
+
+  const TEXT_PATTERNS = [
+    /\b(?:owner|proprietor|founder|director|principal|ceo|manager|established by)\b[\s:,–\-]+([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})/i,
+    /\bi['']m ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20}),?\s+(?:the\s+)?(?:owner|founder|director|creator|chef|barber|stylist)/i,
+    /\bhi,?\s+i['']m ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})/i,
+    /\bhello,?\s+i['']m ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})/i,
+    /\bmy name is ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})/i,
+    /\bwelcome[,!]?\s+i['']m ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})/i,
+  ];
+
+  for (const url of pagesToTry) {
+    try {
+      const res  = await axios.get(url, FETCH_OPTS);
+      const html = typeof res.data === 'string' ? res.data : '';
+
+      // 1. JSON-LD
+      for (const [, jsonStr] of html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+        try {
+          const schemas = [].concat(JSON.parse(jsonStr));
+          for (const s of schemas) {
+            const name = s?.owner?.name || s?.founder?.name || (s?.['@type'] === 'Person' && s?.name) || null;
+            if (name && typeof name === 'string' && name.includes(' ')) return name.trim();
+          }
+        } catch { /* skip */ }
+      }
+
+      // 2. Text patterns against stripped HTML
+      const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      for (const pattern of TEXT_PATTERNS) {
+        const m = text.match(pattern);
+        if (m?.[1]) return m[1].trim();
+      }
+    } catch { /* page not found or blocked — try next */ }
+  }
+
+  return null;
+}
+
+/**
+ * Master owner-name resolver.
+ * Tries Companies House first (authoritative for UK), then website scraping.
+ */
+async function findOwnerName(businessName, websiteUrl) {
+  const chName = await findOwnerFromCompaniesHouse(businessName);
+  if (chName) return { name: chName, source: 'Companies House' };
+
+  const webName = await findOwnerFromWebsite(websiteUrl);
+  if (webName) return { name: webName, source: 'website' };
+
+  return null;
 }
 
 exports.scanBusinessLeads = onCall(
@@ -457,12 +542,13 @@ exports.scanBusinessLeads = onCall(
       };
     });
 
-    // ── Step 5: Scrape owner names from business websites in parallel ────────
-    // Only attempt sites that exist; cap at 15 to keep total latency under 30s.
+    // ── Step 5: Resolve owner names in parallel ─────────────────────────────
+    // Cap at 15 to keep total latency under the 60s function timeout.
     await Promise.allSettled(
       rawLeads.slice(0, 15).map(async (lead) => {
-        if (!lead.website) return;
-        lead.ownerName = await findOwnerName(lead.website);
+        const result = await findOwnerName(lead.name, lead.website);
+        lead.ownerName       = result?.name   ?? null;
+        lead.ownerNameSource = result?.source ?? null;
       })
     );
 
