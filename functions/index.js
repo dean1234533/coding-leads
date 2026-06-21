@@ -243,100 +243,164 @@ exports.createManualDraft = onCall(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Function 3: fetchRssFeeds
+// Function 3: scanBusinessLeads
 //
-// Fetches Reddit posts server-side to find potential business clients.
-// Targets subreddits where business owners/entrepreneurs post about their needs.
-// Scores each post for relevance to mobile/web app development services.
+// Uses Google Places API to find real local businesses, then checks each one
+// for digital opportunity signals:
+//   • No website at all         → prime lead (score 5)
+//   • Website but no app listed → strong lead (score 3)
+//   • Has website               → standard lead (score 1)
+//
+// The frontend receives a sorted list of real businesses the user can reach
+// out to about building/improving their app or website.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SUBREDDITS = [
-  { sub: 'smallbusiness', source: 'r/smallbusiness', hiringOnly: false },
-  { sub: 'Entrepreneur',  source: 'r/Entrepreneur',  hiringOnly: false },
-  { sub: 'startups',      source: 'r/startups',      hiringOnly: false },
-  { sub: 'ecommerce',     source: 'r/ecommerce',     hiringOnly: false },
-  // r/forhire: only keep [Hiring] posts — the [For Hire] ones are competitors
-  { sub: 'forhire',       source: 'r/forhire',       hiringOnly: true  },
+// Business types that are strong candidates for app/website development work
+const BUSINESS_TYPES = [
+  { value: 'restaurant',        label: 'Restaurants & Cafés'   },
+  { value: 'beauty_salon',      label: 'Beauty & Hair Salons'  },
+  { value: 'gym',               label: 'Gyms & Fitness'        },
+  { value: 'lawyer',            label: 'Law Firms'             },
+  { value: 'real_estate_agency',label: 'Estate Agents'         },
+  { value: 'accounting',        label: 'Accountants'           },
+  { value: 'plumber',           label: 'Tradespeople'          },
+  { value: 'clothing_store',    label: 'Retail / Clothing'     },
+  { value: 'car_repair',        label: 'Auto Services'         },
+  { value: 'dentist',           label: 'Dentists & Medical'    },
+  { value: 'store',             label: 'General Retail'        },
 ];
 
-// Keywords that suggest a business owner needs dev/app/tech work
-const TECH_KEYWORDS = [
-  'app', 'mobile app', 'ios', 'android', 'website', 'web app',
-  'software', 'developer', 'development', 'tech', 'digital',
-  'platform', 'automation', 'ecommerce', 'e-commerce', 'online store',
-  'booking', 'dashboard', 'saas', 'mvp', 'build', 'integrate',
-];
-
-// Keywords that suggest the poster IS a freelancer advertising — skip these
-const SKIP_KEYWORDS = [
-  '[for hire]', 'for hire]', 'available for', 'available immediately',
-  'i am a developer', "i'm a developer", 'hire me', 'my portfolio',
-];
-
-function scorePost(title, content) {
-  const text = `${title} ${content}`.toLowerCase();
-  // Skip freelancer ads
-  if (SKIP_KEYWORDS.some(kw => text.includes(kw))) return -1;
-  return TECH_KEYWORDS.reduce((n, kw) => n + (text.includes(kw) ? 1 : 0), 0);
+function scoreOpportunity(place) {
+  if (!place.website) return 5; // No website at all — highest priority
+  // Has a website — still worth reaching out about an app or improvements
+  return 1;
 }
 
-exports.fetchRssFeeds = onCall(
-  { cors: true, timeoutSeconds: 45, memory: '256MiB' },
-  async () => {
-    const headers = {
-      'User-Agent': 'outreach-dashboard/1.0 (by /u/outreach_bot)',
-      'Accept': 'application/json',
-    };
+function opportunityLabel(place) {
+  if (!place.website) return 'No Website — Prime Lead';
+  return 'Has Website — App / Upgrade Opportunity';
+}
 
-    const results = await Promise.allSettled(
-      SUBREDDITS.map(({ sub }) =>
-        axios.get(`https://www.reddit.com/r/${sub}/new.json?limit=25`, { headers, timeout: 12_000 })
+exports.scanBusinessLeads = onCall(
+  {
+    cors:           true,
+    timeoutSeconds: 60,
+    memory:         '512MiB',
+    secrets:        ['GOOGLE_PLACES_KEY'],
+  },
+  async (request) => {
+    const {
+      location   = 'London, UK',
+      radius     = 2000,         // metres
+      type       = 'restaurant',
+      maxResults = 20,
+    } = request.data ?? {};
+
+    const apiKey = process.env.GOOGLE_PLACES_KEY;
+    if (!apiKey) throw new HttpsError('internal', 'GOOGLE_PLACES_KEY secret not set.');
+
+    // ── Step 1: Geocode the location string to lat/lng ──────────────────────
+    let lat, lng;
+    try {
+      const geoRes = await axios.get(
+        'https://maps.googleapis.com/maps/api/geocode/json',
+        { params: { address: location, key: apiKey }, timeout: 10_000 }
+      );
+      if (!geoRes.data.results?.length) {
+        throw new HttpsError('invalid-argument', `Could not geocode location: "${location}"`);
+      }
+      ({ lat, lng } = geoRes.data.results[0].geometry.location);
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError('internal', `Geocoding failed: ${err.message}`);
+    }
+
+    // ── Step 2: Nearby business search ──────────────────────────────────────
+    let places = [];
+    try {
+      const searchRes = await axios.get(
+        'https://maps.googleapis.com/maps/api/place/nearbysearch/json',
+        {
+          params: {
+            location: `${lat},${lng}`,
+            radius,
+            type,
+            key: apiKey,
+          },
+          timeout: 15_000,
+        }
+      );
+      places = (searchRes.data.results ?? []).slice(0, maxResults);
+    } catch (err) {
+      throw new HttpsError('internal', `Places search failed: ${err.message}`);
+    }
+
+    if (!places.length) return { leads: [], meta: { location, type, radius } };
+
+    // ── Step 3: Fetch details (website, phone) for each place in parallel ───
+    const detailResults = await Promise.allSettled(
+      places.map(p =>
+        axios.get('https://maps.googleapis.com/maps/api/place/details/json', {
+          params: {
+            place_id: p.place_id,
+            fields:   'name,formatted_address,formatted_phone_number,website,types,rating,user_ratings_total,business_status,url',
+            key:      apiKey,
+          },
+          timeout: 10_000,
+        })
       )
     );
 
-    const items = [];
+    // ── Step 4: Score and shape the leads ───────────────────────────────────
+    const leads = detailResults
+      .map((r, i) => {
+        if (r.status === 'rejected') {
+          console.warn('[scanBusinessLeads] detail fetch failed:', r.reason.message);
+          // Fall back to the basic Nearby Search data
+          const p = places[i];
+          return {
+            id:               p.place_id,
+            name:             p.name,
+            address:          p.vicinity ?? '',
+            phone:            null,
+            website:          null,
+            googleMapsUrl:    null,
+            rating:           p.rating ?? null,
+            reviewCount:      p.user_ratings_total ?? 0,
+            types:            p.types ?? [],
+            hasWebsite:       false,
+            opportunityScore: 5,
+            opportunityLabel: 'No Website — Prime Lead',
+          };
+        }
+        const d = r.value.data.result ?? {};
+        const hasWebsite = !!d.website;
+        return {
+          id:               places[i].place_id,
+          name:             d.name ?? places[i].name,
+          address:          d.formatted_address ?? '',
+          phone:            d.formatted_phone_number ?? null,
+          website:          d.website ?? null,
+          googleMapsUrl:    d.url ?? null,
+          rating:           d.rating ?? null,
+          reviewCount:      d.user_ratings_total ?? 0,
+          types:            d.types ?? [],
+          hasWebsite,
+          opportunityScore: scoreOpportunity(d),
+          opportunityLabel: opportunityLabel(d),
+        };
+      })
+      // Highest opportunity first, then by fewest reviews (smaller = easier to win)
+      .sort((a, b) =>
+        b.opportunityScore !== a.opportunityScore
+          ? b.opportunityScore - a.opportunityScore
+          : (a.reviewCount ?? 999) - (b.reviewCount ?? 999)
+      );
 
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        console.warn(`[fetchRssFeeds] r/${SUBREDDITS[index].sub} failed:`, result.reason.message);
-        return;
-      }
-
-      const { source, hiringOnly } = SUBREDDITS[index];
-      const posts = result.value.data?.data?.children ?? [];
-
-      posts.forEach(({ data: post }) => {
-        const title = post.title ?? '(no title)';
-
-        // For r/forhire, skip anything that isn't a [Hiring] post
-        if (hiringOnly && !/^\[hiring\]/i.test(title.trim())) return;
-
-        const content = post.selftext?.slice(0, 400) ?? '';
-        const relevanceScore = scorePost(title, content);
-
-        // Skip confirmed freelancer ads
-        if (relevanceScore < 0) return;
-
-        items.push({
-          id:             post.id,
-          title,
-          link:           `https://www.reddit.com${post.permalink}`,
-          author:         post.author ?? '',
-          content:        content.slice(0, 300),
-          pubDate:        new Date(post.created_utc * 1000).toISOString(),
-          source,
-          relevanceScore,
-        });
-      });
-    });
-
-    // Sort: high-relevance first, then by recency
-    items.sort((a, b) =>
-      b.relevanceScore !== a.relevanceScore
-        ? b.relevanceScore - a.relevanceScore
-        : new Date(b.pubDate) - new Date(a.pubDate)
-    );
-
-    return { items };
+    return {
+      leads,
+      meta: { location, type, radius, found: leads.length },
+    };
   }
 );
+
