@@ -245,30 +245,31 @@ export default function LeadDashboard() {
 
       {/* ── Nav ── */}
       <header className="sticky top-0 z-10 border-b border-gray-800 bg-gray-950/90 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-indigo-400">Client Outreach</p>
             <h1 className="text-base font-semibold leading-tight text-gray-100">Lead Dashboard</h1>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_theme(colors.emerald.400)]" />
-            <span className="text-xs text-gray-400">Dean Burt · deanburt1308@gmail.com</span>
+            <span className="h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_theme(colors.emerald.400)]" />
+            <span className="text-xs text-gray-400 hidden sm:inline">Dean Burt · deanburt1308@gmail.com</span>
+            <span className="text-xs text-gray-400 sm:hidden">Dean Burt</span>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-8 px-6 py-8">
+      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
 
         {/* ── Stats ── */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-3 sm:gap-4">
           {[
             { label: 'Total Leads',    value: totalLeads    },
             { label: 'Drafts Created', value: draftsCreated },
             { label: 'Errors',         value: errors        },
           ].map(({ label, value }) => (
-            <div key={label} className="rounded-xl border border-gray-800 bg-gray-900 px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">{label}</p>
-              <p className="mt-1 text-3xl font-semibold tabular-nums text-gray-100">{value}</p>
+            <div key={label} className="rounded-xl border border-gray-800 bg-gray-900 px-3 py-3 sm:px-5 sm:py-4">
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-gray-500 truncate">{label}</p>
+              <p className="mt-1 text-2xl sm:text-3xl font-semibold tabular-nums text-gray-100">{value}</p>
             </div>
           ))}
         </div>
@@ -284,11 +285,11 @@ export default function LeadDashboard() {
         <section ref={formRef} className="rounded-xl border border-gray-800 bg-gray-900 scroll-mt-24">
 
           {/* Header with active mode badge */}
-          <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
+          <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3 sm:px-6 sm:py-4">
             <div>
               <h2 className="text-sm font-semibold text-gray-200">New Lead</h2>
               <p className="mt-0.5 text-xs text-gray-500">
-                Fill in manually or copy from the RSS Scout above.
+                Fill in manually or copy from the Scout above.
               </p>
             </div>
             {/* Shows which mode is currently active */}
@@ -297,7 +298,7 @@ export default function LeadDashboard() {
             </span>
           </div>
 
-          <form className="p-6 space-y-5">
+          <form className="p-4 sm:p-6 space-y-5">
 
             {/* ── Row 1: Lead Type selector (always visible, full width on mobile) ── */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -361,7 +362,7 @@ export default function LeadDashboard() {
 
         {/* ── Pipeline table ── */}
         <section className="rounded-xl border border-gray-800 bg-gray-900">
-          <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
+          <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3 sm:px-6 sm:py-4">
             <div>
               <h2 className="text-sm font-semibold text-gray-200">Lead Pipeline</h2>
               <p className="mt-0.5 text-xs text-gray-500">Updates automatically as drafts are created.</p>
