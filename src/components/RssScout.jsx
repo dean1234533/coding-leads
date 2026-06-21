@@ -95,6 +95,26 @@ function LeadCard({ lead, onCopy, isCopied }) {
         )}
       </div>
 
+      {/* Owner name row */}
+      {lead.ownerName ? (
+        <div className="flex items-center gap-1.5 text-xs">
+          <svg className="h-3 w-3 flex-shrink-0 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+          </svg>
+          <span className="font-medium text-indigo-300">{lead.ownerName}</span>
+          <span className="text-gray-600">— owner</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 text-xs text-gray-600">
+          <svg className="h-3 w-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+          </svg>
+          <span className="italic">Owner name not found — verify manually</span>
+        </div>
+      )}
+
       {/* Website / phone row */}
       <div className="flex flex-wrap gap-3 text-xs">
         {lead.website ? (
@@ -211,7 +231,7 @@ export default function RssScout({ onCopyToForm }) {
     onCopyToForm({
       companyName: lead.name,
       websiteUrl:  lead.website ?? '',
-      ownerName:   '',
+      ownerName:   lead.ownerName ?? '',
     });
     setCopiedId(lead.id);
     setTimeout(() => setCopiedId(null), 2000);

@@ -271,14 +271,80 @@ const BUSINESS_TYPES = [
 ];
 
 function scoreOpportunity(place) {
-  if (!place.website) return 5; // No website at all — highest priority
-  // Has a website — still worth reaching out about an app or improvements
+  if (!place.website) return 5;
   return 1;
 }
 
 function opportunityLabel(place) {
   if (!place.website) return 'No Website — Prime Lead';
   return 'Has Website — App / Upgrade Opportunity';
+}
+
+/**
+ * Attempts to find the business owner's name from their website.
+ * Tries three sources in order:
+ *   1. JSON-LD structured data (owner / founder / Person schema)
+ *   2. <meta name="author"> tag
+ *   3. Common text patterns ("Owner: Jane Smith", "Hi, I'm ...", etc.)
+ * Returns null on any failure — never throws.
+ */
+async function findOwnerName(websiteUrl) {
+  if (!websiteUrl) return null;
+  try {
+    const res = await axios.get(websiteUrl, {
+      timeout: 6_000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; BusinessLeadBot/1.0)',
+        Accept: 'text/html',
+      },
+      maxRedirects: 3,
+      // Only download the first 200KB — enough to find head/schema data
+      maxContentLength: 200_000,
+    });
+
+    const html = typeof res.data === 'string' ? res.data : '';
+
+    // ── 1. JSON-LD structured data ──────────────────────────────────────────
+    const scriptTags = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+    for (const [, jsonStr] of scriptTags) {
+      try {
+        const schemas = [].concat(JSON.parse(jsonStr));
+        for (const s of schemas) {
+          const name =
+            s?.owner?.name ||
+            s?.founder?.name ||
+            s?.employee?.name ||
+            (s?.['@type'] === 'Person' && s?.name) ||
+            null;
+          if (name && typeof name === 'string') return name.trim();
+        }
+      } catch { /* malformed JSON — skip */ }
+    }
+
+    // ── 2. Meta author tag ──────────────────────────────────────────────────
+    const metaAuthor = html.match(/<meta[^>]+name=["']author["'][^>]+content=["']([^"']{2,60})["']/i)
+                    || html.match(/<meta[^>]+content=["']([^"']{2,60})["'][^>]+name=["']author["']/i);
+    if (metaAuthor?.[1]) return metaAuthor[1].trim();
+
+    // ── 3. Common natural-language patterns ─────────────────────────────────
+    const TEXT_PATTERNS = [
+      /\b(?:owner|proprietor|founder|director|principal|ceo|manager)\b[\s:,–-]+([A-Z][a-zÀ-ÿ'-]+ [A-Z][a-zÀ-ÿ'-]+)/,
+      /\bmy name is ([A-Z][a-zÀ-ÿ'-]+ [A-Z][a-zÀ-ÿ'-]+)/i,
+      /\bhi,?\s+i['']m ([A-Z][a-zÀ-ÿ'-]+ [A-Z][a-zÀ-ÿ'-]+)/i,
+      /\bhello,?\s+i['']m ([A-Z][a-zÀ-ÿ'-]+ [A-Z][a-zÀ-ÿ'-]+)/i,
+      /\bi['']m ([A-Z][a-zÀ-ÿ'-]+ [A-Z][a-zÀ-ÿ'-]+),?\s+(?:the\s+)?(?:owner|founder|director)/i,
+    ];
+    // Strip tags before pattern matching so we don't match across HTML attributes
+    const textOnly = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    for (const pattern of TEXT_PATTERNS) {
+      const m = textOnly.match(pattern);
+      if (m?.[1]) return m[1].trim();
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 exports.scanBusinessLeads = onCall(
@@ -351,51 +417,61 @@ exports.scanBusinessLeads = onCall(
       )
     );
 
-    // ── Step 4: Score and shape the leads ───────────────────────────────────
-    const leads = detailResults
-      .map((r, i) => {
-        if (r.status === 'rejected') {
-          console.warn('[scanBusinessLeads] detail fetch failed:', r.reason.message);
-          // Fall back to the basic Nearby Search data
-          const p = places[i];
-          return {
-            id:               p.place_id,
-            name:             p.name,
-            address:          p.vicinity ?? '',
-            phone:            null,
-            website:          null,
-            googleMapsUrl:    null,
-            rating:           p.rating ?? null,
-            reviewCount:      p.user_ratings_total ?? 0,
-            types:            p.types ?? [],
-            hasWebsite:       false,
-            opportunityScore: 5,
-            opportunityLabel: 'No Website — Prime Lead',
-          };
-        }
-        const d = r.value.data.result ?? {};
-        const hasWebsite = !!d.website;
+    // ── Step 4: Shape basic lead objects ────────────────────────────────────
+    const rawLeads = detailResults.map((r, i) => {
+      if (r.status === 'rejected') {
+        console.warn('[scanBusinessLeads] detail fetch failed:', r.reason.message);
+        const p = places[i];
         return {
-          id:               places[i].place_id,
-          name:             d.name ?? places[i].name,
-          address:          d.formatted_address ?? '',
-          phone:            d.formatted_phone_number ?? null,
-          website:          d.website ?? null,
-          googleMapsUrl:    d.url ?? null,
-          rating:           d.rating ?? null,
-          reviewCount:      d.user_ratings_total ?? 0,
-          types:            d.types ?? [],
-          hasWebsite,
-          opportunityScore: scoreOpportunity(d),
-          opportunityLabel: opportunityLabel(d),
+          id:               p.place_id,
+          name:             p.name,
+          address:          p.vicinity ?? '',
+          phone:            null,
+          website:          null,
+          googleMapsUrl:    null,
+          rating:           p.rating ?? null,
+          reviewCount:      p.user_ratings_total ?? 0,
+          types:            p.types ?? [],
+          hasWebsite:       false,
+          opportunityScore: 5,
+          opportunityLabel: 'No Website — Prime Lead',
+          ownerName:        null,
         };
+      }
+      const d = r.value.data.result ?? {};
+      const hasWebsite = !!d.website;
+      return {
+        id:               places[i].place_id,
+        name:             d.name ?? places[i].name,
+        address:          d.formatted_address ?? '',
+        phone:            d.formatted_phone_number ?? null,
+        website:          d.website ?? null,
+        googleMapsUrl:    d.url ?? null,
+        rating:           d.rating ?? null,
+        reviewCount:      d.user_ratings_total ?? 0,
+        types:            d.types ?? [],
+        hasWebsite,
+        opportunityScore: scoreOpportunity(d),
+        opportunityLabel: opportunityLabel(d),
+        ownerName:        null, // populated in Step 5
+      };
+    });
+
+    // ── Step 5: Scrape owner names from business websites in parallel ────────
+    // Only attempt sites that exist; cap at 15 to keep total latency under 30s.
+    await Promise.allSettled(
+      rawLeads.slice(0, 15).map(async (lead) => {
+        if (!lead.website) return;
+        lead.ownerName = await findOwnerName(lead.website);
       })
-      // Highest opportunity first, then by fewest reviews (smaller = easier to win)
-      .sort((a, b) =>
-        b.opportunityScore !== a.opportunityScore
-          ? b.opportunityScore - a.opportunityScore
-          : (a.reviewCount ?? 999) - (b.reviewCount ?? 999)
-      );
+    );
+
+    // ── Step 6: Sort and return ──────────────────────────────────────────────
+    const leads = rawLeads.sort((a, b) =>
+      b.opportunityScore !== a.opportunityScore
+        ? b.opportunityScore - a.opportunityScore
+        : (a.reviewCount ?? 999) - (b.reviewCount ?? 999)
+    );
 
     return {
       leads,
