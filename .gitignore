@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+functions/node_modules/
+
+# Environment variables — never commit real keys
+.env
+.env.local
+.env.*.local
+functions/.secret.local
+
+# Vite build output
+dist/
+dist-ssr/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+functions/.runtimeconfig.json
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
