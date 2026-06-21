@@ -3,7 +3,7 @@
   "description": "Firebase Cloud Functions for Client Outreach Dashboard",
   "version": "1.0.0",
   "engines": {
-    "node": "18"
+    "node": "22"
   },
   "main": "index.js",
   "scripts": {
