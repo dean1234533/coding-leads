@@ -43,16 +43,29 @@ function buildOutreachEmail(companyName, websiteUrl, ownerName) {
  * Local Business manual template — used when leadType === 'local_business'.
  * No AI — pure string replacement on {{company_name}} and {{owner_name}}.
  */
-function buildLocalBusinessEmail(companyName, ownerName) {
-  const subject = `Question about ${companyName}`;
+function buildLocalBusinessEmail(companyName, ownerName, websiteUrl) {
+  const greeting = ownerName?.trim() ? `Hi ${ownerName.trim()},` : 'Hi there,';
+  const subject  = `A quick idea for ${companyName}`;
 
-  const body = `Hi ${ownerName},
+  const url = websiteUrl?.trim() || '';
+  const isWeakSite = url && (
+    url.startsWith('http://') ||
+    /\.(wix|weebly|squarespace|jimdo|wordpress)\.com|facebook\.com|instagram\.com|linktr\.ee/i.test(url)
+  );
 
-I'm a local developer who recently published "JS Grow Up," a co-parenting platform, to the Google Play Store.
+  const opening = !url
+    ? `I came across ${companyName} while searching for local businesses in the area and noticed you don't yet have a website or mobile app — which means potential customers can't find you online.`
+    : isWeakSite
+    ? `I came across ${companyName} online and noticed your current web presence may not be doing you justice — an outdated or limited website can mean losing customers to competitors before they even make contact.`
+    : `I came across ${companyName}'s website and noticed you don't currently have a dedicated mobile app — which means customers can't easily engage with you from their phones.`;
 
-Having built a platform that handles sensitive user data and complex real-time needs, I specialize in helping businesses like yours avoid the "tech headache" by handling the full app lifecycle—design, code, and store submission—from start to finish.
+  const body = `${greeting}
 
-I'm looking to partner with one new local business this month. Are you open to a 5-minute chat to see if a mobile app could help ${companyName} scale?
+${opening}
+
+I'm a local developer who recently published "JS Grow Up" to the Google Play Store. I help businesses like yours avoid the tech headache by handling the full process — design, development, and store submission — from start to finish.
+
+I have capacity for one new local project this month. Would you be open to a quick 5-minute chat to see whether a website or app could help ${companyName} grow?
 
 Best,
 Dean Burt
@@ -66,9 +79,10 @@ deanburt1308@gmail.com`;
  * No AI — pure string replacement on {{agency_name}} and {{contact_name}}.
  */
 function buildAgencyEmail(agencyName, contactName) {
-  const subject = `Technical partnership inquiry / capacity for ${agencyName}`;
+  const greeting = contactName?.trim() ? `Hi ${contactName.trim()},` : 'Hi there,';
+  const subject  = `Technical partnership inquiry — ${agencyName}`;
 
-  const body = `Hi ${contactName},
+  const body = `${greeting}
 
 I've been following ${agencyName}'s work and love the quality of your digital projects.
 
@@ -97,8 +111,7 @@ function buildManualEmail(leadType, data) {
   if (leadType === 'digital_agency') {
     return buildAgencyEmail(data.companyName, data.ownerName);
   }
-  // Default: local_business
-  return buildLocalBusinessEmail(data.companyName, data.ownerName);
+  return buildLocalBusinessEmail(data.companyName, data.ownerName, data.websiteUrl);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -195,22 +208,22 @@ exports.createManualDraft = onCall(
   async (request) => {
     const { companyName, ownerName, toEmail, websiteUrl, source, leadType } = request.data ?? {};
 
-    // Validate required fields — same for both lead types
-    if (!companyName?.trim() || !ownerName?.trim()) {
-      throw new HttpsError('invalid-argument', 'companyName and ownerName are required.');
+    if (!companyName?.trim()) {
+      throw new HttpsError('invalid-argument', 'companyName is required.');
     }
 
     // Route to the correct template — no AI, pure string replacement
+    const safeName = ownerName?.trim() ?? '';
     const { subject, body } = buildManualEmail(
       leadType ?? 'local_business',
-      { companyName: companyName.trim(), ownerName: ownerName.trim() }
+      { companyName: companyName.trim(), ownerName: safeName }
     );
 
     // Write a Firestore record immediately
     const leadRef = await db.collection('leads').add({
       companyName:  companyName.trim(),
       websiteUrl:   websiteUrl ?? null,
-      ownerName:    ownerName.trim(),
+      ownerName:    safeName,
       ownerEmail:   toEmail ?? null,
       gmailDraftId: null,
       leadType:     leadType ?? 'local_business',
@@ -270,108 +283,99 @@ const BUSINESS_TYPES = [
   { value: 'store',             label: 'General Retail'        },
 ];
 
+// Free/amateur website builders and hosting platforms
+const WEAK_WEBSITE_PATTERNS = [
+  /\.wix\.com/i,
+  /\.weebly\.com/i,
+  /\.squarespace\.com/i,
+  /\.jimdo\.com/i,
+  /\.webnode\./i,
+  /\.moonfruit\.com/i,
+  /\.yolasite\.com/i,
+  /\.wordpress\.com/i,   // .com = free hosted, not self-hosted
+  /\.blogspot\.com/i,
+  /\.godaddysites\.com/i,
+  /\.myshopify\.com/i,   // Shopify free subdomain (no custom domain)
+  /facebook\.com/i,      // using Facebook page as website
+  /instagram\.com/i,     // using Instagram as website
+  /linktr\.ee/i,         // Linktree = no real website
+  /linkinbio/i,
+];
+
 function scoreOpportunity(place) {
   if (!place.website) return 5;
+  // No SSL — outdated site
+  if (place.website.startsWith('http://')) return 3;
+  // Free builder or social page used as website
+  if (WEAK_WEBSITE_PATTERNS.some(p => p.test(place.website))) return 3;
   return 1;
 }
 
 function opportunityLabel(place) {
   if (!place.website) return 'No Website — Prime Lead';
+  if (place.website.startsWith('http://') || WEAK_WEBSITE_PATTERNS.some(p => p.test(place.website))) {
+    return 'Weak Website — Redesign Opportunity';
+  }
   return 'Has Website — App / Upgrade Opportunity';
 }
 
-/**
- * Looks up the business owner/director via the Companies House API (UK).
- * Returns the active director's formatted name, or null if not found.
- * This is the primary owner-name source — authoritative for registered UK companies.
- */
-async function findOwnerFromCompaniesHouse(businessName) {
-  const apiKey = process.env.COMPANIES_HOUSE_KEY;
-  if (!apiKey) return null;
-
-  try {
-    // Search for the company by name
-    const searchRes = await axios.get(
-      'https://api.company-information.service.gov.uk/search/companies',
-      {
-        params:  { q: businessName, items_per_page: 3 },
-        auth:    { username: apiKey, password: '' },
-        timeout: 6_000,
-      }
-    );
-
-    const company = searchRes.data.items?.find(
-      c => c.company_status === 'active'
-    ) ?? searchRes.data.items?.[0];
-
-    if (!company?.company_number) return null;
-
-    // Fetch the active officers (directors) for that company
-    const officersRes = await axios.get(
-      `https://api.company-information.service.gov.uk/company/${company.company_number}/officers`,
-      {
-        params:  { items_per_page: 10 },
-        auth:    { username: apiKey, password: '' },
-        timeout: 6_000,
-      }
-    );
-
-    const officers = officersRes.data.items ?? [];
-
-    // Prefer active directors/members; fall back to any active officer
-    const director = officers.find(o =>
-      !o.resigned_on &&
-      ['director', 'llp-member', 'llp-designated-member', 'corporate-director'].includes(o.officer_role)
-    ) ?? officers.find(o => !o.resigned_on);
-
-    if (!director) return null;
-
-    // Companies House returns names as "SURNAME, Firstname Middlename"
-    const els = director.name_elements;
-    if (els?.forename && els?.surname) {
-      const first = els.forename.split(' ')[0];
-      const sur   = els.surname;
-      return `${cap(first)} ${cap(sur)}`;
-    }
-
-    // Fallback: parse the raw name string ("SMITH, John David" → "John Smith")
-    const parts = (director.name ?? '').split(',').map(s => s.trim());
-    if (parts.length >= 2) {
-      const surname   = cap(parts[0]);
-      const firstname = cap(parts[1].split(' ')[0]);
-      return `${firstname} ${surname}`;
-    }
-
-    return cap(director.name) || null;
-  } catch {
-    return null;
-  }
-}
-
-/** Title-cases a string ("SMITH" → "Smith", "mcdonald" → "Mcdonald") */
+/** Title-cases a word ("SMITH" → "Smith") */
 function cap(str = '') {
+  if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
 /**
- * Fallback: scrapes the business website looking for owner name signals.
- * Tries the homepage plus common About/Team/Contact sub-pages.
+ * Source 1 — parse the business name itself.
+ * A large proportion of UK small businesses are named after their owner:
+ *   "Sarah's Beauty Salon"  → "Sarah"
+ *   "Khan's Curry House"    → "Khan"
+ *   "Dean Burt Plumbing"    → "Dean Burt"
+ * Returns a first name (or full name if embedded), or null.
+ */
+function guessOwnerFromBusinessName(rawName) {
+  if (!rawName) return null;
+
+  // Normalise curly/smart apostrophes (Google Places uses U+2019 '') to straight '
+  const businessName = rawName.replace(/[‘’‚‛ʼ]/g, "'");
+
+  // "Sarah's Salon" / "Khan's Curry" / "Giuseppe's Kitchen" / "Nando's"
+  // Only the possessive pattern reliably identifies a person's name.
+  const possessive = businessName.match(/^([A-ZÀ-ÿ][a-zA-ZÀ-ÿ-]{1,18})'s?\b/);
+  if (possessive) return cap(possessive[1]);
+
+  return null;
+}
+
+/**
+ * Source 2 — scrape the business website with real Chrome headers.
+ * Tries homepage + 5 common sub-pages (About, Team, Contact…).
+ * Checks JSON-LD structured data first, then text patterns.
  * Returns null on any failure — never throws.
  */
 async function findOwnerFromWebsite(websiteUrl) {
   if (!websiteUrl) return null;
 
-  const FETCH_OPTS = {
-    timeout: 5_000,
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml',
-    },
-    maxRedirects: 3,
-    maxContentLength: 300_000,
+  const BROWSER_HEADERS = {
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+      '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-GB,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Cache-Control':   'no-cache',
   };
 
-  const base = new URL(websiteUrl).origin;
+  const FETCH_OPTS = {
+    timeout:          7_000,
+    headers:          BROWSER_HEADERS,
+    maxRedirects:     3,
+    maxContentLength: 400_000,
+  };
+
+  let base;
+  try { base = new URL(websiteUrl).origin; } catch { return null; }
+
   const pagesToTry = [
     websiteUrl,
     `${base}/about`,
@@ -382,52 +386,130 @@ async function findOwnerFromWebsite(websiteUrl) {
   ];
 
   const TEXT_PATTERNS = [
-    /\b(?:owner|proprietor|founder|director|principal|ceo|manager|established by)\b[\s:,–\-]+([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})/i,
-    /\bi['']m ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20}),?\s+(?:the\s+)?(?:owner|founder|director|creator|chef|barber|stylist)/i,
-    /\bhi,?\s+i['']m ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})/i,
-    /\bhello,?\s+i['']m ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})/i,
-    /\bmy name is ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})/i,
-    /\bwelcome[,!]?\s+i['']m ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})/i,
+    // "Owner John Smith" / "Director: Jane Doe" / "Founded by David Brown"
+    /\b(?:owner|proprietor|founder|co-founder|director|principal|ceo|established by|run by|created by)\b[\s:,–\-]+([A-Z][a-zÀ-ÿ'\-]{1,20}(?: [A-Z][a-zÀ-ÿ'\-]{1,20})?)/i,
+    // "John Smith, owner" / "Jane Doe - Founder"
+    /([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})[,\s\-–]+(?:owner|founder|director|principal|proprietor)\b/i,
+    // "I'm Jane Smith, the owner"
+    /\bi['']m ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20}),?\s+(?:the\s+)?(?:owner|founder|director|chef|stylist|barber|therapist|trainer)/i,
+    // "Hi, I'm John" / "Hello, I'm Sarah Smith"
+    /\b(?:hi|hello|hey)[,!]?\s+i['']m ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})\b/i,
+    // "My name is John Smith"
+    /\bmy name is ([A-Z][a-zÀ-ÿ'\-]{1,20} [A-Z][a-zÀ-ÿ'\-]{1,20})\b/i,
   ];
 
   for (const url of pagesToTry) {
     try {
       const res  = await axios.get(url, FETCH_OPTS);
       const html = typeof res.data === 'string' ? res.data : '';
+      if (!html) continue;
 
-      // 1. JSON-LD
+      // 1. JSON-LD structured data
       for (const [, jsonStr] of html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
         try {
           const schemas = [].concat(JSON.parse(jsonStr));
           for (const s of schemas) {
-            const name = s?.owner?.name || s?.founder?.name || (s?.['@type'] === 'Person' && s?.name) || null;
-            if (name && typeof name === 'string' && name.includes(' ')) return name.trim();
+            const name =
+              s?.owner?.name   ??
+              s?.founder?.name ??
+              (s?.['@type'] === 'Person' ? s?.name : null) ??
+              null;
+            if (name && typeof name === 'string' && name.trim().includes(' ')) {
+              return name.trim();
+            }
           }
-        } catch { /* skip */ }
+        } catch { /* malformed JSON-LD */ }
       }
 
-      // 2. Text patterns against stripped HTML
-      const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      // 2. Text patterns on stripped HTML
+      const text = html
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ');
+
       for (const pattern of TEXT_PATTERNS) {
         const m = text.match(pattern);
-        if (m?.[1]) return m[1].trim();
+        if (m?.[1] && m[1].trim().length > 3) return m[1].trim();
       }
-    } catch { /* page not found or blocked — try next */ }
+    } catch { /* page blocked or not found — try next */ }
   }
 
   return null;
 }
 
 /**
- * Master owner-name resolver.
- * Tries Companies House first (authoritative for UK), then website scraping.
+ * Source 3 — Companies House API (UK).
+ * Searches registered companies by name, then fetches their active directors.
+ * Most reliable source for any registered UK business.
  */
-async function findOwnerName(businessName, websiteUrl) {
+async function findOwnerFromCompaniesHouse(rawName) {
+  const apiKey = process.env.COMPANIES_HOUSE_KEY;
+  if (!apiKey) return null;
+
+  const businessName = rawName.replace(/[‘’‚‛ʼ]/g, "'");
+
+  try {
+    const searchRes = await axios.get(
+      'https://api.company-information.service.gov.uk/search/companies',
+      {
+        params: { q: businessName, items_per_page: 3 },
+        auth:   { username: apiKey, password: '' },
+        timeout: 3_000,
+      }
+    );
+
+    const company =
+      searchRes.data.items?.find(c => c.company_status === 'active') ??
+      searchRes.data.items?.[0];
+
+    if (!company?.company_number) return null;
+
+    const officersRes = await axios.get(
+      `https://api.company-information.service.gov.uk/company/${company.company_number}/officers`,
+      {
+        params: { items_per_page: 10 },
+        auth:   { username: apiKey, password: '' },
+        timeout: 6_000,
+      }
+    );
+
+    const officers = officersRes.data.items ?? [];
+    const director =
+      officers.find(o =>
+        !o.resigned_on &&
+        ['director', 'llp-member', 'llp-designated-member', 'corporate-director'].includes(o.officer_role)
+      ) ?? officers.find(o => !o.resigned_on);
+
+    if (!director) return null;
+
+    // Companies House returns "SURNAME, Firstname Middlename"
+    const els = director.name_elements;
+    if (els?.forename && els?.surname) {
+      return `${cap(els.forename.split(' ')[0])} ${cap(els.surname)}`;
+    }
+    const parts = (director.name ?? '').split(',').map(s => s.trim());
+    if (parts.length >= 2) {
+      return `${cap(parts[1].split(' ')[0])} ${cap(parts[0])}`;
+    }
+    return cap(director.name) || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Master owner-name resolver.
+ *   1. Business name parsing  (instant — "Sarah's Salon" → "Sarah")
+ *   2. Companies House API    (authoritative for registered UK companies)
+ * Website scraping removed — sequential page fetches caused function timeouts.
+ */
+async function findOwnerName(businessName) {
+  const guessed = guessOwnerFromBusinessName(businessName);
+  if (guessed) return { name: guessed, source: 'business name' };
+
   const chName = await findOwnerFromCompaniesHouse(businessName);
   if (chName) return { name: chName, source: 'Companies House' };
-
-  const webName = await findOwnerFromWebsite(websiteUrl);
-  if (webName) return { name: webName, source: 'website' };
 
   return null;
 }
@@ -437,13 +519,14 @@ exports.scanBusinessLeads = onCall(
     cors:           true,
     timeoutSeconds: 60,
     memory:         '512MiB',
-    secrets:        ['GOOGLE_PLACES_KEY'],
+    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY'],
   },
   async (request) => {
     const {
       location   = 'London, UK',
-      radius     = 2000,         // metres
+      radius     = 2000,
       type       = 'restaurant',
+      scanMode   = 'business',    // 'business' | 'agency'
       maxResults = 20,
     } = request.data ?? {};
 
@@ -466,22 +549,34 @@ exports.scanBusinessLeads = onCall(
       throw new HttpsError('internal', `Geocoding failed: ${err.message}`);
     }
 
-    // ── Step 2: Nearby business search ──────────────────────────────────────
+    // ── Step 2: Search for places ────────────────────────────────────────────
     let places = [];
     try {
-      const searchRes = await axios.get(
-        'https://maps.googleapis.com/maps/api/place/nearbysearch/json',
-        {
-          params: {
-            location: `${lat},${lng}`,
-            radius,
-            type,
-            key: apiKey,
-          },
-          timeout: 15_000,
-        }
-      );
-      places = (searchRes.data.results ?? []).slice(0, maxResults);
+      if (scanMode === 'agency') {
+        // Text Search finds agencies by keyword — no Places type exists for them
+        const searchRes = await axios.get(
+          'https://maps.googleapis.com/maps/api/place/textsearch/json',
+          {
+            params: {
+              query:    `digital agency ${location}`,
+              location: `${lat},${lng}`,
+              radius,
+              key:      apiKey,
+            },
+            timeout: 15_000,
+          }
+        );
+        places = (searchRes.data.results ?? []).slice(0, maxResults);
+      } else {
+        const searchRes = await axios.get(
+          'https://maps.googleapis.com/maps/api/place/nearbysearch/json',
+          {
+            params: { location: `${lat},${lng}`, radius, type, key: apiKey },
+            timeout: 15_000,
+          }
+        );
+        places = (searchRes.data.results ?? []).slice(0, maxResults);
+      }
     } catch (err) {
       throw new HttpsError('internal', `Places search failed: ${err.message}`);
     }
@@ -543,10 +638,11 @@ exports.scanBusinessLeads = onCall(
     });
 
     // ── Step 5: Resolve owner names in parallel ─────────────────────────────
-    // Cap at 15 to keep total latency under the 60s function timeout.
+    console.log('[owner] business names:', rawLeads.slice(0, 15).map(l => l.name));
     await Promise.allSettled(
       rawLeads.slice(0, 15).map(async (lead) => {
-        const result = await findOwnerName(lead.name, lead.website);
+        const result = await findOwnerName(lead.name);
+        console.log(`[owner] "${lead.name}" → ${result ? `${result.name} (${result.source})` : 'null'}`);
         lead.ownerName       = result?.name   ?? null;
         lead.ownerNameSource = result?.source ?? null;
       })
@@ -561,7 +657,7 @@ exports.scanBusinessLeads = onCall(
 
     return {
       leads,
-      meta: { location, type, radius, found: leads.length },
+      meta: { location, type, radius, scanMode, found: leads.length },
     };
   }
 );

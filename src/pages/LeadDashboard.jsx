@@ -172,11 +172,11 @@ export default function LeadDashboard() {
   // ── RSS Scout callback ────────────────────────────────────────────────────
   // Called when user clicks "Copy to Lead Form" on an RSS post.
   // Merges post data into the form, scrolls to it, and briefly highlights fields.
-  const handleCopyToForm = useCallback(({ companyName, websiteUrl, ownerName }) => {
-    setForm({ companyName, websiteUrl, ownerName });
+  const handleCopyToForm = useCallback(({ companyName, websiteUrl, ownerName, leadType: lt }) => {
+    setForm({ companyName, websiteUrl: websiteUrl ?? '', ownerName: ownerName ?? '' });
+    if (lt) setLeadType(lt);
     setFormHighlight(true);
     setAlert(null);
-    // Smooth scroll to the form section
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setTimeout(() => setFormHighlight(false), 2500);
   }, []);

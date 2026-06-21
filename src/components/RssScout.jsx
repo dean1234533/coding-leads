@@ -15,6 +15,12 @@ import { useState, useCallback } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '../firebase';
 
+// ─── Scan modes ───────────────────────────────────────────────────────────────
+const SCAN_MODES = [
+  { value: 'business', label: 'Local Business' },
+  { value: 'agency',   label: 'Digital Agency' },
+];
+
 // ─── Business type options (mirrors the backend BUSINESS_TYPES list) ──────────
 const BUSINESS_TYPES = [
   { value: 'restaurant',         label: 'Restaurants & Cafés'  },
@@ -50,6 +56,17 @@ function PrimeBadge() {
   );
 }
 
+function WeakWebBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-orange-400 ring-1 ring-inset ring-orange-500/30">
+      <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/>
+      </svg>
+      Weak Website
+    </span>
+  );
+}
+
 function HasWebBadge() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-400 ring-1 ring-inset ring-amber-500/30">
@@ -74,19 +91,21 @@ function StarRating({ rating, count }) {
 }
 
 function LeadCard({ lead, onCopy, isCopied }) {
-  const isPrime = lead.opportunityScore >= 5;
+  const score   = lead.opportunityScore;
+  const isPrime = score >= 5;
+  const isWeak  = score === 3;
 
   return (
     <div className={`flex flex-col gap-3 rounded-xl border p-4 transition ${
-      isPrime
-        ? 'border-emerald-500/30 bg-emerald-500/5'
-        : 'border-gray-800 bg-gray-900/60 hover:border-gray-700'
+      isPrime ? 'border-emerald-500/30 bg-emerald-500/5'
+      : isWeak ? 'border-orange-500/20 bg-orange-500/5'
+      : 'border-gray-800 bg-gray-900/60 hover:border-gray-700'
     }`}>
 
       {/* Badges + name */}
       <div>
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          {isPrime ? <PrimeBadge /> : <HasWebBadge />}
+          {isPrime ? <PrimeBadge /> : isWeak ? <WeakWebBadge /> : <HasWebBadge />}
           <StarRating rating={lead.rating} count={lead.reviewCount} />
         </div>
         <h3 className="font-semibold text-gray-100">{lead.name}</h3>
@@ -105,9 +124,11 @@ function LeadCard({ lead, onCopy, isCopied }) {
           <span className="font-medium text-indigo-300">{lead.ownerName}</span>
           {lead.ownerNameSource && (
             <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
-              lead.ownerNameSource === 'Companies House'
-                ? 'bg-emerald-500/10 text-emerald-500'
-                : 'bg-gray-700 text-gray-400'
+              lead.ownerNameSource === 'business name'
+                ? 'bg-violet-500/15 text-violet-400'
+                : lead.ownerNameSource === 'website'
+                  ? 'bg-gray-700 text-gray-400'
+                  : 'bg-emerald-500/10 text-emerald-500'
             }`}>
               {lead.ownerNameSource}
             </span>
@@ -206,6 +227,7 @@ function SkeletonCard() {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function RssScout({ onCopyToForm }) {
+  const [scanMode, setScanMode]   = useState('business');
   const [location, setLocation]   = useState('London, UK');
   const [type,     setType]       = useState('restaurant');
   const [radius,   setRadius]     = useState(2000);
@@ -214,7 +236,14 @@ export default function RssScout({ onCopyToForm }) {
   const [error,    setError]      = useState(null);
   const [meta,     setMeta]       = useState(null);
   const [copiedId, setCopiedId]   = useState(null);
-  const [filter,   setFilter]     = useState('all'); // 'all' | 'prime'
+  const [filter,   setFilter]     = useState('all');
+
+  function handleScanModeChange(mode) {
+    setScanMode(mode);
+    setLeads([]);
+    setMeta(null);
+    setError(null);
+  }
 
   const scan = useCallback(async () => {
     if (!location.trim()) return;
@@ -224,7 +253,7 @@ export default function RssScout({ onCopyToForm }) {
     setMeta(null);
     try {
       const fns = getFunctions(app);
-      const res = await httpsCallable(fns, 'scanBusinessLeads')({ location, type, radius });
+      const res = await httpsCallable(fns, 'scanBusinessLeads')({ location, type, radius, scanMode });
       setLeads(res.data.leads ?? []);
       setMeta(res.data.meta);
     } catch (err) {
@@ -233,13 +262,14 @@ export default function RssScout({ onCopyToForm }) {
     } finally {
       setLoading(false);
     }
-  }, [location, type, radius]);
+  }, [location, type, radius, scanMode]);
 
   function handleCopy(lead) {
     onCopyToForm({
       companyName: lead.name,
       websiteUrl:  lead.website ?? '',
       ownerName:   lead.ownerName ?? '',
+      leadType:    scanMode === 'agency' ? 'digital_agency' : 'local_business',
     });
     setCopiedId(lead.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -255,14 +285,40 @@ export default function RssScout({ onCopyToForm }) {
 
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-white">Business Lead Scout</h1>
+        <h1 className="text-xl font-bold text-white">Lead Scout</h1>
         <p className="text-xs text-gray-500">
-          Find local businesses that need a website or mobile app — sorted by opportunity.
+          {scanMode === 'agency'
+            ? 'Find digital agencies to partner with for white-label or subcontract work.'
+            : 'Find local businesses that need a website or mobile app — sorted by opportunity.'}
         </p>
+        {scanMode === 'business' && (
+          <div className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-400">
+            <span className="font-semibold">Tip for owner names:</span> scan suburbs not city centres — Hackney, Brixton, Clapham, Stoke Newington etc. return independent owner-run businesses. City centres return chains (Boots, KFC, Costa) with no findable owner.
+          </div>
+        )}
       </div>
 
       {/* Search controls */}
       <div className="rounded-xl border border-gray-800 bg-gray-900 p-4 space-y-3">
+
+        {/* Scan mode toggle */}
+        <div className="flex gap-1 rounded-xl border border-gray-800 bg-gray-950 p-1">
+          {SCAN_MODES.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => handleScanModeChange(value)}
+              className={`flex-1 rounded-lg py-2 text-xs font-semibold transition ${
+                scanMode === value
+                  ? value === 'agency'
+                    ? 'bg-violet-600 text-white'
+                    : 'bg-indigo-600 text-white'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         {/* Location */}
         <div>
@@ -277,7 +333,8 @@ export default function RssScout({ onCopyToForm }) {
           />
         </div>
 
-        {/* Type + Radius row */}
+        {/* Type + Radius row — business mode only */}
+        {scanMode === 'business' && (
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-400">Business Type</label>
@@ -304,6 +361,7 @@ export default function RssScout({ onCopyToForm }) {
             </select>
           </div>
         </div>
+        )}
 
         {/* Scan button */}
         <button
@@ -319,7 +377,7 @@ export default function RssScout({ onCopyToForm }) {
               </svg>
               Scanning businesses…
             </span>
-          ) : 'Scan for Leads'}
+          ) : scanMode === 'agency' ? 'Scan for Agencies' : 'Scan for Leads'}
         </button>
       </div>
 
