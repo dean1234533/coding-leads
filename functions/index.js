@@ -5,76 +5,70 @@ const { initializeApp }      = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { findOwnerEmail }     = require('./leadService');
 const { createGmailDraft }   = require('./gmailService');
+const Parser                 = require('rss-parser');
 
-// Initialize Firebase Admin SDK (uses Application Default Credentials in Cloud)
 initializeApp();
 const db = getFirestore();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Static Email Template
-//
-// This template is populated with the lead's details at runtime.
-// The 3-sentence structure mirrors the outreach_email_prompt.md persona:
-//   Sentence 1 — personalized opener using company name and website
-//   Sentence 2 — fixed authority/credibility line
-//   Sentence 3 — fixed low-pressure CTA
+// Template helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Fills in the static outreach email template with lead-specific values.
- *
- * @param {string} companyName
- * @param {string} websiteUrl
- * @param {string} ownerName
- * @returns {{ subject: string, body: string }}
+ * Original 3-sentence outreach template used by createOutreachDraft.
+ * Populated from website URL + company name + owner name.
  */
-function buildEmail(companyName, websiteUrl, ownerName) {
+function buildOutreachEmail(companyName, websiteUrl, ownerName) {
   const subject = `A quick idea for ${companyName}`;
-
   const body = [
     `Hi ${ownerName},`,
     '',
-    // Sentence 1 — personalized context using the submitted website URL
     `I was browsing ${companyName}'s website at ${websiteUrl} and noticed your business `
-    + `doesn't appear to have a dedicated mobile app — which likely means customers `
-    + `can't engage with you conveniently from their phones.`,
-
-    // Sentence 2 — fixed authority line (verbatim from persona brief)
+      + `doesn't appear to have a dedicated mobile app — which likely means customers `
+      + `can't engage with you conveniently from their phones.`,
     `I'm a local developer who recently published the "JS Grow Up" app to the Google `
-    + `Play Store — I help businesses avoid the tech headache by handling the entire `
-    + `process, from design and development through launch and store submission.`,
-
-    // Sentence 3 — fixed low-pressure CTA (verbatim from persona brief)
+      + `Play Store — I help businesses avoid the tech headache by handling the entire `
+      + `process, from design and development through launch and store submission.`,
     `I have capacity for one new local project this month; would you be open to a quick `
-    + `5-minute chat to see whether a mobile app could help ${companyName} grow?`,
-
+      + `5-minute chat to see whether a mobile app could help ${companyName} grow?`,
     '',
     'Dean Burt',
     'deanburt1308@gmail.com',
   ].join('\n');
+  return { subject, body };
+}
+
+/**
+ * Manual outreach template used by createManualDraft.
+ * No AI — pure string replacement on {{company_name}} and {{owner_name}}.
+ */
+function buildManualEmail(companyName, ownerName) {
+  const subject = `Question about ${companyName}`;
+
+  const body = `Hi ${ownerName},
+
+I'm a local developer who recently published "JS Grow Up," a co-parenting platform, to the Google Play Store.
+
+Having built a platform that handles sensitive user data and complex real-time needs, I specialize in helping businesses like yours avoid the "tech headache" by handling the full app lifecycle—design, code, and store submission—from start to finish.
+
+I'm looking to partner with one new local business this month. Are you open to a 5-minute chat to see if a mobile app could help ${companyName} scale?
+
+Best,
+Dean Burt
+deanburt1308@gmail.com`;
 
   return { subject, body };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Firebase Callable Function: createOutreachDraft
-//
-// Called from the frontend via httpsCallable(functions, 'createOutreachDraft').
-//
-// Flow:
-//   1. Validate inputs
-//   2. Create a Firestore lead record with status "pending"
-//   3. Look up the owner's email via Hunter.io
-//   4. Populate the static email template
-//   5. Create a Gmail Draft (never sends)
-//   6. Update Firestore record with final status and draft ID
+// Function 1: createOutreachDraft
+// Hunter.io email lookup → static template → Gmail draft → Firestore
 // ─────────────────────────────────────────────────────────────────────────────
 
 exports.createOutreachDraft = onCall(
   {
     timeoutSeconds: 60,
     memory: '256MiB',
-    // Declare secrets so Firebase injects them as process.env at runtime
     secrets: [
       'HUNTER_KEY',
       'GMAIL_CLIENT_ID',
@@ -85,19 +79,15 @@ exports.createOutreachDraft = onCall(
   async (request) => {
     const { companyName, websiteUrl, ownerName } = request.data ?? {};
 
-    // ── Step 1: Validate inputs ──────────────────────────────────────────────
     if (!companyName?.trim() || !websiteUrl?.trim() || !ownerName?.trim()) {
-      throw new HttpsError(
-        'invalid-argument',
-        'companyName, websiteUrl, and ownerName are all required.'
-      );
+      throw new HttpsError('invalid-argument', 'companyName, websiteUrl, and ownerName are required.');
     }
 
     const normalizedUrl = websiteUrl.startsWith('http')
       ? websiteUrl.trim()
       : `https://${websiteUrl.trim()}`;
 
-    // ── Step 2: Create Firestore record immediately (shown as "Pending") ─────
+    // Write immediately so the dashboard shows "Pending" right away
     const leadRef = await db.collection('leads').add({
       companyName:  companyName.trim(),
       websiteUrl:   normalizedUrl,
@@ -105,32 +95,20 @@ exports.createOutreachDraft = onCall(
       ownerEmail:   null,
       gmailDraftId: null,
       status:       'pending',
+      source:       'form',
       createdAt:    FieldValue.serverTimestamp(),
     });
 
     try {
-      // ── Step 3: Look up the owner's email via Hunter.io ───────────────────
-      // Extract the root domain from the URL (strips www. prefix)
-      const domain = new URL(normalizedUrl).hostname.replace(/^www\./, '');
+      const domain    = new URL(normalizedUrl).hostname.replace(/^www\./, '');
       const ownerEmail = await findOwnerEmail(domain, ownerName.trim());
 
-      // ── Step 4: Populate the email template ───────────────────────────────
-      const { subject, body } = buildEmail(
-        companyName.trim(),
-        normalizedUrl,
-        ownerName.trim()
+      const { subject, body } = buildOutreachEmail(
+        companyName.trim(), normalizedUrl, ownerName.trim()
       );
 
-      // ── Step 5: Create the Gmail Draft ────────────────────────────────────
-      // If no email was found, the draft is saved without a "To:" address
-      // so it can be filled in manually before sending.
-      const gmailDraftId = await createGmailDraft({
-        to: ownerEmail ?? '',
-        subject,
-        body,
-      });
+      const gmailDraftId = await createGmailDraft({ to: ownerEmail ?? '', subject, body });
 
-      // ── Step 6: Mark the lead as complete ─────────────────────────────────
       await leadRef.update({
         ownerEmail:   ownerEmail ?? null,
         gmailDraftId,
@@ -138,21 +116,140 @@ exports.createOutreachDraft = onCall(
         updatedAt:    FieldValue.serverTimestamp(),
       });
 
-      return {
-        success:      true,
-        leadId:       leadRef.id,
-        gmailDraftId,
-        emailFound:   ownerEmail !== null,
-      };
+      return { success: true, leadId: leadRef.id, gmailDraftId, emailFound: ownerEmail !== null };
     } catch (err) {
-      // On any error, mark the lead as failed in Firestore so it's visible
-      console.error('[createOutreachDraft] Error:', err.message);
-      await leadRef.update({
-        status:       'error',
-        errorMessage: err.message,
-        updatedAt:    FieldValue.serverTimestamp(),
-      });
+      console.error('[createOutreachDraft]', err.message);
+      await leadRef.update({ status: 'error', errorMessage: err.message, updatedAt: FieldValue.serverTimestamp() });
       throw new HttpsError('internal', err.message);
     }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Function 2: createManualDraft
+//
+// No AI, no email lookup. Pure template-based string replacement.
+// Accepts an optional toEmail so RSS Scout leads can include a recipient
+// if one was found in the post content.
+//
+// Flow:
+//   1. Validate companyName + ownerName
+//   2. Fill the manual template via string replacement
+//   3. Create a Gmail Draft (never sends)
+//   4. Write a Firestore lead record with source: 'rss'
+// ─────────────────────────────────────────────────────────────────────────────
+
+exports.createManualDraft = onCall(
+  {
+    timeoutSeconds: 30,
+    memory: '256MiB',
+    secrets: [
+      'GMAIL_CLIENT_ID',
+      'GMAIL_CLIENT_SECRET',
+      'GMAIL_REFRESH_TOKEN',
+    ],
+  },
+  async (request) => {
+    const { companyName, ownerName, toEmail, websiteUrl, source } = request.data ?? {};
+
+    // Validate required fields
+    if (!companyName?.trim() || !ownerName?.trim()) {
+      throw new HttpsError('invalid-argument', 'companyName and ownerName are required.');
+    }
+
+    // Build the email from the static template — no AI, no external calls
+    const { subject, body } = buildManualEmail(companyName.trim(), ownerName.trim());
+
+    // Write a Firestore record immediately
+    const leadRef = await db.collection('leads').add({
+      companyName:  companyName.trim(),
+      websiteUrl:   websiteUrl ?? null,
+      ownerName:    ownerName.trim(),
+      ownerEmail:   toEmail ?? null,
+      gmailDraftId: null,
+      status:       'pending',
+      source:       source ?? 'manual',
+      createdAt:    FieldValue.serverTimestamp(),
+    });
+
+    try {
+      // Create the Gmail draft — toEmail is optional; user can add recipient before sending
+      const gmailDraftId = await createGmailDraft({
+        to:      toEmail ?? '',
+        subject,
+        body,
+      });
+
+      await leadRef.update({
+        gmailDraftId,
+        status:    'draft_created',
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      return { success: true, leadId: leadRef.id, gmailDraftId };
+    } catch (err) {
+      console.error('[createManualDraft]', err.message);
+      await leadRef.update({ status: 'error', errorMessage: err.message, updatedAt: FieldValue.serverTimestamp() });
+      throw new HttpsError('internal', err.message);
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Function 3: fetchRssFeeds
+//
+// Fetches Reddit RSS feeds server-side to avoid browser CORS restrictions.
+// Returns a flat, sorted array of posts from r/forhire and r/smallbusiness.
+// No secrets required — Reddit RSS feeds are public.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RSS_FEEDS = [
+  { url: 'https://www.reddit.com/r/forhire/.rss',       source: 'r/forhire'       },
+  { url: 'https://www.reddit.com/r/smallbusiness/.rss', source: 'r/smallbusiness' },
+];
+
+exports.fetchRssFeeds = onCall(
+  { timeoutSeconds: 30, memory: '256MiB' },
+  async () => {
+    const parser = new Parser({
+      // Reddit requires a non-default user-agent
+      headers: { 'User-Agent': 'outreach-dashboard/1.0' },
+      customFields: { item: ['author', 'media:thumbnail'] },
+    });
+
+    // Fetch all feeds in parallel; failed feeds are skipped gracefully
+    const results = await Promise.allSettled(
+      RSS_FEEDS.map(({ url }) => parser.parseURL(url))
+    );
+
+    const items = [];
+
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.warn(`[fetchRssFeeds] ${RSS_FEEDS[index].url} failed:`, result.reason.message);
+        return;
+      }
+
+      const { source } = RSS_FEEDS[index];
+
+      result.value.items.slice(0, 15).forEach((item) => {
+        items.push({
+          id:       item.guid  ?? item.link,
+          title:    item.title ?? '(no title)',
+          link:     item.link  ?? '',
+          // Reddit puts the username in the author field
+          author:   item.author ?? item.creator ?? '',
+          // contentSnippet strips HTML; fall back to raw content
+          content:  item.contentSnippet ?? item.content ?? '',
+          pubDate:  item.pubDate ?? '',
+          source,
+        });
+      });
+    });
+
+    // Sort newest-first across both feeds
+    items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+
+    return { items };
   }
 );
