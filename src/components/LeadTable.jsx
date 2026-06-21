@@ -71,12 +71,11 @@ function formatDate(timestamp) {
 
 // Column header definitions
 const COLUMNS = [
-  { label: 'Date',         width: 'w-28' },
-  { label: 'Company',      width: 'w-40' },
-  { label: 'Owner',        width: 'w-32' },
-  { label: 'Email Found',  width: 'w-56' },
-  { label: 'Status',       width: 'w-36' },
-  { label: '',             width: 'w-10' },
+  { label: 'Date',    width: 'w-28' },
+  { label: 'Company', width: 'w-40' },
+  { label: 'Owner',   width: 'w-32' },
+  { label: 'Status',  width: 'w-36' },
+  { label: '',        width: 'w-10' },
 ];
 
 /**
@@ -161,21 +160,7 @@ export default function LeadTable({ leads, onDelete }) {
               </td>
 
               {/* Owner */}
-              <td className="px-5 py-4 text-gray-300">{lead.ownerName}</td>
-
-              {/* Email found */}
-              <td className="px-5 py-4 font-mono text-xs">
-                {lead.ownerEmail ? (
-                  <a
-                    href={`mailto:${lead.ownerEmail}`}
-                    className="text-indigo-400 transition hover:text-indigo-300"
-                  >
-                    {lead.ownerEmail}
-                  </a>
-                ) : (
-                  <span className="text-gray-600">Not found</span>
-                )}
-              </td>
+              <td className="px-5 py-4 text-gray-300">{lead.ownerName || <span className="text-gray-600">—</span>}</td>
 
               {/* Status */}
               <td className="px-5 py-4">

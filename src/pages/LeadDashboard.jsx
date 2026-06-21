@@ -238,7 +238,7 @@ export default function LeadDashboard() {
 
   const totalLeads    = leads.length;
   const draftsCreated = leads.filter((l) => l.status === 'draft_created').length;
-  const emailsFound   = leads.filter((l) => l.ownerEmail).length;
+  const errors        = leads.filter((l) => l.status === 'error').length;
 
   return (
     <div className="min-h-screen bg-gray-950 font-sans text-gray-100 antialiased">
@@ -264,7 +264,7 @@ export default function LeadDashboard() {
           {[
             { label: 'Total Leads',    value: totalLeads    },
             { label: 'Drafts Created', value: draftsCreated },
-            { label: 'Emails Found',   value: emailsFound   },
+            { label: 'Errors',         value: errors        },
           ].map(({ label, value }) => (
             <div key={label} className="rounded-xl border border-gray-800 bg-gray-900 px-5 py-4">
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">{label}</p>
