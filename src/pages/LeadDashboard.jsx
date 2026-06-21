@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, doc, deleteDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable }              from 'firebase/functions';
 import { db, app }    from '../firebase';
 import LeadTable      from '../components/LeadTable';
@@ -126,20 +126,20 @@ const EMPTY_FORM = { companyName: '', websiteUrl: '', ownerName: '' };
 // Field config per lead type — controls labels, placeholders, and which fields render
 const FORM_CONFIG = {
   local_business: {
-    badge:           { label: 'Local Business', classes: 'bg-sky-500/10 text-sky-400 ring-sky-500/20' },
-    companyLabel:    'Company Name',
+    badge:              { label: 'Local Business', classes: 'bg-sky-500/10 text-sky-400 ring-sky-500/20' },
+    companyLabel:       'Company Name',
     companyPlaceholder: 'Riverside Gym',
-    showWebsiteUrl:  true,
-    ownerLabel:      'Owner Name',
-    ownerPlaceholder: 'Marcus',
+    showWebsiteUrl:     true,
+    ownerLabel:         'Owner Name (optional)',
+    ownerPlaceholder:   'Leave blank → "Hi there,"',
   },
   digital_agency: {
-    badge:           { label: 'Agency Partner', classes: 'bg-violet-500/10 text-violet-400 ring-violet-500/20' },
-    companyLabel:    'Agency Name',
+    badge:              { label: 'Agency Partner', classes: 'bg-violet-500/10 text-violet-400 ring-violet-500/20' },
+    companyLabel:       'Agency Name',
     companyPlaceholder: 'Momentum Digital',
-    showWebsiteUrl:  false,
-    ownerLabel:      'Contact Person',
-    ownerPlaceholder: 'Sarah',
+    showWebsiteUrl:     false,
+    ownerLabel:         'Contact Person (optional)',
+    ownerPlaceholder:   'Leave blank → "Hi there,"',
   },
 };
 
@@ -181,10 +181,10 @@ export default function LeadDashboard() {
     setTimeout(() => setFormHighlight(false), 2500);
   }, []);
 
-  const field = (key) => ({
+  const field = (key, required = false) => ({
     value:     form[key],
     onChange:  (v) => setForm((p) => ({ ...p, [key]: v })),
-    required:  true,
+    required,
     highlight: formHighlight && form[key] !== '',
   });
 
@@ -211,16 +211,11 @@ export default function LeadDashboard() {
   }
 
   // ── Quick send: createManualDraft (template only, no lookup) ─────────────
-  // Sends the appropriate template based on the current leadType.
-  // Agency drafts use the partnership template; local business uses the local template.
   async function handleManualDraft(e) {
     e.preventDefault();
     const cfg = FORM_CONFIG[leadType];
-    if (!form.companyName?.trim() || !form.ownerName?.trim()) {
-      setAlert({
-        type:    'error',
-        message: `${cfg.companyLabel} and ${cfg.ownerLabel} are required.`,
-      });
+    if (!form.companyName?.trim()) {
+      setAlert({ type: 'error', message: `${cfg.companyLabel} is required.` });
       return;
     }
     setAlert(null);
@@ -235,6 +230,10 @@ export default function LeadDashboard() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleDeleteLead(leadId) {
+    await deleteDoc(doc(db, 'leads', leadId));
   }
 
   const totalLeads    = leads.length;
@@ -305,89 +304,57 @@ export default function LeadDashboard() {
               <LeadTypeSelect value={leadType} onChange={handleLeadTypeChange} />
             </div>
 
-            {/* ── Row 2: Fields change based on selected lead type ── */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {/* ── Row 2: Fields ── */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
-              {/* Company Name / Agency Name */}
+              {/* Company Name / Agency Name — only required field */}
               <FormField
                 id="companyName"
                 label={FORM_CONFIG[leadType].companyLabel}
                 placeholder={FORM_CONFIG[leadType].companyPlaceholder}
-                {...field('companyName')}
+                {...field('companyName', true)}
               />
 
-              {/* Website URL — only shown for Local Business */}
+              {/* Website URL — optional, shown for Local Business only */}
               {FORM_CONFIG[leadType].showWebsiteUrl && (
                 <FormField
                   id="websiteUrl"
-                  label="Website URL"
+                  label="Website URL (optional)"
                   type="url"
                   placeholder="https://example.com"
                   {...field('websiteUrl')}
                 />
               )}
 
-              {/* Owner Name / Contact Person */}
-              <FormField
-                id="ownerName"
-                label={FORM_CONFIG[leadType].ownerLabel}
-                placeholder={FORM_CONFIG[leadType].ownerPlaceholder}
-                {...field('ownerName')}
-              />
+              {/* Owner name is passed silently from the Lead Scout when found.
+                  Not shown in the form — email falls back to "Hi there," automatically. */}
             </div>
 
             {alert && <Alert type={alert.type} message={alert.message} onDismiss={() => setAlert(null)} />}
 
-            {/* ── Submit buttons ── */}
+            {/* ── Submit button ── */}
             <div className="flex flex-wrap items-center gap-3">
-
-              {/* Generate Draft: Hunter.io lookup — only available for Local Business
-                  (agencies don't have a domain to look up against) */}
-              {leadType === 'local_business' && (
-                <button
-                  type="submit"
-                  onClick={handleSubmit}
-                  disabled={loading}
-                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:cursor-not-allowed disabled:bg-indigo-900 disabled:text-indigo-500"
-                >
-                  {loading && (
+              <button
+                type="button"
+                onClick={handleManualDraft}
+                disabled={loading || !form.companyName.trim()}
+                className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-40 ${
+                  leadType === 'digital_agency'
+                    ? 'bg-violet-600 hover:bg-violet-500 focus:ring-violet-500'
+                    : 'bg-indigo-600 hover:bg-indigo-500 focus:ring-indigo-500'
+                }`}
+              >
+                {loading ? (
+                  <>
                     <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                     </svg>
-                  )}
-                  {loading ? 'Working...' : 'Generate Draft'}
-                </button>
-              )}
-
-              {/* Manual Draft: template only, works for both lead types */}
-              <button
-                type="button"
-                onClick={handleManualDraft}
-                disabled={loading}
-                className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-40 ${
-                  leadType === 'digital_agency'
-                    // Primary button for agency mode (only option available)
-                    ? 'bg-violet-600 text-white hover:bg-violet-500 focus:ring-violet-500'
-                    // Secondary button for local business mode
-                    : 'border border-gray-700 text-gray-300 hover:border-gray-600 hover:text-gray-100 focus:ring-gray-500'
-                }`}
-              >
-                {loading && leadType === 'digital_agency' && (
-                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                )}
-                {leadType === 'digital_agency' ? 'Send Partnership Draft' : 'Manual Draft'}
+                    Creating…
+                  </>
+                ) : 'Create Draft in Gmail'}
               </button>
-
-              <p className="text-xs text-gray-600">
-                {leadType === 'digital_agency'
-                  ? 'Partnership template · no email lookup · Gmail draft only'
-                  : 'Generate Draft = Hunter.io lookup · Manual Draft = template only'
-                }
-              </p>
+              <p className="text-xs text-gray-600">Saves to Gmail drafts — never auto-sends</p>
             </div>
           </form>
         </section>
@@ -403,7 +370,7 @@ export default function LeadDashboard() {
               {totalLeads} {totalLeads === 1 ? 'lead' : 'leads'}
             </span>
           </div>
-          <LeadTable leads={leads} />
+          <LeadTable leads={leads} onDelete={handleDeleteLead} />
         </section>
 
       </main>

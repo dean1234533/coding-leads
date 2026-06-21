@@ -76,6 +76,7 @@ const COLUMNS = [
   { label: 'Owner',        width: 'w-32' },
   { label: 'Email Found',  width: 'w-56' },
   { label: 'Status',       width: 'w-36' },
+  { label: '',             width: 'w-10' },
 ];
 
 /**
@@ -111,7 +112,7 @@ function EmptyState() {
  *
  * @param {{ leads: Array<object> }} props
  */
-export default function LeadTable({ leads }) {
+export default function LeadTable({ leads, onDelete }) {
   if (leads.length === 0) return <EmptyState />;
 
   return (
@@ -179,6 +180,20 @@ export default function LeadTable({ leads }) {
               {/* Status */}
               <td className="px-5 py-4">
                 <StatusBadge status={lead.status} />
+              </td>
+
+              {/* Delete */}
+              <td className="px-3 py-4 text-right">
+                <button
+                  onClick={() => onDelete(lead.id)}
+                  aria-label="Delete lead"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-red-400"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
+                  </svg>
+                </button>
               </td>
             </tr>
           ))}
