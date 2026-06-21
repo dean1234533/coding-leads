@@ -107,8 +107,9 @@ function buildManualEmail(leadType, data) {
 
 exports.createOutreachDraft = onCall(
   {
+    cors:          true,
     timeoutSeconds: 60,
-    memory: '256MiB',
+    memory:        '256MiB',
     secrets: [
       'HUNTER_KEY',
       'GMAIL_CLIENT_ID',
@@ -181,8 +182,9 @@ exports.createOutreachDraft = onCall(
 
 exports.createManualDraft = onCall(
   {
+    cors:          true,
     timeoutSeconds: 30,
-    memory: '256MiB',
+    memory:        '256MiB',
     secrets: [
       'GMAIL_CLIENT_ID',
       'GMAIL_CLIENT_SECRET',
@@ -253,7 +255,7 @@ const RSS_FEEDS = [
 ];
 
 exports.fetchRssFeeds = onCall(
-  { timeoutSeconds: 30, memory: '256MiB' },
+  { cors: true, timeoutSeconds: 30, memory: '256MiB' },
   async () => {
     const parser = new Parser({
       // Reddit requires a non-default user-agent
