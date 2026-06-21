@@ -1,11 +1,12 @@
 /**
  * RssScout
  *
- * Fetches the latest posts from r/forhire and r/smallbusiness via a Firebase
- * Cloud Function (which handles Reddit's CORS restrictions server-side).
+ * Finds potential business clients by scanning subreddits where business
+ * owners and entrepreneurs post about their needs (r/smallbusiness,
+ * r/Entrepreneur, r/startups, r/ecommerce, r/forhire [Hiring only]).
  *
- * Each post card includes a "Copy to Lead Form" button that pre-fills the
- * parent LeadDashboard form with best-effort extracted data from the post.
+ * Posts are scored for relevance to mobile/web app development services and
+ * sorted highest-relevance first. "Hot lead" badges flag the best matches.
  *
  * Props:
  *   onCopyToForm({ companyName, websiteUrl, ownerName }) — called when the
@@ -47,6 +48,9 @@ function SourceBadge({ source }) {
   const styles = {
     'r/forhire':       'bg-violet-500/10 text-violet-400 ring-violet-500/20',
     'r/smallbusiness': 'bg-sky-500/10 text-sky-400 ring-sky-500/20',
+    'r/Entrepreneur':  'bg-orange-500/10 text-orange-400 ring-orange-500/20',
+    'r/startups':      'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20',
+    'r/ecommerce':     'bg-pink-500/10 text-pink-400 ring-pink-500/20',
   };
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1 ring-inset ${styles[source] ?? 'bg-gray-500/10 text-gray-400 ring-gray-500/20'}`}>
@@ -55,18 +59,34 @@ function SourceBadge({ source }) {
   );
 }
 
+/** Hot lead badge shown when relevanceScore >= 2 */
+function HotBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-inset ring-amber-500/25">
+      <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M11.983 1.907a.75.75 0 00-1.292-.657l-8.5 9.5A.75.75 0 002.75 12h6.572l-1.305 6.093a.75.75 0 001.292.657l8.5-9.5A.75.75 0 0017.25 8h-6.572l1.305-6.093z" />
+      </svg>
+      Hot Lead
+    </span>
+  );
+}
+
 /** Single post card */
 function PostCard({ post, onCopy, isCopied }) {
   const excerpt = post.content?.slice(0, 180).trim();
+  const isHot = (post.relevanceScore ?? 0) >= 2;
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-gray-800 bg-gray-900/60 p-4 transition hover:border-gray-700">
+    <div className={`flex flex-col gap-3 rounded-xl border p-4 transition hover:border-gray-700 ${
+      isHot ? 'border-amber-500/30 bg-amber-500/5' : 'border-gray-800 bg-gray-900/60'
+    }`}>
 
       {/* Header row */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
             <SourceBadge source={post.source} />
+            {isHot && <HotBadge />}
             {post.author && (
               <span className="text-xs text-gray-500">u/{post.author}</span>
             )}
@@ -163,7 +183,7 @@ export default function RssScout({ onCopyToForm }) {
   const [error,   setError]   = useState(null);
   // Track which post was most recently copied (by post ID) for button feedback
   const [copiedId, setCopiedId] = useState(null);
-  // Active filter: 'all' | 'r/forhire' | 'r/smallbusiness'
+  // Active filter: 'all' | 'hot' | source name
   const [filter, setFilter] = useState('all');
 
   // Extracted so it can be called on mount AND by the Refresh button
@@ -204,7 +224,9 @@ export default function RssScout({ onCopyToForm }) {
 
   const filteredPosts = filter === 'all'
     ? posts
-    : posts.filter(p => p.source === filter);
+    : filter === 'hot'
+      ? posts.filter(p => (p.relevanceScore ?? 0) >= 2)
+      : posts.filter(p => p.source === filter);
 
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900">
@@ -212,9 +234,9 @@ export default function RssScout({ onCopyToForm }) {
       {/* ── Section header ── */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 px-6 py-4">
         <div>
-          <h2 className="text-sm font-semibold text-gray-200">RSS Lead Scout</h2>
+          <h2 className="text-sm font-semibold text-gray-200">Lead Scout</h2>
           <p className="mt-0.5 text-xs text-gray-500">
-            Live posts from r/forhire and r/smallbusiness. Click a card to pre-fill the form.
+            Business owners &amp; entrepreneurs posting about app/tech needs — sorted by relevance.
           </p>
         </div>
 
@@ -236,19 +258,27 @@ export default function RssScout({ onCopyToForm }) {
             {loading ? 'Loading...' : 'Refresh'}
           </button>
 
-          {/* Source filter tabs */}
+          {/* Filter tabs */}
           <div className="flex items-center gap-1 rounded-lg border border-gray-800 bg-gray-950 p-1">
-            {['all', 'r/forhire', 'r/smallbusiness'].map((f) => (
+            {[
+              { key: 'all',              label: 'All'              },
+              { key: 'hot',              label: 'Hot Leads'        },
+              { key: 'r/smallbusiness',  label: 'Small Biz'       },
+              { key: 'r/Entrepreneur',   label: 'Entrepreneur'     },
+              { key: 'r/startups',       label: 'Startups'         },
+              { key: 'r/ecommerce',      label: 'eCommerce'        },
+              { key: 'r/forhire',        label: 'For Hire'         },
+            ].map(({ key, label }) => (
               <button
-                key={f}
-                onClick={() => setFilter(f)}
+                key={key}
+                onClick={() => setFilter(key)}
                 className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-                  filter === f
+                  filter === key
                     ? 'bg-gray-800 text-gray-100'
                     : 'text-gray-500 hover:text-gray-300'
                 }`}
               >
-                {f === 'all' ? 'All' : f}
+                {label}
               </button>
             ))}
           </div>
@@ -277,8 +307,13 @@ export default function RssScout({ onCopyToForm }) {
 
         {/* Empty state */}
         {!loading && !error && filteredPosts.length === 0 && (
-          <div className="py-12 text-center text-sm text-gray-600">
-            No posts found for this filter.
+          <div className="py-12 text-center">
+            <p className="text-sm text-gray-500">No leads found for this filter.</p>
+            <p className="mt-1 text-xs text-gray-600">
+              {filter === 'hot'
+                ? 'No high-relevance posts right now — check back later or browse All.'
+                : 'Try switching to All or refreshing.'}
+            </p>
           </div>
         )}
 

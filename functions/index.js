@@ -5,6 +5,7 @@ const { initializeApp }      = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { findOwnerEmail }     = require('./leadService');
 const { createGmailDraft }   = require('./gmailService');
+const axios                  = require('axios');
 const Parser                 = require('rss-parser');
 
 initializeApp();
@@ -244,31 +245,52 @@ exports.createManualDraft = onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 // Function 3: fetchRssFeeds
 //
-// Fetches Reddit RSS feeds server-side to avoid browser CORS restrictions.
-// Returns a flat, sorted array of posts from r/forhire and r/smallbusiness.
-// No secrets required — Reddit RSS feeds are public.
+// Fetches Reddit posts server-side to find potential business clients.
+// Targets subreddits where business owners/entrepreneurs post about their needs.
+// Scores each post for relevance to mobile/web app development services.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Reddit subreddits to pull leads from
 const SUBREDDITS = [
-  { sub: 'forhire',       source: 'r/forhire'       },
-  { sub: 'smallbusiness', source: 'r/smallbusiness' },
+  { sub: 'smallbusiness', source: 'r/smallbusiness', hiringOnly: false },
+  { sub: 'Entrepreneur',  source: 'r/Entrepreneur',  hiringOnly: false },
+  { sub: 'startups',      source: 'r/startups',      hiringOnly: false },
+  { sub: 'ecommerce',     source: 'r/ecommerce',     hiringOnly: false },
+  // r/forhire: only keep [Hiring] posts — the [For Hire] ones are competitors
+  { sub: 'forhire',       source: 'r/forhire',       hiringOnly: true  },
 ];
 
+// Keywords that suggest a business owner needs dev/app/tech work
+const TECH_KEYWORDS = [
+  'app', 'mobile app', 'ios', 'android', 'website', 'web app',
+  'software', 'developer', 'development', 'tech', 'digital',
+  'platform', 'automation', 'ecommerce', 'e-commerce', 'online store',
+  'booking', 'dashboard', 'saas', 'mvp', 'build', 'integrate',
+];
+
+// Keywords that suggest the poster IS a freelancer advertising — skip these
+const SKIP_KEYWORDS = [
+  '[for hire]', 'for hire]', 'available for', 'available immediately',
+  'i am a developer', "i'm a developer", 'hire me', 'my portfolio',
+];
+
+function scorePost(title, content) {
+  const text = `${title} ${content}`.toLowerCase();
+  // Skip freelancer ads
+  if (SKIP_KEYWORDS.some(kw => text.includes(kw))) return -1;
+  return TECH_KEYWORDS.reduce((n, kw) => n + (text.includes(kw) ? 1 : 0), 0);
+}
+
 exports.fetchRssFeeds = onCall(
-  { cors: true, timeoutSeconds: 30, memory: '256MiB' },
+  { cors: true, timeoutSeconds: 45, memory: '256MiB' },
   async () => {
-    // Reddit's JSON API is more reliable than RSS from a server environment.
-    // User-agent must follow Reddit's required format or requests return 429/403.
     const headers = {
       'User-Agent': 'outreach-dashboard/1.0 (by /u/outreach_bot)',
       'Accept': 'application/json',
     };
 
-    // Fetch all subreddits in parallel; failed ones are skipped gracefully
     const results = await Promise.allSettled(
       SUBREDDITS.map(({ sub }) =>
-        axios.get(`https://www.reddit.com/r/${sub}/new.json?limit=15`, { headers, timeout: 10_000 })
+        axios.get(`https://www.reddit.com/r/${sub}/new.json?limit=25`, { headers, timeout: 12_000 })
       )
     );
 
@@ -280,24 +302,40 @@ exports.fetchRssFeeds = onCall(
         return;
       }
 
-      const { source } = SUBREDDITS[index];
+      const { source, hiringOnly } = SUBREDDITS[index];
       const posts = result.value.data?.data?.children ?? [];
 
       posts.forEach(({ data: post }) => {
+        const title = post.title ?? '(no title)';
+
+        // For r/forhire, skip anything that isn't a [Hiring] post
+        if (hiringOnly && !/^\[hiring\]/i.test(title.trim())) return;
+
+        const content = post.selftext?.slice(0, 400) ?? '';
+        const relevanceScore = scorePost(title, content);
+
+        // Skip confirmed freelancer ads
+        if (relevanceScore < 0) return;
+
         items.push({
-          id:      post.id,
-          title:   post.title   ?? '(no title)',
-          link:    `https://www.reddit.com${post.permalink}`,
-          author:  post.author  ?? '',
-          content: post.selftext?.slice(0, 300) ?? '',
-          pubDate: new Date(post.created_utc * 1000).toISOString(),
+          id:             post.id,
+          title,
+          link:           `https://www.reddit.com${post.permalink}`,
+          author:         post.author ?? '',
+          content:        content.slice(0, 300),
+          pubDate:        new Date(post.created_utc * 1000).toISOString(),
           source,
+          relevanceScore,
         });
       });
     });
 
-    // Sort newest-first across both feeds
-    items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+    // Sort: high-relevance first, then by recency
+    items.sort((a, b) =>
+      b.relevanceScore !== a.relevanceScore
+        ? b.relevanceScore - a.relevanceScore
+        : new Date(b.pubDate) - new Date(a.pubDate)
+    );
 
     return { items };
   }
