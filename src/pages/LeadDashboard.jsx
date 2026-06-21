@@ -71,12 +71,81 @@ function Alert({ type, message, onDismiss }) {
   );
 }
 
+// ─── Lead Type dropdown ───────────────────────────────────────────────────────
+
+// All supported lead types. Add new entries here to extend the dropdown.
+const LEAD_TYPES = [
+  { value: 'local_business', label: 'Local Business' },
+  { value: 'digital_agency', label: 'Digital Agency' },
+];
+
+/**
+ * Styled dropdown for selecting the outreach mode.
+ * Visually distinct from the text inputs to signal it controls the form shape.
+ */
+function LeadTypeSelect({ value, onChange }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="leadType" className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">
+        Lead Type
+      </label>
+      <div className="relative">
+        <select
+          id="leadType"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="
+            w-full appearance-none rounded-lg border border-gray-700 bg-gray-800/50
+            px-3.5 py-2.5 pr-9 text-sm text-gray-100 transition
+            focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500
+            hover:border-gray-600 cursor-pointer
+          "
+        >
+          {LEAD_TYPES.map(({ value: v, label }) => (
+            <option key={v} value={v} className="bg-gray-900">
+              {label}
+            </option>
+          ))}
+        </select>
+        {/* Chevron icon */}
+        <svg
+          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main dashboard ───────────────────────────────────────────────────────────
 
 const EMPTY_FORM = { companyName: '', websiteUrl: '', ownerName: '' };
 
+// Field config per lead type — controls labels, placeholders, and which fields render
+const FORM_CONFIG = {
+  local_business: {
+    badge:           { label: 'Local Business', classes: 'bg-sky-500/10 text-sky-400 ring-sky-500/20' },
+    companyLabel:    'Company Name',
+    companyPlaceholder: 'Riverside Gym',
+    showWebsiteUrl:  true,
+    ownerLabel:      'Owner Name',
+    ownerPlaceholder: 'Marcus',
+  },
+  digital_agency: {
+    badge:           { label: 'Agency Partner', classes: 'bg-violet-500/10 text-violet-400 ring-violet-500/20' },
+    companyLabel:    'Agency Name',
+    companyPlaceholder: 'Momentum Digital',
+    showWebsiteUrl:  false,
+    ownerLabel:      'Contact Person',
+    ownerPlaceholder: 'Sarah',
+  },
+};
+
 export default function LeadDashboard() {
   const [form,      setForm]      = useState(EMPTY_FORM);
+  const [leadType,  setLeadType]  = useState('local_business');
   const [leads,     setLeads]     = useState([]);
   const [loading,   setLoading]   = useState(false);
   const [alert,     setAlert]     = useState(null);
@@ -84,6 +153,13 @@ export default function LeadDashboard() {
   const [formHighlight, setFormHighlight] = useState(false);
   // Ref for scrolling the form into view when RSS Scout copies a post
   const formRef = useRef(null);
+
+  // Clear the form and alert when the lead type changes
+  function handleLeadTypeChange(newType) {
+    setLeadType(newType);
+    setForm(EMPTY_FORM);
+    setAlert(null);
+  }
 
   // ── Real-time Firestore listener ─────────────────────────────────────────
   useEffect(() => {
@@ -135,20 +211,24 @@ export default function LeadDashboard() {
   }
 
   // ── Quick send: createManualDraft (template only, no lookup) ─────────────
-  // Available as an alternative submit — useful for RSS Scout leads where
-  // we already have the owner name but no website to look up.
+  // Sends the appropriate template based on the current leadType.
+  // Agency drafts use the partnership template; local business uses the local template.
   async function handleManualDraft(e) {
     e.preventDefault();
+    const cfg = FORM_CONFIG[leadType];
     if (!form.companyName?.trim() || !form.ownerName?.trim()) {
-      setAlert({ type: 'error', message: 'Company Name and Owner Name are required for a manual draft.' });
+      setAlert({
+        type:    'error',
+        message: `${cfg.companyLabel} and ${cfg.ownerLabel} are required.`,
+      });
       return;
     }
     setAlert(null);
     setLoading(true);
     try {
       const fn = httpsCallable(getFunctions(app), 'createManualDraft');
-      await fn({ ...form, source: 'rss' });
-      setAlert({ type: 'success', message: 'Manual draft saved to Gmail.' });
+      await fn({ ...form, leadType, source: leadType === 'digital_agency' ? 'agency' : 'manual' });
+      setAlert({ type: 'success', message: `${cfg.badge.label} draft saved to Gmail.` });
       setForm(EMPTY_FORM);
     } catch (err) {
       setAlert({ type: 'error', message: err?.message ?? 'Something went wrong.' });
@@ -203,51 +283,110 @@ export default function LeadDashboard() {
 
         {/* ── Lead form ── */}
         <section ref={formRef} className="rounded-xl border border-gray-800 bg-gray-900 scroll-mt-24">
-          <div className="border-b border-gray-800 px-6 py-4">
-            <h2 className="text-sm font-semibold text-gray-200">New Lead</h2>
-            <p className="mt-0.5 text-xs text-gray-500">
-              Fill in manually or copy from the RSS Scout above.
-              <span className="ml-1 text-gray-600">· "Generate Draft" looks up their email · "Manual Draft" uses a template only</span>
-            </p>
+
+          {/* Header with active mode badge */}
+          <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-200">New Lead</h2>
+              <p className="mt-0.5 text-xs text-gray-500">
+                Fill in manually or copy from the RSS Scout above.
+              </p>
+            </div>
+            {/* Shows which mode is currently active */}
+            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${FORM_CONFIG[leadType].badge.classes}`}>
+              {FORM_CONFIG[leadType].badge.label}
+            </span>
           </div>
 
           <form className="p-6 space-y-5">
+
+            {/* ── Row 1: Lead Type selector (always visible, full width on mobile) ── */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <FormField id="companyName" label="Company Name" placeholder="Riverside Gym"          {...field('companyName')} />
-              <FormField id="websiteUrl"  label="Website URL"  placeholder="https://example.com" type="url" {...field('websiteUrl')} />
-              <FormField id="ownerName"   label="Owner Name"   placeholder="Marcus"               {...field('ownerName')} />
+              <LeadTypeSelect value={leadType} onChange={handleLeadTypeChange} />
+            </div>
+
+            {/* ── Row 2: Fields change based on selected lead type ── */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+
+              {/* Company Name / Agency Name */}
+              <FormField
+                id="companyName"
+                label={FORM_CONFIG[leadType].companyLabel}
+                placeholder={FORM_CONFIG[leadType].companyPlaceholder}
+                {...field('companyName')}
+              />
+
+              {/* Website URL — only shown for Local Business */}
+              {FORM_CONFIG[leadType].showWebsiteUrl && (
+                <FormField
+                  id="websiteUrl"
+                  label="Website URL"
+                  type="url"
+                  placeholder="https://example.com"
+                  {...field('websiteUrl')}
+                />
+              )}
+
+              {/* Owner Name / Contact Person */}
+              <FormField
+                id="ownerName"
+                label={FORM_CONFIG[leadType].ownerLabel}
+                placeholder={FORM_CONFIG[leadType].ownerPlaceholder}
+                {...field('ownerName')}
+              />
             </div>
 
             {alert && <Alert type={alert.type} message={alert.message} onDismiss={() => setAlert(null)} />}
 
-            {/* Two submit buttons: full lookup vs. quick manual template */}
+            {/* ── Submit buttons ── */}
             <div className="flex flex-wrap items-center gap-3">
+
+              {/* Generate Draft: Hunter.io lookup — only available for Local Business
+                  (agencies don't have a domain to look up against) */}
+              {leadType === 'local_business' && (
+                <button
+                  type="submit"
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:cursor-not-allowed disabled:bg-indigo-900 disabled:text-indigo-500"
+                >
+                  {loading && (
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                  )}
+                  {loading ? 'Working...' : 'Generate Draft'}
+                </button>
+              )}
+
+              {/* Manual Draft: template only, works for both lead types */}
               <button
-                type="submit"
-                onClick={handleSubmit}
+                type="button"
+                onClick={handleManualDraft}
                 disabled={loading}
-                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:cursor-not-allowed disabled:bg-indigo-900 disabled:text-indigo-500"
+                className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-40 ${
+                  leadType === 'digital_agency'
+                    // Primary button for agency mode (only option available)
+                    ? 'bg-violet-600 text-white hover:bg-violet-500 focus:ring-violet-500'
+                    // Secondary button for local business mode
+                    : 'border border-gray-700 text-gray-300 hover:border-gray-600 hover:text-gray-100 focus:ring-gray-500'
+                }`}
               >
-                {loading && (
+                {loading && leadType === 'digital_agency' && (
                   <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                   </svg>
                 )}
-                {loading ? 'Working...' : 'Generate Draft'}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleManualDraft}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-700 px-5 py-2.5 text-sm font-medium text-gray-300 transition hover:border-gray-600 hover:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Manual Draft
+                {leadType === 'digital_agency' ? 'Send Partnership Draft' : 'Manual Draft'}
               </button>
 
               <p className="text-xs text-gray-600">
-                Generate Draft = Hunter.io lookup · Manual Draft = template only, instant
+                {leadType === 'digital_agency'
+                  ? 'Partnership template · no email lookup · Gmail draft only'
+                  : 'Generate Draft = Hunter.io lookup · Manual Draft = template only'
+                }
               </p>
             </div>
           </form>

@@ -39,10 +39,10 @@ function buildOutreachEmail(companyName, websiteUrl, ownerName) {
 }
 
 /**
- * Manual outreach template used by createManualDraft.
+ * Local Business manual template — used when leadType === 'local_business'.
  * No AI — pure string replacement on {{company_name}} and {{owner_name}}.
  */
-function buildManualEmail(companyName, ownerName) {
+function buildLocalBusinessEmail(companyName, ownerName) {
   const subject = `Question about ${companyName}`;
 
   const body = `Hi ${ownerName},
@@ -58,6 +58,46 @@ Dean Burt
 deanburt1308@gmail.com`;
 
   return { subject, body };
+}
+
+/**
+ * Digital Agency partner template — used when leadType === 'digital_agency'.
+ * No AI — pure string replacement on {{agency_name}} and {{contact_name}}.
+ */
+function buildAgencyEmail(agencyName, contactName) {
+  const subject = `Technical partnership inquiry / capacity for ${agencyName}`;
+
+  const body = `Hi ${contactName},
+
+I've been following ${agencyName}'s work and love the quality of your digital projects.
+
+I'm a full-stack developer who recently published "JS Grow Up" (a co-parenting app) to the Google Play Store. I specialize in the full development lifecycle—from design and code to store submission—and I'm looking to partner with a few select agencies that need reliable, back-office technical capacity.
+
+If you ever have a client project requiring app or dashboard development that falls outside your current bandwidth, I'd love to be a reliable resource you can lean on.
+
+Are you open to a brief chat to see if we could be a fit for future overflow work?
+
+Best,
+Dean Burt
+deanburt1308@gmail.com`;
+
+  return { subject, body };
+}
+
+/**
+ * Routes to the correct template based on leadType.
+ * Keeps template selection in one place — add new lead types here.
+ *
+ * @param {'local_business'|'digital_agency'} leadType
+ * @param {object} data  — companyName/agencyName, ownerName/contactName
+ * @returns {{ subject: string, body: string }}
+ */
+function buildManualEmail(leadType, data) {
+  if (leadType === 'digital_agency') {
+    return buildAgencyEmail(data.companyName, data.ownerName);
+  }
+  // Default: local_business
+  return buildLocalBusinessEmail(data.companyName, data.ownerName);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,15 +168,15 @@ exports.createOutreachDraft = onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 // Function 2: createManualDraft
 //
-// No AI, no email lookup. Pure template-based string replacement.
-// Accepts an optional toEmail so RSS Scout leads can include a recipient
-// if one was found in the post content.
+// No AI, no email lookup. Routes to the correct static template based on
+// leadType ('local_business' | 'digital_agency') and performs pure string
+// replacement. Always creates a Gmail Draft — never sends.
 //
 // Flow:
 //   1. Validate companyName + ownerName
-//   2. Fill the manual template via string replacement
+//   2. Route to the correct template via buildManualEmail(leadType, data)
 //   3. Create a Gmail Draft (never sends)
-//   4. Write a Firestore lead record with source: 'rss'
+//   4. Write a Firestore lead record with leadType + source tracking
 // ─────────────────────────────────────────────────────────────────────────────
 
 exports.createManualDraft = onCall(
@@ -150,15 +190,18 @@ exports.createManualDraft = onCall(
     ],
   },
   async (request) => {
-    const { companyName, ownerName, toEmail, websiteUrl, source } = request.data ?? {};
+    const { companyName, ownerName, toEmail, websiteUrl, source, leadType } = request.data ?? {};
 
-    // Validate required fields
+    // Validate required fields — same for both lead types
     if (!companyName?.trim() || !ownerName?.trim()) {
       throw new HttpsError('invalid-argument', 'companyName and ownerName are required.');
     }
 
-    // Build the email from the static template — no AI, no external calls
-    const { subject, body } = buildManualEmail(companyName.trim(), ownerName.trim());
+    // Route to the correct template — no AI, pure string replacement
+    const { subject, body } = buildManualEmail(
+      leadType ?? 'local_business',
+      { companyName: companyName.trim(), ownerName: ownerName.trim() }
+    );
 
     // Write a Firestore record immediately
     const leadRef = await db.collection('leads').add({
@@ -167,6 +210,7 @@ exports.createManualDraft = onCall(
       ownerName:    ownerName.trim(),
       ownerEmail:   toEmail ?? null,
       gmailDraftId: null,
+      leadType:     leadType ?? 'local_business',
       status:       'pending',
       source:       source ?? 'manual',
       createdAt:    FieldValue.serverTimestamp(),
