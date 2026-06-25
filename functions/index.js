@@ -498,6 +498,29 @@ async function findOwnerFromCompaniesHouse(rawName) {
   }
 }
 
+// Emails that are useless for outreach
+const IGNORED_EMAIL_PREFIXES = ['noreply', 'no-reply', 'donotreply', 'support', 'privacy', 'legal', 'abuse', 'webmaster', 'postmaster'];
+
+/**
+ * Scrapes the homepage for mailto: links and returns the first useful contact email.
+ * Single request, 3s timeout — fast enough to run in parallel with owner name lookup.
+ */
+async function findContactEmail(website) {
+  if (!website) return null;
+  try {
+    const res  = await axios.get(website, { timeout: 3_000, headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 3 });
+    const html = typeof res.data === 'string' ? res.data : '';
+    const matches = [...html.matchAll(/mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/gi)];
+    for (const [, email] of matches) {
+      const prefix = email.split('@')[0].toLowerCase();
+      if (!IGNORED_EMAIL_PREFIXES.some(p => prefix.startsWith(p))) return email.toLowerCase();
+    }
+    // Fall back to first email even if generic
+    if (matches.length > 0) return matches[0][1].toLowerCase();
+  } catch { /* site blocked or unreachable */ }
+  return null;
+}
+
 /**
  * Master owner-name resolver.
  *   1. Business name parsing  (instant — "Sarah's Salon" → "Sarah")
@@ -633,18 +656,23 @@ exports.scanBusinessLeads = onCall(
         hasWebsite,
         opportunityScore: scoreOpportunity(d),
         opportunityLabel: opportunityLabel(d),
-        ownerName:        null, // populated in Step 5
+        ownerName:        null,
+        contactEmail:     null,
       };
     });
 
-    // ── Step 5: Resolve owner names in parallel ─────────────────────────────
+    // ── Step 5: Resolve owner names + contact emails in parallel ───────────
     console.log('[owner] business names:', rawLeads.slice(0, 15).map(l => l.name));
     await Promise.allSettled(
       rawLeads.slice(0, 15).map(async (lead) => {
-        const result = await findOwnerName(lead.name);
-        console.log(`[owner] "${lead.name}" → ${result ? `${result.name} (${result.source})` : 'null'}`);
-        lead.ownerName       = result?.name   ?? null;
-        lead.ownerNameSource = result?.source ?? null;
+        const [ownerResult, email] = await Promise.all([
+          findOwnerName(lead.name),
+          findContactEmail(lead.website),
+        ]);
+        console.log(`[owner] "${lead.name}" → ${ownerResult ? `${ownerResult.name} (${ownerResult.source})` : 'null'} | email: ${email ?? 'none'}`);
+        lead.ownerName       = ownerResult?.name   ?? null;
+        lead.ownerNameSource = ownerResult?.source ?? null;
+        lead.contactEmail    = email ?? null;
       })
     );
 

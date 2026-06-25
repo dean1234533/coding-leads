@@ -144,7 +144,7 @@ function LeadCard({ lead, onCopy, isCopied }) {
         </div>
       )}
 
-      {/* Website / phone row */}
+      {/* Website / phone / email row */}
       <div className="flex flex-wrap gap-3 text-xs">
         {lead.website ? (
           <a
@@ -157,7 +157,7 @@ function LeadCard({ lead, onCopy, isCopied }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
             </svg>
-            {new URL(lead.website).hostname.replace(/^www\./, '')}
+            {(() => { try { return new URL(lead.website).hostname.replace(/^www\./, ''); } catch { return lead.website; } })()}
           </a>
         ) : (
           <span className="text-gray-600 italic">No website found</span>
@@ -174,6 +174,27 @@ function LeadCard({ lead, onCopy, isCopied }) {
           </a>
         )}
       </div>
+
+      {/* Contact email row */}
+      {lead.contactEmail ? (
+        <div className="flex items-center gap-1.5 text-xs">
+          <svg className="h-3 w-3 flex-shrink-0 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+          <a href={`mailto:${lead.contactEmail}`} className="text-emerald-400 hover:underline font-mono">
+            {lead.contactEmail}
+          </a>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 text-xs text-gray-600">
+          <svg className="h-3 w-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+          <span className="italic">No email found</span>
+        </div>
+      )}
 
       {/* Action row */}
       <div className="flex items-center gap-3 pt-1">
@@ -266,10 +287,11 @@ export default function RssScout({ onCopyToForm }) {
 
   function handleCopy(lead) {
     onCopyToForm({
-      companyName: lead.name,
-      websiteUrl:  lead.website ?? '',
-      ownerName:   lead.ownerName ?? '',
-      leadType:    scanMode === 'agency' ? 'digital_agency' : 'local_business',
+      companyName:  lead.name,
+      websiteUrl:   lead.website ?? '',
+      ownerName:    lead.ownerName ?? '',
+      toEmail:      lead.contactEmail ?? '',
+      leadType:     scanMode === 'agency' ? 'digital_agency' : 'local_business',
     });
     setCopiedId(lead.id);
     setTimeout(() => setCopiedId(null), 2000);

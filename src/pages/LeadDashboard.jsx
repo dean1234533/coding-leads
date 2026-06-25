@@ -121,7 +121,7 @@ function LeadTypeSelect({ value, onChange }) {
 
 // ─── Main dashboard ───────────────────────────────────────────────────────────
 
-const EMPTY_FORM = { companyName: '', websiteUrl: '', ownerName: '' };
+const EMPTY_FORM = { companyName: '', websiteUrl: '', ownerName: '', toEmail: '' };
 
 // Field config per lead type — controls labels, placeholders, and which fields render
 const FORM_CONFIG = {
@@ -172,8 +172,8 @@ export default function LeadDashboard() {
   // ── RSS Scout callback ────────────────────────────────────────────────────
   // Called when user clicks "Copy to Lead Form" on an RSS post.
   // Merges post data into the form, scrolls to it, and briefly highlights fields.
-  const handleCopyToForm = useCallback(({ companyName, websiteUrl, ownerName, leadType: lt }) => {
-    setForm({ companyName, websiteUrl: websiteUrl ?? '', ownerName: ownerName ?? '' });
+  const handleCopyToForm = useCallback(({ companyName, websiteUrl, ownerName, toEmail, leadType: lt }) => {
+    setForm({ companyName, websiteUrl: websiteUrl ?? '', ownerName: ownerName ?? '', toEmail: toEmail ?? '' });
     if (lt) setLeadType(lt);
     setFormHighlight(true);
     setAlert(null);
@@ -327,8 +327,14 @@ export default function LeadDashboard() {
                 />
               )}
 
-              {/* Owner name is passed silently from the Lead Scout when found.
-                  Not shown in the form — email falls back to "Hi there," automatically. */}
+                {/* To Email — auto-filled from Scout, editable */}
+              <FormField
+                id="toEmail"
+                label="To Email (optional)"
+                type="email"
+                placeholder="contact@business.com"
+                {...field('toEmail')}
+              />
             </div>
 
             {alert && <Alert type={alert.type} message={alert.message} onDismiss={() => setAlert(null)} />}
