@@ -498,56 +498,89 @@ async function findOwnerFromCompaniesHouse(rawName) {
   }
 }
 
-const IGNORED_EMAIL_PREFIXES = ['noreply', 'no-reply', 'donotreply', 'privacy', 'legal', 'abuse', 'webmaster', 'postmaster', 'unsubscribe', 'bounce'];
+const IGNORED_EMAIL_PREFIXES = ['noreply', 'no-reply', 'donotreply', 'privacy', 'legal', 'abuse', 'webmaster', 'postmaster', 'unsubscribe', 'bounce', 'hello@wix', 'support@'];
+const EMAIL_REGEX = /\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/g;
 
-function extractEmailsFromHtml(html) {
-  const matches = [...html.matchAll(/mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/gi)];
-  const emails = matches.map(m => m[1].toLowerCase());
-  const preferred = emails.find(e => !IGNORED_EMAIL_PREFIXES.some(p => e.split('@')[0].startsWith(p)));
-  return preferred ?? emails[0] ?? null;
+function pickBestEmail(emails, domain) {
+  if (!emails.length) return null;
+  // Filter out ignored prefixes and emails not on the business domain
+  const onDomain  = emails.filter(e => e.includes(`@${domain}`) && !IGNORED_EMAIL_PREFIXES.some(p => e.startsWith(p)));
+  const anyGood   = emails.filter(e => !IGNORED_EMAIL_PREFIXES.some(p => e.startsWith(p)));
+  return onDomain[0] ?? anyGood[0] ?? emails[0];
+}
+
+function extractEmailsFromHtml(html, domain) {
+  const stripped = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ');
+
+  // mailto: links first (most explicit), then plain-text emails in content
+  const mailto = [...html.matchAll(/mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/gi)].map(m => m[1].toLowerCase());
+  const plain  = [...stripped.matchAll(EMAIL_REGEX)].map(m => m[1].toLowerCase());
+  const all    = [...new Set([...mailto, ...plain])];
+  return pickBestEmail(all, domain);
 }
 
 /**
- * Finds a contact email for a business website.
- * 1. Hunter.io domain search — authoritative, verified emails
- * 2. Homepage + contact page scraping — fallback for businesses not in Hunter
+ * Finds a contact email for a business.
+ * 1. Hunter Email Finder  — targeted name + domain search (needs ownerName)
+ * 2. Hunter Domain Search — any verified email on the domain
+ * 3. Website scraping     — mailto: links + plain-text emails across 5 pages
  */
-async function findContactEmail(website) {
+async function findContactEmail(website, ownerName) {
   if (!website) return null;
 
   let domain;
   try { domain = new URL(website).hostname.replace(/^www\./, ''); } catch { return null; }
 
-  // ── 1. Hunter.io domain search ──────────────────────────────────────────
   const hunterKey = process.env.HUNTER_KEY;
+
+  // ── 1. Hunter Email Finder (name + domain) ──────────────────────────────
+  if (hunterKey && ownerName) {
+    const parts = ownerName.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      try {
+        const res = await axios.get('https://api.hunter.io/v2/email-finder', {
+          params: { domain, first_name: parts[0], last_name: parts.slice(1).join(' '), api_key: hunterKey },
+          timeout: 5_000,
+        });
+        const email = res.data?.data?.email;
+        if (email) return email.toLowerCase();
+      } catch { /* not found or quota hit */ }
+    }
+  }
+
+  // ── 2. Hunter Domain Search ─────────────────────────────────────────────
   if (hunterKey) {
     try {
       const res = await axios.get('https://api.hunter.io/v2/domain-search', {
-        params: { domain, api_key: hunterKey, limit: 5 },
+        params: { domain, api_key: hunterKey, limit: 10 },
         timeout: 5_000,
       });
-      const emails = res.data?.data?.emails ?? [];
-      // Prefer personal emails over generic ones, sorted by confidence
-      const sorted = emails.sort((a, b) => {
-        if (a.type === 'personal' && b.type !== 'personal') return -1;
-        if (b.type === 'personal' && a.type !== 'personal') return  1;
-        return (b.confidence ?? 0) - (a.confidence ?? 0);
-      });
-      const pick = sorted.find(e => !IGNORED_EMAIL_PREFIXES.some(p => e.value?.split('@')[0].startsWith(p)));
-      if (pick?.value) return pick.value.toLowerCase();
-      if (sorted[0]?.value) return sorted[0].value.toLowerCase();
-    } catch { /* Hunter unavailable — fall through to scrape */ }
+      const emails = (res.data?.data?.emails ?? [])
+        .sort((a, b) => {
+          if (a.type === 'personal' && b.type !== 'personal') return -1;
+          if (b.type === 'personal' && a.type !== 'personal') return  1;
+          return (b.confidence ?? 0) - (a.confidence ?? 0);
+        })
+        .map(e => e.value?.toLowerCase())
+        .filter(Boolean);
+      const pick = pickBestEmail(emails, domain);
+      if (pick) return pick;
+    } catch { /* quota hit or unavailable */ }
   }
 
-  // ── 2. Scrape homepage + contact page ───────────────────────────────────
+  // ── 3. Scrape homepage, contact page, about, and footer ─────────────────
   try {
     const base  = new URL(website).origin;
-    const pages = [website, `${base}/contact`, `${base}/contact-us`];
+    const pages = [website, `${base}/contact`, `${base}/contact-us`, `${base}/about`, `${base}/about-us`];
     const opts  = { timeout: 4_000, headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 3 };
     const results = await Promise.allSettled(pages.map(url => axios.get(url, opts)));
     for (const r of results) {
       if (r.status !== 'fulfilled') continue;
-      const email = extractEmailsFromHtml(typeof r.value.data === 'string' ? r.value.data : '');
+      const html  = typeof r.value.data === 'string' ? r.value.data : '';
+      const email = extractEmailsFromHtml(html, domain);
       if (email) return email;
     }
   } catch { /* all pages blocked */ }
@@ -699,13 +732,11 @@ exports.scanBusinessLeads = onCall(
     console.log('[owner] business names:', rawLeads.slice(0, 15).map(l => l.name));
     await Promise.allSettled(
       rawLeads.slice(0, 15).map(async (lead) => {
-        const [ownerResult, email] = await Promise.all([
-          findOwnerName(lead.name),
-          findContactEmail(lead.website),
-        ]);
-        console.log(`[owner] "${lead.name}" → ${ownerResult ? `${ownerResult.name} (${ownerResult.source})` : 'null'} | email: ${email ?? 'none'}`);
+        const ownerResult = await findOwnerName(lead.name);
         lead.ownerName       = ownerResult?.name   ?? null;
         lead.ownerNameSource = ownerResult?.source ?? null;
+        const email = await findContactEmail(lead.website, lead.ownerName);
+        console.log(`[owner] "${lead.name}" → ${ownerResult ? `${ownerResult.name} (${ownerResult.source})` : 'null'} | email: ${email ?? 'none'}`);
         lead.contactEmail    = email ?? null;
       })
     );
