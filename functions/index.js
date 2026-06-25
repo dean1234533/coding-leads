@@ -498,26 +498,34 @@ async function findOwnerFromCompaniesHouse(rawName) {
   }
 }
 
-// Emails that are useless for outreach
-const IGNORED_EMAIL_PREFIXES = ['noreply', 'no-reply', 'donotreply', 'support', 'privacy', 'legal', 'abuse', 'webmaster', 'postmaster'];
+const IGNORED_EMAIL_PREFIXES = ['noreply', 'no-reply', 'donotreply', 'privacy', 'legal', 'abuse', 'webmaster', 'postmaster', 'unsubscribe', 'bounce'];
+
+function extractEmailsFromHtml(html) {
+  const matches = [...html.matchAll(/mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/gi)];
+  const emails = matches.map(m => m[1].toLowerCase());
+  const preferred = emails.find(e => !IGNORED_EMAIL_PREFIXES.some(p => e.split('@')[0].startsWith(p)));
+  return preferred ?? emails[0] ?? null;
+}
 
 /**
- * Scrapes the homepage for mailto: links and returns the first useful contact email.
- * Single request, 3s timeout — fast enough to run in parallel with owner name lookup.
+ * Scrapes the homepage and contact page in parallel for a mailto: email address.
  */
 async function findContactEmail(website) {
   if (!website) return null;
   try {
-    const res  = await axios.get(website, { timeout: 3_000, headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 3 });
-    const html = typeof res.data === 'string' ? res.data : '';
-    const matches = [...html.matchAll(/mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/gi)];
-    for (const [, email] of matches) {
-      const prefix = email.split('@')[0].toLowerCase();
-      if (!IGNORED_EMAIL_PREFIXES.some(p => prefix.startsWith(p))) return email.toLowerCase();
+    const base = new URL(website).origin;
+    const pages = [website, `${base}/contact`, `${base}/contact-us`];
+    const opts  = { timeout: 4_000, headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 3 };
+
+    const results = await Promise.allSettled(pages.map(url => axios.get(url, opts)));
+
+    for (const r of results) {
+      if (r.status !== 'fulfilled') continue;
+      const html = typeof r.value.data === 'string' ? r.value.data : '';
+      const email = extractEmailsFromHtml(html);
+      if (email) return email;
     }
-    // Fall back to first email even if generic
-    if (matches.length > 0) return matches[0][1].toLowerCase();
-  } catch { /* site blocked or unreachable */ }
+  } catch { /* invalid URL or all pages blocked */ }
   return null;
 }
 
