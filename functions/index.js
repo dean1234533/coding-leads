@@ -524,19 +524,48 @@ function extractEmailsFromHtml(html, domain) {
 
 /**
  * Finds a contact email for a business.
- * 1. Hunter Email Finder  — targeted name + domain search (needs ownerName)
- * 2. Hunter Domain Search — any verified email on the domain
- * 3. Website scraping     — mailto: links + plain-text emails across 5 pages
+ * 1. Serper Google search  — searches Google for the email, extracts from snippets
+ * 2. Hunter Email Finder   — targeted name + domain search (needs ownerName)
+ * 3. Hunter Domain Search  — any verified email on the domain
+ * 4. Website scraping      — mailto: links + plain-text emails across 5 pages
  */
-async function findContactEmail(website, ownerName) {
-  if (!website) return null;
+async function findContactEmail(website, ownerName, businessName) {
+  if (!website && !businessName) return null;
 
-  let domain;
-  try { domain = new URL(website).hostname.replace(/^www\./, ''); } catch { return null; }
+  let domain = null;
+  if (website) {
+    try { domain = new URL(website).hostname.replace(/^www\./, ''); } catch {}
+  }
 
+  const serperKey = process.env.SERPER_KEY;
   const hunterKey = process.env.HUNTER_KEY;
 
-  // ── 1. Hunter Email Finder (name + domain) ──────────────────────────────
+  // ── 1. Serper Google search ─────────────────────────────────────────────
+  // Google has already indexed contact pages — snippets often contain emails
+  if (serperKey) {
+    const queries = [];
+    if (domain)       queries.push(`site:${domain} email`);
+    if (businessName) queries.push(`"${businessName}" email contact`);
+
+    for (const q of queries) {
+      try {
+        const res = await axios.post(
+          'https://google.serper.dev/search',
+          { q, num: 5 },
+          { headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' }, timeout: 5_000 }
+        );
+        const text = (res.data?.organic ?? [])
+          .map(r => `${r.title ?? ''} ${r.snippet ?? ''}`)
+          .join(' ');
+        const email = extractEmailsFromHtml(text, domain ?? '');
+        if (email) return email;
+      } catch { /* search failed */ }
+    }
+  }
+
+  if (!domain) return null;
+
+  // ── 2. Hunter Email Finder (name + domain) ──────────────────────────────
   if (hunterKey && ownerName) {
     const parts = ownerName.trim().split(/\s+/);
     if (parts.length >= 2) {
@@ -551,7 +580,7 @@ async function findContactEmail(website, ownerName) {
     }
   }
 
-  // ── 2. Hunter Domain Search ─────────────────────────────────────────────
+  // ── 3. Hunter Domain Search ─────────────────────────────────────────────
   if (hunterKey) {
     try {
       const res = await axios.get('https://api.hunter.io/v2/domain-search', {
@@ -571,7 +600,7 @@ async function findContactEmail(website, ownerName) {
     } catch { /* quota hit or unavailable */ }
   }
 
-  // ── 3. Scrape homepage, contact page, about, and footer ─────────────────
+  // ── 4. Scrape homepage, contact page, about ─────────────────────────────
   try {
     const base  = new URL(website).origin;
     const pages = [website, `${base}/contact`, `${base}/contact-us`, `${base}/about`, `${base}/about-us`];
@@ -609,7 +638,7 @@ exports.scanBusinessLeads = onCall(
     cors:           true,
     timeoutSeconds: 60,
     memory:         '512MiB',
-    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY'],
+    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY'],
   },
   async (request) => {
     const {
@@ -735,7 +764,7 @@ exports.scanBusinessLeads = onCall(
         const ownerResult = await findOwnerName(lead.name);
         lead.ownerName       = ownerResult?.name   ?? null;
         lead.ownerNameSource = ownerResult?.source ?? null;
-        const email = await findContactEmail(lead.website, lead.ownerName);
+        const email = await findContactEmail(lead.website, lead.ownerName, lead.name);
         console.log(`[owner] "${lead.name}" → ${ownerResult ? `${ownerResult.name} (${ownerResult.source})` : 'null'} | email: ${email ?? 'none'}`);
         lead.contactEmail    = email ?? null;
       })
