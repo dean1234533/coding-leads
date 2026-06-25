@@ -508,24 +508,50 @@ function extractEmailsFromHtml(html) {
 }
 
 /**
- * Scrapes the homepage and contact page in parallel for a mailto: email address.
+ * Finds a contact email for a business website.
+ * 1. Hunter.io domain search — authoritative, verified emails
+ * 2. Homepage + contact page scraping — fallback for businesses not in Hunter
  */
 async function findContactEmail(website) {
   if (!website) return null;
+
+  let domain;
+  try { domain = new URL(website).hostname.replace(/^www\./, ''); } catch { return null; }
+
+  // ── 1. Hunter.io domain search ──────────────────────────────────────────
+  const hunterKey = process.env.HUNTER_KEY;
+  if (hunterKey) {
+    try {
+      const res = await axios.get('https://api.hunter.io/v2/domain-search', {
+        params: { domain, api_key: hunterKey, limit: 5 },
+        timeout: 5_000,
+      });
+      const emails = res.data?.data?.emails ?? [];
+      // Prefer personal emails over generic ones, sorted by confidence
+      const sorted = emails.sort((a, b) => {
+        if (a.type === 'personal' && b.type !== 'personal') return -1;
+        if (b.type === 'personal' && a.type !== 'personal') return  1;
+        return (b.confidence ?? 0) - (a.confidence ?? 0);
+      });
+      const pick = sorted.find(e => !IGNORED_EMAIL_PREFIXES.some(p => e.value?.split('@')[0].startsWith(p)));
+      if (pick?.value) return pick.value.toLowerCase();
+      if (sorted[0]?.value) return sorted[0].value.toLowerCase();
+    } catch { /* Hunter unavailable — fall through to scrape */ }
+  }
+
+  // ── 2. Scrape homepage + contact page ───────────────────────────────────
   try {
-    const base = new URL(website).origin;
+    const base  = new URL(website).origin;
     const pages = [website, `${base}/contact`, `${base}/contact-us`];
     const opts  = { timeout: 4_000, headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 3 };
-
     const results = await Promise.allSettled(pages.map(url => axios.get(url, opts)));
-
     for (const r of results) {
       if (r.status !== 'fulfilled') continue;
-      const html = typeof r.value.data === 'string' ? r.value.data : '';
-      const email = extractEmailsFromHtml(html);
+      const email = extractEmailsFromHtml(typeof r.value.data === 'string' ? r.value.data : '');
       if (email) return email;
     }
-  } catch { /* invalid URL or all pages blocked */ }
+  } catch { /* all pages blocked */ }
+
   return null;
 }
 
@@ -550,7 +576,7 @@ exports.scanBusinessLeads = onCall(
     cors:           true,
     timeoutSeconds: 60,
     memory:         '512MiB',
-    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY'],
+    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY'],
   },
   async (request) => {
     const {
