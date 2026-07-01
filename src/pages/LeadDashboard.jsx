@@ -16,6 +16,10 @@ import { getFunctions, httpsCallable }              from 'firebase/functions';
 import { db, app }    from '../firebase';
 import LeadTable      from '../components/LeadTable';
 import RssScout       from '../components/RssScout';
+import Pricing        from '../components/Pricing';
+import CallScripts    from '../components/CallScripts';
+import BookingManager from '../components/BookingManager';
+import InstallBanner  from '../components/InstallBanner';
 
 // ─── Form field ───────────────────────────────────────────────────────────────
 
@@ -39,8 +43,8 @@ function FormField({ label, id, type = 'text', placeholder, value, onChange, req
           focus:outline-none focus:ring-1
           hover:border-gray-600
           ${highlight
-            ? 'border-indigo-500 bg-indigo-950/30 focus:border-indigo-400 focus:ring-indigo-400'
-            : 'border-gray-700 bg-gray-800/50 focus:border-indigo-500 focus:ring-indigo-500'
+            ? 'border-blue-500 bg-blue-950/30 focus:border-blue-400 focus:ring-blue-400'
+            : 'border-gray-700 bg-gray-800/50 focus:border-blue-500 focus:ring-blue-500'
           }
         `}
       />
@@ -75,8 +79,9 @@ function Alert({ type, message, onDismiss }) {
 
 // All supported lead types. Add new entries here to extend the dropdown.
 const LEAD_TYPES = [
-  { value: 'local_business', label: 'Local Business' },
-  { value: 'digital_agency', label: 'Digital Agency' },
+  { value: 'local_business', label: 'Local Business'      },
+  { value: 'digital_agency', label: 'Digital Agency'      },
+  { value: 'bookrightly',    label: 'Bookrightly Pitch'   },
 ];
 
 /**
@@ -97,7 +102,7 @@ function LeadTypeSelect({ value, onChange }) {
           className="
             w-full appearance-none rounded-lg border border-gray-700 bg-gray-800/50
             px-3.5 py-2.5 pr-9 text-sm text-gray-100 transition
-            focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500
+            focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500
             hover:border-gray-600 cursor-pointer
           "
         >
@@ -121,7 +126,7 @@ function LeadTypeSelect({ value, onChange }) {
 
 // ─── Main dashboard ───────────────────────────────────────────────────────────
 
-const EMPTY_FORM = { companyName: '', websiteUrl: '', ownerName: '', toEmail: '' };
+const EMPTY_FORM = { companyName: '', websiteUrl: '', ownerName: '', toEmail: '', mockupUrl: '' };
 
 // Field config per lead type — controls labels, placeholders, and which fields render
 const FORM_CONFIG = {
@@ -141,11 +146,28 @@ const FORM_CONFIG = {
     ownerLabel:         'Contact Person (optional)',
     ownerPlaceholder:   'Leave blank → "Hi there,"',
   },
+  bookrightly: {
+    badge:              { label: 'Bookrightly', classes: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' },
+    companyLabel:       'Business Name',
+    companyPlaceholder: 'Sarah\'s Hair Studio',
+    showWebsiteUrl:     false,
+    ownerLabel:         'Owner Name (optional)',
+    ownerPlaceholder:   'Leave blank → "Hi there,"',
+  },
 };
 
+const NAV_TABS = [
+  { key: 'dashboard', label: 'Dashboard'    },
+  { key: 'booking',   label: 'Booking'      },
+  { key: 'pricing',   label: 'Pricing'      },
+  { key: 'scripts',   label: 'Call Scripts' },
+];
+
 export default function LeadDashboard() {
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [form,      setForm]      = useState(EMPTY_FORM);
   const [leadType,  setLeadType]  = useState('local_business');
+  const [bookrightlyTemplate, setBookrightlyTemplate] = useState('subscription');
   const [leads,     setLeads]     = useState([]);
   const [loading,   setLoading]   = useState(false);
   const [alert,     setAlert]     = useState(null);
@@ -222,7 +244,7 @@ export default function LeadDashboard() {
     setLoading(true);
     try {
       const fn = httpsCallable(getFunctions(app), 'createManualDraft');
-      await fn({ ...form, leadType, source: leadType === 'digital_agency' ? 'agency' : 'manual' });
+      await fn({ ...form, leadType, source: leadType === 'digital_agency' ? 'agency' : 'manual', mockupUrl: form.mockupUrl ?? '', bookrightlyTemplate });
       setAlert({ type: 'success', message: `${cfg.badge.label} draft saved to Gmail.` });
       setForm(EMPTY_FORM);
     } catch (err) {
@@ -245,20 +267,46 @@ export default function LeadDashboard() {
 
       {/* ── Nav ── */}
       <header className="sticky top-0 z-10 border-b border-gray-800 bg-gray-950/90 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-indigo-400">Client Outreach</p>
-            <h1 className="text-base font-semibold leading-tight text-gray-100">Lead Dashboard</h1>
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="flex items-center justify-between py-3 sm:py-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-400">Client Outreach</p>
+              <h1 className="text-base font-semibold leading-tight text-gray-100">Lead Dashboard</h1>
+            </div>
+            <div className="flex items-center gap-2 rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5">
+              <span className="h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_theme(colors.emerald.400)]" />
+              <span className="text-xs text-gray-400 hidden sm:inline">Dean Burt · deanburt1308@gmail.com</span>
+              <span className="text-xs text-gray-400 sm:hidden">Dean Burt</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5">
-            <span className="h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_theme(colors.emerald.400)]" />
-            <span className="text-xs text-gray-400 hidden sm:inline">Dean Burt · deanburt1308@gmail.com</span>
-            <span className="text-xs text-gray-400 sm:hidden">Dean Burt</span>
+          {/* Tab bar */}
+          <div className="flex gap-1 -mb-px">
+            {NAV_TABS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`px-4 py-2 text-xs font-semibold border-b-2 transition ${
+                  activeTab === key
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </header>
 
+      <InstallBanner />
+
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+
+        {activeTab === 'booking'   && <BookingManager />}
+        {activeTab === 'pricing'   && <Pricing />}
+        {activeTab === 'scripts'   && <CallScripts />}
+
+        {activeTab === 'dashboard' && (<>
 
         {/* ── Stats ── */}
         <div className="grid grid-cols-3 gap-3 sm:gap-4">
@@ -305,6 +353,34 @@ export default function LeadDashboard() {
               <LeadTypeSelect value={leadType} onChange={handleLeadTypeChange} />
             </div>
 
+            {/* ── Bookrightly template toggle ── */}
+            {leadType === 'bookrightly' && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBookrightlyTemplate('subscription')}
+                  className={`rounded-full px-3.5 py-1 text-xs font-semibold transition ring-1 ring-inset ${
+                    bookrightlyTemplate === 'subscription'
+                      ? 'bg-blue-500/15 text-blue-300 ring-blue-500/40'
+                      : 'text-gray-500 ring-gray-700 hover:text-gray-300'
+                  }`}
+                >
+                  Subscription Pitch
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBookrightlyTemplate('platform')}
+                  className={`rounded-full px-3.5 py-1 text-xs font-semibold transition ring-1 ring-inset ${
+                    bookrightlyTemplate === 'platform'
+                      ? 'bg-blue-500/15 text-blue-300 ring-blue-500/40'
+                      : 'text-gray-500 ring-gray-700 hover:text-gray-300'
+                  }`}
+                >
+                  Platform Pitch
+                </button>
+              </div>
+            )}
+
             {/* ── Row 2: Fields ── */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
@@ -335,6 +411,15 @@ export default function LeadDashboard() {
                 placeholder="contact@business.com"
                 {...field('toEmail')}
               />
+
+              {/* Mockup URL — when filled, email includes a line about it */}
+              <FormField
+                id="mockupUrl"
+                label="Mockup URL (optional)"
+                type="url"
+                placeholder="https://figma.com/proto/..."
+                {...field('mockupUrl')}
+              />
             </div>
 
             {alert && <Alert type={alert.type} message={alert.message} onDismiss={() => setAlert(null)} />}
@@ -347,8 +432,8 @@ export default function LeadDashboard() {
                 disabled={loading || !form.companyName.trim()}
                 className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-40 ${
                   leadType === 'digital_agency'
-                    ? 'bg-violet-600 hover:bg-violet-500 focus:ring-violet-500'
-                    : 'bg-indigo-600 hover:bg-indigo-500 focus:ring-indigo-500'
+                    ? 'bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-400 hover:to-purple-400 focus:ring-violet-500'
+                    : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 focus:ring-blue-500'
                 }`}
               >
                 {loading ? (
@@ -379,6 +464,8 @@ export default function LeadDashboard() {
           </div>
           <LeadTable leads={leads} onDelete={handleDeleteLead} />
         </section>
+
+        </>)}
 
       </main>
     </div>

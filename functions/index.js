@@ -4,7 +4,8 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { initializeApp }      = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { findOwnerEmail }     = require('./leadService');
-const { createGmailDraft }   = require('./gmailService');
+const { createGmailDraft, sendEmail } = require('./gmailService');
+const { getFreeBusy, createCalendarEvent, generateSlots, filterFreeSlots } = require('./calendarService');
 const axios                  = require('axios');
 const Parser                 = require('rss-parser');
 
@@ -27,14 +28,15 @@ function buildOutreachEmail(companyName, websiteUrl, ownerName) {
     `I was browsing ${companyName}'s website at ${websiteUrl} and noticed your business `
       + `doesn't appear to have a dedicated mobile app — which likely means customers `
       + `can't engage with you conveniently from their phones.`,
-    `I'm a local developer who recently published the "JS Grow Up" app to the Google `
-      + `Play Store — I help businesses avoid the tech headache by handling the entire `
-      + `process, from design and development through launch and store submission.`,
+    `I'm a local developer specialising in building mobile apps and websites — I help `
+      + `businesses avoid the tech headache by handling the entire process, from design `
+      + `and development through launch and store submission.`,
     `I have capacity for one new local project this month; would you be open to a quick `
       + `5-minute chat to see whether a mobile app could help ${companyName} grow?`,
     '',
     'Dean Burt',
     'deanburt1308@gmail.com',
+    'https://dean-da-dev.co.uk',
   ].join('\n');
   return { subject, body };
 }
@@ -43,7 +45,7 @@ function buildOutreachEmail(companyName, websiteUrl, ownerName) {
  * Local Business manual template — used when leadType === 'local_business'.
  * No AI — pure string replacement on {{company_name}} and {{owner_name}}.
  */
-function buildLocalBusinessEmail(companyName, ownerName, websiteUrl) {
+function buildLocalBusinessEmail(companyName, ownerName, websiteUrl, mockupUrl) {
   const greeting = ownerName?.trim() ? `Hi ${ownerName.trim()},` : 'Hi there,';
   const subject  = `A quick idea for ${companyName}`;
 
@@ -59,17 +61,49 @@ function buildLocalBusinessEmail(companyName, ownerName, websiteUrl) {
     ? `I came across ${companyName} online and noticed your current web presence may not be doing you justice — an outdated or limited website can mean losing customers to competitors before they even make contact.`
     : `I came across ${companyName}'s website and noticed you don't currently have a dedicated mobile app — which means customers can't easily engage with you from their phones.`;
 
+  const mockupLine = mockupUrl?.trim()
+    ? `\nI've actually put together a quick mockup of what a new site could look like for ${companyName} — feel free to take a look: ${mockupUrl.trim()}\n`
+    : `\nI've actually put together a quick mockup of what a new site could look like for ${companyName} — feel free to take a look: [PASTE MOCKUP URL HERE]\n`;
+
   const body = `${greeting}
 
 ${opening}
-
-I'm a local developer who recently published "JS Grow Up" to the Google Play Store. I help businesses like yours avoid the tech headache by handling the full process — design, development, and store submission — from start to finish.
+${mockupLine}
+I'm a local developer specialising in building mobile apps and websites. I help businesses like yours avoid the tech headache by handling the full process — design, development, and store submission — from start to finish.
 
 I have capacity for one new local project this month. Would you be open to a quick 5-minute chat to see whether a website or app could help ${companyName} grow?
 
 Best,
 Dean Burt
-deanburt1308@gmail.com`;
+deanburt1308@gmail.com
+https://dean-da-dev.co.uk`;
+
+  return { subject, body };
+}
+
+/**
+ * Bookrightly platform pitch — shorter, feature-led, 90-day free trial angle.
+ * Used when bookrightlyTemplate === 'platform'.
+ */
+function buildBookrightlyPlatformEmail(businessName, ownerName, businessType) {
+  const greeting = ownerName?.trim() ? `Hey ${ownerName.trim()},` : 'Hey,';
+  const subject  = `Built something I think you'd find useful — ${businessName}`;
+
+  const typeLabel = businessType?.trim() || 'businesses like yours';
+
+  const body = `${greeting}
+
+I've been building a platform called Bookrightly and I think it'd be useful for you.
+
+It basically gives ${typeLabel} everything they need to run their business properly — your own booking site, online card payments, automated reminders, invoices, and a dashboard to manage everything. There's also trade-specific stuff built in (like a quote generator with a shareable client link, or workout plans for PTs).
+
+It's 90 days free to try, no card required, and takes about 10 minutes to set up.
+
+Worth having a look: bookrightly.co.uk
+
+Dean Burt
+deanburt1308@gmail.com
+https://dean-da-dev.co.uk`;
 
   return { subject, body };
 }
@@ -78,23 +112,67 @@ deanburt1308@gmail.com`;
  * Digital Agency partner template — used when leadType === 'digital_agency'.
  * No AI — pure string replacement on {{agency_name}} and {{contact_name}}.
  */
-function buildAgencyEmail(agencyName, contactName) {
+function buildAgencyEmail(agencyName, contactName, mockupUrl) {
   const greeting = contactName?.trim() ? `Hi ${contactName.trim()},` : 'Hi there,';
   const subject  = `Technical partnership inquiry — ${agencyName}`;
+
+  const mockupLine = mockupUrl?.trim()
+    ? `\nYou can also see an example of my recent work here: ${mockupUrl.trim()}\n`
+    : `\nYou can also see an example of my recent work here: [PASTE MOCKUP URL HERE]\n`;
 
   const body = `${greeting}
 
 I've been following ${agencyName}'s work and love the quality of your digital projects.
 
-I'm a full-stack developer who recently published "JS Grow Up" (a co-parenting app) to the Google Play Store. I specialize in the full development lifecycle—from design and code to store submission—and I'm looking to partner with a few select agencies that need reliable, back-office technical capacity.
-
+I'm a full-stack developer specialising in building mobile apps and websites. I handle the full development lifecycle — from design and code to store submission — and I'm looking to partner with a few select agencies that need reliable, back-office technical capacity.
+${mockupLine}
 If you ever have a client project requiring app or dashboard development that falls outside your current bandwidth, I'd love to be a reliable resource you can lean on.
 
 Are you open to a brief chat to see if we could be a fit for future overflow work?
 
 Best,
 Dean Burt
-deanburt1308@gmail.com`;
+deanburt1308@gmail.com
+https://dean-da-dev.co.uk`;
+
+  return { subject, body };
+}
+
+/**
+ * Bookrightly subscription template — used when leadType === 'bookrightly'.
+ * Targets hairdressers, barbers, personal trainers, and decorators with no website.
+ * Pitches www.bookrightly.co.uk as an affordable subscription solution.
+ */
+function buildBookrightlyEmail(businessName, ownerName, mockupUrl) {
+  const greeting = ownerName?.trim() ? `Hi ${ownerName.trim()},` : 'Hi there,';
+  const subject  = `Get online with a website and booking system — ${businessName}`;
+
+  const mockupLine = mockupUrl?.trim()
+    ? `\nI've actually put together a quick mockup of what your site could look like — take a look: ${mockupUrl.trim()}\n`
+    : `\nI've actually put together a quick mockup of what your site could look like — take a look: [PASTE MOCKUP URL HERE]\n`;
+
+  const body = `${greeting}
+
+I came across ${businessName} and noticed you don't currently have a website. Without one, you're likely missing out on customers who search online before booking — and that's a big chunk of new business going elsewhere.
+
+I run a platform called Bookrightly (www.bookrightly.co.uk) built specifically for businesses like yours. For just £29/month you get:
+
+  ✓ Your own professional website
+  ✓ Online booking system so clients can book 24/7
+  ✓ Card payments built in
+  ✓ Client management and appointment reminders
+  ✓ Calendar sync with Google Calendar
+  ✓ No setup fees — up and running in days
+${mockupLine}
+Most of my customers say it pays for itself with just one or two extra bookings a month.
+
+Would you be open to a quick 5-minute chat to see if it could work for ${businessName}?
+
+Best,
+Dean Burt
+deanburt1308@gmail.com
+https://dean-da-dev.co.uk
+www.bookrightly.co.uk`;
 
   return { subject, body };
 }
@@ -103,15 +181,21 @@ deanburt1308@gmail.com`;
  * Routes to the correct template based on leadType.
  * Keeps template selection in one place — add new lead types here.
  *
- * @param {'local_business'|'digital_agency'} leadType
+ * @param {'local_business'|'digital_agency'|'bookrightly'} leadType
  * @param {object} data  — companyName/agencyName, ownerName/contactName
  * @returns {{ subject: string, body: string }}
  */
 function buildManualEmail(leadType, data) {
   if (leadType === 'digital_agency') {
-    return buildAgencyEmail(data.companyName, data.ownerName);
+    return buildAgencyEmail(data.companyName, data.ownerName, data.mockupUrl);
   }
-  return buildLocalBusinessEmail(data.companyName, data.ownerName, data.websiteUrl);
+  if (leadType === 'bookrightly') {
+    if (data.bookrightlyTemplate === 'platform') {
+      return buildBookrightlyPlatformEmail(data.companyName, data.ownerName, data.businessType);
+    }
+    return buildBookrightlyEmail(data.companyName, data.ownerName, data.mockupUrl);
+  }
+  return buildLocalBusinessEmail(data.companyName, data.ownerName, data.websiteUrl, data.mockupUrl);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -206,7 +290,7 @@ exports.createManualDraft = onCall(
     ],
   },
   async (request) => {
-    const { companyName, ownerName, toEmail, websiteUrl, source, leadType } = request.data ?? {};
+    const { companyName, ownerName, toEmail, websiteUrl, source, leadType, mockupUrl } = request.data ?? {};
 
     if (!companyName?.trim()) {
       throw new HttpsError('invalid-argument', 'companyName is required.');
@@ -216,7 +300,7 @@ exports.createManualDraft = onCall(
     const safeName = ownerName?.trim() ?? '';
     const { subject, body } = buildManualEmail(
       leadType ?? 'local_business',
-      { companyName: companyName.trim(), ownerName: safeName }
+      { companyName: companyName.trim(), ownerName: safeName, websiteUrl, mockupUrl: mockupUrl ?? '' }
     );
 
     // Write a Firestore record immediately
@@ -524,10 +608,12 @@ function extractEmailsFromHtml(html, domain) {
 
 /**
  * Finds a contact email for a business.
- * 1. Serper Google search  — searches Google for the email, extracts from snippets
+ * 1. Serper Google search  — concurrent queries; scrapes actual result URLs
  * 2. Hunter Email Finder   — targeted name + domain search (needs ownerName)
  * 3. Hunter Domain Search  — any verified email on the domain
- * 4. Website scraping      — mailto: links + plain-text emails across 5 pages
+ * 4. Website scraping      — mailto: links + plain-text emails across 7 pages
+ *
+ * All sub-steps run concurrently where possible to stay within the 60s budget.
  */
 async function findContactEmail(website, ownerName, businessName) {
   if (!website && !businessName) return null;
@@ -541,70 +627,116 @@ async function findContactEmail(website, ownerName, businessName) {
   const hunterKey = process.env.HUNTER_KEY;
 
   // ── 1. Serper Google search ─────────────────────────────────────────────
-  // Google has already indexed contact pages — snippets often contain emails
+  // Run all queries concurrently, then scrape the actual result pages that
+  // Google found — snippets are truncated but full pages have the emails.
   if (serperKey) {
     const queries = [];
     if (domain)       queries.push(`site:${domain} email`);
     if (businessName) queries.push(`"${businessName}" email contact`);
 
-    for (const q of queries) {
-      try {
-        const res = await axios.post(
+    const serperResults = await Promise.allSettled(
+      queries.map(q =>
+        axios.post(
           'https://google.serper.dev/search',
           { q, num: 5 },
           { headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' }, timeout: 5_000 }
-        );
-        const text = (res.data?.organic ?? [])
-          .map(r => `${r.title ?? ''} ${r.snippet ?? ''}`)
-          .join(' ');
-        const email = extractEmailsFromHtml(text, domain ?? '');
+        )
+      )
+    );
+
+    // Collect discovered URLs and check snippets/knowledgeGraph immediately
+    const discoveredUrls = [];
+    for (const r of serperResults) {
+      if (r.status !== 'fulfilled') continue;
+      const data = r.value.data ?? {};
+
+      // Knowledge graph / answer box sometimes has the email inline
+      const quickText = JSON.stringify(data.knowledgeGraph ?? '') + ' ' +
+                        JSON.stringify(data.answerBox ?? '');
+      const quickEmail = extractEmailsFromHtml(quickText, domain ?? '');
+      if (quickEmail) return quickEmail;
+
+      // Snippet scan
+      const snippetText = (data.organic ?? [])
+        .map(row => `${row.title ?? ''} ${row.snippet ?? ''}`)
+        .join(' ');
+      const snippetEmail = extractEmailsFromHtml(snippetText, domain ?? '');
+      if (snippetEmail) return snippetEmail;
+
+      // Queue top-2 result URLs for full-page scraping
+      (data.organic ?? []).slice(0, 2).forEach(row => row.link && discoveredUrls.push(row.link));
+    }
+
+    // Scrape the actual pages Google found — far more complete than snippets
+    if (discoveredUrls.length) {
+      const uniqueUrls = [...new Set(discoveredUrls)].slice(0, 6);
+      const pageResults = await Promise.allSettled(
+        uniqueUrls.map(url =>
+          axios.get(url, { timeout: 4_000, headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 3 })
+        )
+      );
+      for (const r of pageResults) {
+        if (r.status !== 'fulfilled') continue;
+        const html  = typeof r.value.data === 'string' ? r.value.data : '';
+        const email = extractEmailsFromHtml(html, domain ?? '');
         if (email) return email;
-      } catch { /* search failed */ }
+      }
     }
   }
 
   if (!domain) return null;
 
-  // ── 2. Hunter Email Finder (name + domain) ──────────────────────────────
-  if (hunterKey && ownerName) {
-    const parts = ownerName.trim().split(/\s+/);
-    if (parts.length >= 2) {
-      try {
-        const res = await axios.get('https://api.hunter.io/v2/email-finder', {
-          params: { domain, first_name: parts[0], last_name: parts.slice(1).join(' '), api_key: hunterKey },
-          timeout: 5_000,
-        });
-        const email = res.data?.data?.email;
-        if (email) return email.toLowerCase();
-      } catch { /* not found or quota hit */ }
+  // ── 2 & 3. Hunter Email Finder + Domain Search (concurrent) ─────────────
+  if (hunterKey) {
+    const hunterCalls = [];
+
+    if (ownerName) {
+      const parts = ownerName.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        hunterCalls.push(
+          axios.get('https://api.hunter.io/v2/email-finder', {
+            params: { domain, first_name: parts[0], last_name: parts.slice(1).join(' '), api_key: hunterKey },
+            timeout: 5_000,
+          }).then(r => r.data?.data?.email?.toLowerCase() ?? null).catch(() => null)
+        );
+      }
+    }
+
+    hunterCalls.push(
+      axios.get('https://api.hunter.io/v2/domain-search', {
+        params: { domain, api_key: hunterKey, limit: 10 },
+        timeout: 5_000,
+      }).then(r => {
+        const emails = (r.data?.data?.emails ?? [])
+          .sort((a, b) => {
+            if (a.type === 'personal' && b.type !== 'personal') return -1;
+            if (b.type === 'personal' && a.type !== 'personal') return  1;
+            return (b.confidence ?? 0) - (a.confidence ?? 0);
+          })
+          .map(e => e.value?.toLowerCase()).filter(Boolean);
+        return pickBestEmail(emails, domain);
+      }).catch(() => null)
+    );
+
+    const hunterEmails = await Promise.all(hunterCalls);
+    for (const email of hunterEmails) {
+      if (email) return email;
     }
   }
 
-  // ── 3. Hunter Domain Search ─────────────────────────────────────────────
-  if (hunterKey) {
-    try {
-      const res = await axios.get('https://api.hunter.io/v2/domain-search', {
-        params: { domain, api_key: hunterKey, limit: 10 },
-        timeout: 5_000,
-      });
-      const emails = (res.data?.data?.emails ?? [])
-        .sort((a, b) => {
-          if (a.type === 'personal' && b.type !== 'personal') return -1;
-          if (b.type === 'personal' && a.type !== 'personal') return  1;
-          return (b.confidence ?? 0) - (a.confidence ?? 0);
-        })
-        .map(e => e.value?.toLowerCase())
-        .filter(Boolean);
-      const pick = pickBestEmail(emails, domain);
-      if (pick) return pick;
-    } catch { /* quota hit or unavailable */ }
-  }
-
-  // ── 4. Scrape homepage, contact page, about ─────────────────────────────
+  // ── 4. Scrape website pages (7 common contact locations) ─────────────────
   try {
     const base  = new URL(website).origin;
-    const pages = [website, `${base}/contact`, `${base}/contact-us`, `${base}/about`, `${base}/about-us`];
-    const opts  = { timeout: 4_000, headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 3 };
+    const pages = [
+      website,
+      `${base}/contact`,
+      `${base}/contact-us`,
+      `${base}/get-in-touch`,
+      `${base}/about`,
+      `${base}/about-us`,
+      `${base}/team`,
+    ];
+    const opts = { timeout: 4_000, headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 3 };
     const results = await Promise.allSettled(pages.map(url => axios.get(url, opts)));
     for (const r of results) {
       if (r.status !== 'fulfilled') continue;
@@ -781,6 +913,151 @@ exports.scanBusinessLeads = onCall(
       leads,
       meta: { location, type, radius, scanMode, found: leads.length },
     };
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Booking Functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Function 4: getAvailableSlots
+ * Reads the owner's Google Calendar and returns free slots for the next N days.
+ * Called only by the authenticated dashboard (Dean's view).
+ */
+exports.getAvailableSlots = onCall(
+  {
+    cors:           true,
+    timeoutSeconds: 30,
+    memory:         '256MiB',
+    secrets:        ['CALENDAR_CLIENT_ID', 'CALENDAR_CLIENT_SECRET', 'CALENDAR_REFRESH_TOKEN'],
+  },
+  async (request) => {
+    const { durationMins = 60, daysAhead = 14 } = request.data ?? {};
+
+    const now  = new Date();
+    const from = new Date(now);
+    from.setDate(from.getDate() + 1); // start tomorrow
+    from.setHours(0, 0, 0, 0);
+
+    const to = new Date(from);
+    to.setDate(to.getDate() + daysAhead);
+    to.setHours(23, 59, 59, 999);
+
+    const busyTimes     = await getFreeBusy(from.toISOString(), to.toISOString());
+    const allSlots      = generateSlots(from, to, durationMins);
+    const freeSlots     = filterFreeSlots(allSlots, busyTimes);
+
+    return { slots: freeSlots, durationMins };
+  }
+);
+
+/**
+ * Function 5: updateBookingSettings (authenticated)
+ * Dean saves his booking title and slot duration to Firestore.
+ */
+exports.updateBookingSettings = onCall(
+  {
+    cors:           true,
+    timeoutSeconds: 10,
+    memory:         '256MiB',
+  },
+  async (request) => {
+    const { title, durationMins, approvedSlots } = request.data ?? {};
+    const payload = { updatedAt: FieldValue.serverTimestamp() };
+    if (title        !== undefined) payload.title        = title;
+    if (durationMins !== undefined) payload.durationMins = durationMins;
+    if (approvedSlots !== undefined) payload.approvedSlots = approvedSlots; // array of slot ISO strings or null to show all
+    await db.collection('booking_config').doc('default').set(payload, { merge: true });
+    return { success: true };
+  }
+);
+
+/**
+ * Function 6: getLiveAvailability (public — no auth required)
+ * Reads Google Calendar in real time and returns free slots.
+ * Powers the permanent /book page — the link never changes.
+ */
+exports.getLiveAvailability = onCall(
+  {
+    cors:           true,
+    timeoutSeconds: 30,
+    memory:         '256MiB',
+    secrets:        ['CALENDAR_CLIENT_ID', 'CALENDAR_CLIENT_SECRET', 'CALENDAR_REFRESH_TOKEN'],
+  },
+  async () => {
+    // Load settings from Firestore
+    const configDoc = await db.collection('booking_config').doc('default').get();
+    const config    = configDoc.exists ? configDoc.data() : {};
+    const durationMins = config.durationMins ?? 60;
+    const title        = config.title ?? 'Discovery Call — Dean Burt';
+
+    const now  = new Date();
+    const from = new Date(now);
+    from.setDate(from.getDate() + 1);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(from);
+    to.setDate(to.getDate() + 14);
+    to.setHours(23, 59, 59, 999);
+
+    const busyTimes = await getFreeBusy(from.toISOString(), to.toISOString());
+    const allSlots  = generateSlots(from, to, durationMins);
+    const freeSlots = filterFreeSlots(allSlots, busyTimes);
+
+    // If Dean has hand-picked slots, filter to only those that are still free
+    const approvedSlots = config.approvedSlots;
+    let visibleSlots = freeSlots;
+    if (Array.isArray(approvedSlots) && approvedSlots.length > 0) {
+      const approvedSet = new Set(approvedSlots);
+      visibleSlots = freeSlots.filter(s => approvedSet.has(s.start));
+    }
+
+    return { slots: visibleSlots, durationMins, title };
+  }
+);
+
+/**
+ * Function 7: confirmBooking (public — no auth required)
+ * Client confirms a slot → creates Google Calendar event → marks slot taken.
+ */
+exports.confirmBooking = onCall(
+  {
+    cors:           true,
+    timeoutSeconds: 30,
+    memory:         '256MiB',
+    secrets:        ['CALENDAR_CLIENT_ID', 'CALENDAR_CLIENT_SECRET', 'CALENDAR_REFRESH_TOKEN', 'GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN'],
+  },
+  async (request) => {
+    const { slotStart, slotEnd, clientName, clientEmail, clientNote } = request.data ?? {};
+
+    if (!slotStart || !slotEnd || !clientName || !clientEmail) {
+      throw new HttpsError('invalid-argument', 'Missing required booking fields.');
+    }
+
+    // Load title from settings
+    const configDoc = await db.collection('booking_config').doc('default').get();
+    const title     = configDoc.exists ? (configDoc.data().title ?? 'Discovery Call — Dean Burt') : 'Discovery Call — Dean Burt';
+
+    const startDt = new Date(slotStart);
+    const timeStr = startDt.toLocaleString('en-GB', { timeZone: 'Europe/London', dateStyle: 'full', timeStyle: 'short' });
+
+    await createCalendarEvent({
+      summary:       `${title} — ${clientName}`,
+      description:   `Client: ${clientName}\nEmail: ${clientEmail}${clientNote ? `\nNote: ${clientNote}` : ''}`,
+      startTime:     slotStart,
+      endTime:       slotEnd,
+      attendeeEmail: clientEmail,
+      attendeeName:  clientName,
+    });
+
+    // Notify Dean
+    await sendEmail({
+      to:      'deanburt1308@gmail.com',
+      subject: `New booking: ${clientName} — ${timeStr}`,
+      body:    `You have a new booking!\n\nName:  ${clientName}\nEmail: ${clientEmail}\nTime:  ${timeStr}${clientNote ? `\nNote:  ${clientNote}` : ''}\n\nIt's been added to your Google Calendar.`,
+    }).catch(() => {}); // don't fail the booking if the notification errors
+
+    return { success: true, confirmedTime: timeStr };
   }
 );
 

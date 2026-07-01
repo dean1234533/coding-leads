@@ -81,7 +81,7 @@ export default function LeadTable({ leads, onDelete }) {
               <p className="truncate font-medium text-gray-100">{lead.companyName}</p>
               {lead.websiteUrl && (
                 <a href={lead.websiteUrl} target="_blank" rel="noopener noreferrer"
-                  className="block truncate text-xs text-gray-600 hover:text-indigo-400 transition">
+                  className="block truncate text-xs text-gray-600 hover:text-blue-400 transition">
                   {lead.websiteUrl.replace(/^https?:\/\/(www\.)?/, '')}
                 </a>
               )}
@@ -121,7 +121,7 @@ export default function LeadTable({ leads, onDelete }) {
                   <span className="block truncate max-w-[10rem]">{lead.companyName}</span>
                   {lead.websiteUrl && (
                     <a href={lead.websiteUrl} target="_blank" rel="noopener noreferrer"
-                      className="mt-0.5 block truncate max-w-[10rem] text-xs text-gray-600 hover:text-indigo-400 transition">
+                      className="mt-0.5 block truncate max-w-[10rem] text-xs text-gray-600 hover:text-blue-400 transition">
                       {lead.websiteUrl.replace(/^https?:\/\/(www\.)?/, '')}
                     </a>
                   )}

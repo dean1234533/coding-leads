@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
+html, body {
   font-family: 'Inter', system-ui, sans-serif;
+  overflow-x: hidden;
+  width: 100%;
+  position: relative;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
 }

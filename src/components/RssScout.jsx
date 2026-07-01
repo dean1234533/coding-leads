@@ -43,6 +43,98 @@ const RADII = [
   { value: 5000, label: '5km'   },
 ];
 
+// ─── Design / app prompt generator ───────────────────────────────────────────
+
+const TYPE_LABELS = {
+  restaurant:          'restaurant or café',
+  beauty_salon:        'beauty salon or hair salon',
+  gym:                 'gym or fitness studio',
+  lawyer:              'law firm',
+  real_estate_agency:  'estate agency',
+  accounting:          'accountancy firm',
+  plumber:             'trades business',
+  clothing_store:      'clothing or retail shop',
+  car_repair:          'auto repair garage',
+  dentist:             'dental or medical practice',
+  store:               'retail shop',
+};
+
+const TYPE_COLOURS = {
+  restaurant:          'warm earthy tones — terracotta, cream, and deep green',
+  beauty_salon:        'soft luxury palette — blush pink, champagne, and charcoal',
+  gym:                 'bold, energetic palette — black, electric blue, and white',
+  lawyer:              'professional palette — navy, gold, and white',
+  real_estate_agency:  'trustworthy palette — dark navy, white, and gold accents',
+  accounting:          'clean corporate palette — slate blue, white, and grey',
+  plumber:             'bold, trustworthy palette — deep blue, white, and orange',
+  clothing_store:      'modern retail palette — black, white, and a bold accent colour',
+  car_repair:          'industrial palette — charcoal, red, and white',
+  dentist:             'clean clinical palette — white, soft blue, and mint green',
+  store:               'clean modern palette — white, grey, and a bold accent',
+};
+
+function generateFigmaPrompt(lead, businessType) {
+  const typeLabel  = TYPE_LABELS[businessType]  ?? 'local business';
+  const colours    = TYPE_COLOURS[businessType] ?? 'clean modern palette — white, grey, and a bold accent';
+  const city       = lead.address?.split(',').slice(-2).join(',').trim() ?? 'the local area';
+  const name       = lead.name;
+
+  if (!lead.website) {
+    return `Design a modern, professional website homepage for "${name}", a ${typeLabel} based in ${city}. They currently have no website so this needs to make a strong first impression and convert visitors into customers.
+
+Include:
+- A bold hero section with business name, a one-line value proposition, and a clear call-to-action button (e.g. "Book Now" or "Get a Quote")
+- A services / menu / offerings section with icons or cards
+- A customer reviews / testimonials section
+- A contact section with phone number, address, and a simple enquiry form
+- A sticky mobile navigation bar at the bottom
+
+Style: mobile-first, clean and modern, ${colours}. Target audience: local customers searching on their phone.`;
+  }
+
+  if (lead.opportunityScore === 3) {
+    return `Redesign the homepage for "${name}", a ${typeLabel} in ${city}. Their current website looks outdated — create a fresh, modern redesign that looks credible and drives enquiries.
+
+Include:
+- A bold, full-width hero section with a strong headline and CTA button
+- A services section with clean cards or grid layout
+- Trust signals — customer reviews, years in business, or certifications
+- A clear contact / booking section
+- Smooth mobile layout with large tap targets
+
+Style: ${colours}. The redesign should feel instantly more professional than their current site.`;
+  }
+
+  // Has website → Base44 app prompt
+  return null; // signals to use generateBase44Prompt instead
+}
+
+function generateBase44Prompt(lead, businessType) {
+  const typeLabel = TYPE_LABELS[businessType] ?? 'local business';
+  const city      = lead.address?.split(',').slice(-2).join(',').trim() ?? 'the local area';
+  const name      = lead.name;
+
+  return `Build a mobile app for "${name}", a ${typeLabel} based in ${city}.
+
+The app should complement their existing website (${lead.website ?? 'they have a website'}) and give customers a reason to download and keep using it.
+
+Core features to build:
+1. **Home screen** — welcome banner with business name, quick-access buttons for booking, menu/services, and offers
+2. **Booking / appointment flow** — pick a service, pick a date and time, confirm booking (send confirmation notification)
+3. **Loyalty stamp card** — customers earn a stamp per visit, reward unlocks after 10 stamps
+4. **Push notifications** — send offers and reminders to customers who have the app
+5. **Contact & info screen** — opening hours, address with map, phone number, social links
+
+Authentication: simple email/phone login for customers.
+
+Keep the UI clean and easy to use on mobile. The business owner should be able to manage bookings and send notifications from a simple admin panel.`;
+}
+
+export function getPromptType(lead) {
+  if (lead.opportunityScore === 1) return 'base44';
+  return 'figma';
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function PrimeBadge() {
@@ -90,7 +182,7 @@ function StarRating({ rating, count }) {
   );
 }
 
-function LeadCard({ lead, onCopy, isCopied }) {
+function LeadCard({ lead, onCopy, isCopied, onFigmaCopy, isFigmaCopied, businessType }) {
   const score   = lead.opportunityScore;
   const isPrime = score >= 5;
   const isWeak  = score === 3;
@@ -117,11 +209,11 @@ function LeadCard({ lead, onCopy, isCopied }) {
       {/* Owner name row */}
       {lead.ownerName ? (
         <div className="flex items-center gap-1.5 text-xs">
-          <svg className="h-3 w-3 flex-shrink-0 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-3 w-3 flex-shrink-0 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
           </svg>
-          <span className="font-medium text-indigo-300">{lead.ownerName}</span>
+          <span className="font-medium text-blue-300">{lead.ownerName}</span>
           {lead.ownerNameSource && (
             <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
               lead.ownerNameSource === 'business name'
@@ -151,7 +243,7 @@ function LeadCard({ lead, onCopy, isCopied }) {
             href={lead.website}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-indigo-400 hover:underline"
+            className="flex items-center gap-1 text-blue-400 hover:underline"
           >
             <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -197,13 +289,13 @@ function LeadCard({ lead, onCopy, isCopied }) {
       )}
 
       {/* Action row */}
-      <div className="flex items-center gap-3 pt-1">
+      <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
           onClick={() => onCopy(lead)}
           className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
             isCopied
               ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30'
-              : 'bg-indigo-600 text-white hover:bg-indigo-500'
+              : 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-400 hover:to-cyan-400'
           }`}
         >
           {isCopied ? (
@@ -214,6 +306,32 @@ function LeadCard({ lead, onCopy, isCopied }) {
               Copied to Form
             </>
           ) : 'Copy to Outreach Form'}
+        </button>
+
+        <button
+          onClick={() => onFigmaCopy(lead)}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
+            isFigmaCopied
+              ? 'bg-violet-500/15 text-violet-400 ring-1 ring-violet-500/30'
+              : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+          }`}
+        >
+          {isFigmaCopied ? (
+            <>
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
+              </svg>
+              Prompt Copied
+            </>
+          ) : (
+            <>
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+              </svg>
+              {lead.opportunityScore === 1 ? 'Base44 Prompt' : 'Figma Prompt'}
+            </>
+          )}
         </button>
 
         {lead.googleMapsUrl && (
@@ -256,8 +374,9 @@ export default function RssScout({ onCopyToForm }) {
   const [loading,  setLoading]    = useState(false);
   const [error,    setError]      = useState(null);
   const [meta,     setMeta]       = useState(null);
-  const [copiedId, setCopiedId]   = useState(null);
-  const [filter,   setFilter]     = useState('all');
+  const [copiedId,      setCopiedId]      = useState(null);
+  const [figmaCopiedId, setFigmaCopiedId] = useState(null);
+  const [filter,        setFilter]        = useState('all');
 
   function handleScanModeChange(mode) {
     setScanMode(mode);
@@ -284,6 +403,14 @@ export default function RssScout({ onCopyToForm }) {
       setLoading(false);
     }
   }, [location, type, radius, scanMode]);
+
+  function handleFigmaCopy(lead) {
+    const figmaPrompt = generateFigmaPrompt(lead, type);
+    const prompt = figmaPrompt ?? generateBase44Prompt(lead, type);
+    navigator.clipboard.writeText(prompt).catch(() => {});
+    setFigmaCopiedId(lead.id);
+    setTimeout(() => setFigmaCopiedId(null), 2000);
+  }
 
   function handleCopy(lead) {
     onCopyToForm({
@@ -333,7 +460,7 @@ export default function RssScout({ onCopyToForm }) {
                 scanMode === value
                   ? value === 'agency'
                     ? 'bg-violet-600 text-white'
-                    : 'bg-indigo-600 text-white'
+                    : 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
                   : 'text-gray-500 hover:text-gray-300'
               }`}
             >
@@ -351,7 +478,7 @@ export default function RssScout({ onCopyToForm }) {
             onChange={e => setLocation(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && scan()}
             placeholder="e.g. Hackney, London"
-            className="w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 text-sm text-gray-100 placeholder-gray-600 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 text-sm text-gray-100 placeholder-gray-600 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
         </div>
 
@@ -363,7 +490,7 @@ export default function RssScout({ onCopyToForm }) {
             <select
               value={type}
               onChange={e => setType(e.target.value)}
-              className="w-full rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-sm text-gray-100 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-sm text-gray-100 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
               {BUSINESS_TYPES.map(t => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -375,7 +502,7 @@ export default function RssScout({ onCopyToForm }) {
             <select
               value={radius}
               onChange={e => setRadius(Number(e.target.value))}
-              className="w-full rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-sm text-gray-100 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-sm text-gray-100 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
               {RADII.map(r => (
                 <option key={r.value} value={r.value}>{r.label}</option>
@@ -389,7 +516,7 @@ export default function RssScout({ onCopyToForm }) {
         <button
           onClick={scan}
           disabled={loading || !location.trim()}
-          className="w-full rounded-xl bg-indigo-600 py-3.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 py-3.5 text-sm font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
@@ -445,7 +572,7 @@ export default function RssScout({ onCopyToForm }) {
                   key={key}
                   onClick={() => setFilter(key)}
                   className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                    filter === key ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-300'
+                    filter === key ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : 'text-gray-500 hover:text-gray-300'
                   }`}
                 >
                   {label}
@@ -461,6 +588,9 @@ export default function RssScout({ onCopyToForm }) {
                 lead={lead}
                 onCopy={handleCopy}
                 isCopied={copiedId === lead.id}
+                onFigmaCopy={handleFigmaCopy}
+                isFigmaCopied={figmaCopiedId === lead.id}
+                businessType={type}
               />
             ))}
           </div>

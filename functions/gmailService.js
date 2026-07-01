@@ -14,14 +14,13 @@ const { google } = require('googleapis');
  */
 function getGmailClient() {
   const oauth2Client = new google.auth.OAuth2(
-    process.env.GMAIL_CLIENT_ID,
-    process.env.GMAIL_CLIENT_SECRET,
-    'urn:ietf:wg:oauth:2.0:oob' // out-of-band redirect used when getting the token
+    process.env.GMAIL_CLIENT_ID?.trim(),
+    process.env.GMAIL_CLIENT_SECRET?.trim(),
+    'urn:ietf:wg:oauth:2.0:oob'
   );
 
-  // Set the stored refresh token — the client will auto-renew the access token
   oauth2Client.setCredentials({
-    refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+    refresh_token: process.env.GMAIL_REFRESH_TOKEN?.trim(),
   });
 
   return google.gmail({ version: 'v1', auth: oauth2Client });
@@ -40,6 +39,13 @@ function getGmailClient() {
  * @returns {Promise<string>} The Gmail draft ID (e.g. "r123456789")
  */
 async function createGmailDraft({ to, subject, body }) {
+  const clientId = process.env.GMAIL_CLIENT_ID?.trim();
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET?.trim();
+  const refreshToken = process.env.GMAIL_REFRESH_TOKEN?.trim();
+  console.log('[gmailService] client_id prefix:', clientId?.slice(0, 12));
+  console.log('[gmailService] client_secret present:', !!clientSecret);
+  console.log('[gmailService] refresh_token present:', !!refreshToken);
+
   const gmail = getGmailClient();
 
   // Build a minimal RFC 2822 message
@@ -70,4 +76,29 @@ async function createGmailDraft({ to, subject, body }) {
   return draftId;
 }
 
-module.exports = { createGmailDraft };
+/**
+ * Sends an email immediately via Gmail API.
+ * Used for owner notifications only — outreach emails remain drafts.
+ */
+async function sendEmail({ to, subject, body }) {
+  const gmail = getGmailClient();
+
+  const rawLines = [
+    `From: me`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    'Content-Type: text/plain; charset=utf-8',
+    'MIME-Version: 1.0',
+    '',
+    body,
+  ].join('\r\n');
+
+  const encodedMessage = Buffer.from(rawLines).toString('base64url');
+
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw: encodedMessage },
+  });
+}
+
+module.exports = { createGmailDraft, sendEmail };

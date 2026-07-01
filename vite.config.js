@@ -1,6 +1,41 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['icon.svg'],
+      manifest: {
+        name: 'Lead Dashboard',
+        short_name: 'Leads',
+        description: 'Client outreach and lead management dashboard',
+        theme_color: '#030712',
+        background_color: '#030712',
+        display: 'standalone',
+        orientation: 'portrait',
+        start_url: '/',
+        icons: [
+          {
+            src: 'icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/.*\.googleapis\.com\/.*/i,
+            handler: 'NetworkFirst',
+            options: { cacheName: 'google-apis', networkTimeoutSeconds: 10 },
+          },
+        ],
+      },
+    }),
+  ],
 });
