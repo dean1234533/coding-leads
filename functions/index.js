@@ -1,11 +1,13 @@
 'use strict';
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule }         = require('firebase-functions/v2/scheduler');
 const { initializeApp }      = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { findOwnerEmail }     = require('./leadService');
 const { createGmailDraft, sendEmail } = require('./gmailService');
 const { getFreeBusy, createCalendarEvent, generateSlots, filterFreeSlots } = require('./calendarService');
+const { ensureConfigDocs, runScan } = require('./codingLeadsService');
 const axios                  = require('axios');
 const Parser                 = require('rss-parser');
 
@@ -953,6 +955,27 @@ exports.getAvailableSlots = onCall(
 );
 
 /**
+ * Function 4b: getBookingSettings
+ * Returns the saved booking config (title, duration, approvedSlots).
+ * Server-side so it bypasses Firestore security rules.
+ */
+exports.getBookingSettings = onCall(
+  { cors: true, timeoutSeconds: 10, memory: '256MiB' },
+  async () => {
+    const snap = await db.collection('booking_config').doc('default').get();
+    if (!snap.exists) {
+      return { title: 'Discovery Call — Dean Burt', durationMins: 15, approvedSlots: [] };
+    }
+    const data = snap.data();
+    return {
+      title:         data.title         ?? 'Discovery Call — Dean Burt',
+      durationMins:  data.durationMins  ?? 15,
+      approvedSlots: data.approvedSlots ?? [],
+    };
+  }
+);
+
+/**
  * Function 5: updateBookingSettings (authenticated)
  * Dean saves his booking title and slot duration to Firestore.
  */
@@ -1058,6 +1081,54 @@ exports.confirmBooking = onCall(
     }).catch(() => {}); // don't fail the booking if the notification errors
 
     return { success: true, confirmedTime: timeStr };
+  }
+);
+
+/**
+ * Emails Dean when a scan turns up new high-intent-score leads, so he can
+ * respond fast instead of relying on checking the dashboard.
+ */
+async function notifyHighScoreLeads(newHighScoreLeads) {
+  if (!newHighScoreLeads?.length) return;
+  const lines = newHighScoreLeads
+    .map((l) => `• [${l.intentScore}] ${l.title} (${l.leadType}) — ${l.source}\n  ${l.url}`)
+    .join('\n\n');
+  await sendEmail({
+    to:      'deanburt1308@gmail.com',
+    subject: `${newHighScoreLeads.length} new high-intent coding lead${newHighScoreLeads.length === 1 ? '' : 's'} found`,
+    body:    `New coding leads scoring 60+ just came in:\n\n${lines}\n\nOpen the Coding Leads dashboard to respond.`,
+  }).catch(() => {}); // don't fail the scan if the email fails
+}
+
+const CODING_LEADS_SECRETS = ['GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN'];
+
+/**
+ * Function 8: scanCodingLeadsNow (authenticated, manual trigger)
+ * Polls configured public RSS feeds (e.g. subreddit feeds), scores each post
+ * against the Coding Leads keyword lists, and saves new high-relevance posts
+ * as leads. Safe to call repeatedly — already-seen posts are skipped.
+ */
+exports.scanCodingLeadsNow = onCall(
+  { cors: true, timeoutSeconds: 120, memory: '256MiB', secrets: CODING_LEADS_SECRETS },
+  async () => {
+    await ensureConfigDocs(db);
+    const result = await runScan(db, FieldValue);
+    await notifyHighScoreLeads(result.newHighScoreLeads);
+    return result;
+  }
+);
+
+/**
+ * Function 9: scheduledCodingLeadsScan
+ * Runs the same scan automatically every 6 hours so leads show up without
+ * needing to click "Scan Now".
+ */
+exports.scheduledCodingLeadsScan = onSchedule(
+  { schedule: 'every 6 hours', timeoutSeconds: 300, memory: '256MiB', secrets: CODING_LEADS_SECRETS },
+  async () => {
+    await ensureConfigDocs(db);
+    const result = await runScan(db, FieldValue);
+    await notifyHighScoreLeads(result.newHighScoreLeads);
   }
 );
 

@@ -28,13 +28,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.googleapis\.com\/.*/i,
-            handler: 'NetworkFirst',
-            options: { cacheName: 'google-apis', networkTimeoutSeconds: 10 },
-          },
-        ],
+        navigateFallback: 'index.html',
+        // Never cache Firebase/Google API calls — they use streaming and can't be cached
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [],
       },
     }),
   ],

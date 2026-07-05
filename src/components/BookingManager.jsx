@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { doc, getDoc } from 'firebase/firestore';
-import { app, db } from '../firebase';
+import { app } from '../firebase';
 import Calendar, { dateKey, slotsByDate } from './Calendar';
 
 const DURATION_OPTIONS = [
@@ -52,23 +51,17 @@ export default function BookingManager() {
     }
   }
 
-  // On mount: load saved config from Firestore first, then fetch slots
+  // On mount: load saved config via cloud function (bypasses Firestore rules), then fetch slots
   useEffect(() => {
     async function init() {
       try {
-        const snap = await getDoc(doc(db, 'booking_config', 'default'));
-        if (snap.exists()) {
-          const data = snap.data();
-          const savedDur      = data.durationMins ?? 15;
-          const savedTitle    = data.title ?? 'Discovery Call — Dean Burt';
-          const savedApproved = data.approvedSlots ?? [];
-          setTitle(savedTitle);
-          setDuration(savedDur);
-          if (savedApproved.length > 0) setApproved(new Set(savedApproved));
-          await loadSlots(savedDur);
-        } else {
-          await loadSlots(15);
-        }
+        const fns = getFunctions(app);
+        const res = await httpsCallable(fns, 'getBookingSettings')({});
+        const { title: savedTitle, durationMins: savedDur, approvedSlots: savedApproved } = res.data;
+        setTitle(savedTitle);
+        setDuration(savedDur);
+        if (savedApproved.length > 0) setApproved(new Set(savedApproved));
+        await loadSlots(savedDur);
       } catch {
         await loadSlots(15);
       } finally {

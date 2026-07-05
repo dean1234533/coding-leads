@@ -20,6 +20,7 @@ import Pricing        from '../components/Pricing';
 import CallScripts    from '../components/CallScripts';
 import BookingManager from '../components/BookingManager';
 import InstallBanner  from '../components/InstallBanner';
+import CodingLeadsPage from '../components/CodingLeadsPage';
 
 // ─── Form field ───────────────────────────────────────────────────────────────
 
@@ -157,10 +158,11 @@ const FORM_CONFIG = {
 };
 
 const NAV_TABS = [
-  { key: 'dashboard', label: 'Dashboard'    },
-  { key: 'booking',   label: 'Booking'      },
-  { key: 'pricing',   label: 'Pricing'      },
-  { key: 'scripts',   label: 'Call Scripts' },
+  { key: 'dashboard',   label: 'Dashboard'    },
+  { key: 'codingLeads', label: 'Coding Leads' },
+  { key: 'booking',     label: 'Booking'      },
+  { key: 'pricing',     label: 'Pricing'      },
+  { key: 'scripts',     label: 'Call Scripts' },
 ];
 
 export default function LeadDashboard() {
@@ -302,6 +304,7 @@ export default function LeadDashboard() {
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
 
+        {activeTab === 'codingLeads' && <CodingLeadsPage />}
         {activeTab === 'booking'   && <BookingManager />}
         {activeTab === 'pricing'   && <Pricing />}
         {activeTab === 'scripts'   && <CallScripts />}
