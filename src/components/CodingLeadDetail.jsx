@@ -70,14 +70,30 @@ export default function CodingLeadDetail({ lead, onUpdate, onDelete, onClose }) 
           </Section>
         </div>
 
-        {lead.url && (
-          <a href={lead.url} target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm text-blue-400 hover:underline">
-            Open source
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </a>
+        <div className="flex flex-wrap gap-4">
+          {lead.url && (
+            <a href={lead.url} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-blue-400 hover:underline">
+              Open source
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          )}
+          {lead.contactLink && lead.contactLink !== lead.url && (
+            <a href={lead.contactLink} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-400 hover:underline">
+              Message on Reddit
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </a>
+          )}
+        </div>
+        {(!lead.contactLink || lead.contactLink === lead.url) && (
+          <p className="-mt-3 text-xs text-gray-600">
+            No direct message link for this lead — open the source and reply/DM from there.
+          </p>
         )}
 
         {lead.snippet && (

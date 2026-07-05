@@ -278,7 +278,12 @@ async function runScan(db, FieldValue) {
         const existing = await ref.get();
         if (existing.exists) continue;
 
-        const leadType = detectLeadType(text);
+        const leadType  = detectLeadType(text);
+        const username  = String(item.author ?? '').replace(/^\/?u\//, '').trim();
+        const contactLink = username
+          ? `https://www.reddit.com/message/compose/?to=${encodeURIComponent(username)}`
+          : (item.link ?? '');
+
         await ref.set({
           title:             item.title ?? 'Untitled post',
           source:            src.name,
@@ -291,7 +296,7 @@ async function runScan(db, FieldValue) {
           budget:            detectBudget(text),
           status:            'New',
           notes:             '',
-          contactLink:       item.link ?? '',
+          contactLink,
           detectedKeywords:  [...matchedHigh, ...matchedMedium],
           scoreReasons,
           suggestedOutreach: generateOutreachMessage(leadType),
