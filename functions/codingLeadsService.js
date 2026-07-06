@@ -276,14 +276,23 @@ async function runScan(db, FieldValue) {
         const id  = hashId(item.link ?? item.guid ?? item.title);
         const ref = db.collection('codingLeads').doc(id);
         const existing = await ref.get();
-        if (existing.exists) continue;
 
-        const leadType  = detectLeadType(text);
         const username  = String(item.author ?? '').replace(/^\/?u\//, '').trim();
         const contactLink = username
           ? `https://www.reddit.com/message/compose/?to=${encodeURIComponent(username)}`
           : (item.link ?? '');
 
+        if (existing.exists) {
+          // The post is still fresh enough to be in the feed — patch in a
+          // proper message link if this lead was saved before we could derive one.
+          const existingData = existing.data();
+          if (contactLink && contactLink !== existingData.url && (!existingData.contactLink || existingData.contactLink === existingData.url)) {
+            await ref.update({ contactLink, updatedAt: FieldValue.serverTimestamp() });
+          }
+          continue;
+        }
+
+        const leadType = detectLeadType(text);
         await ref.set({
           title:             item.title ?? 'Untitled post',
           source:            src.name,
