@@ -14,10 +14,12 @@ const GMAIL_SCOPES = [
 const OAUTH_SECRETS = ['GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'TOKEN_ENCRYPTION_KEY', 'APP_URL'];
 
 function getRedirectUri() {
-  // Cloud Functions v2 (2nd gen) HTTPS URL pattern for the callback function.
-  const project = process.env.GCLOUD_PROJECT;
-  const region = 'us-central1';
-  return `https://${region}-${project}.cloudfunctions.net/gmailOAuthCallback`;
+  // 2nd-gen onRequest functions resolve to a Cloud Run URL, not the legacy
+  // us-central1-PROJECT.cloudfunctions.net pattern used by 1st-gen functions.
+  // Override via the OAUTH_REDIRECT_URI secret if this function is ever
+  // deleted and recreated (which changes the Cloud Run URL's random suffix).
+  return process.env.OAUTH_REDIRECT_URI?.trim()
+    ?? 'https://gmailoauthcallback-fuhvokki4q-uc.a.run.app';
 }
 
 function buildOAuthClient() {
