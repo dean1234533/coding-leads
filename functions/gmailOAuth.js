@@ -91,7 +91,9 @@ const getGmailAuthUrl = onCall(
 // gmailOAuthCallback — Google redirects the browser here with ?code=...
 // ─────────────────────────────────────────────────────────────────────────────
 const gmailOAuthCallback = onRequest(
-  { cors: true, timeoutSeconds: 30, memory: '256MiB', secrets: OAUTH_SECRETS },
+  // Google's redirect is an unauthenticated browser GET — this must be publicly
+  // invokable or Cloud Run's IAM layer rejects it before our code ever runs.
+  { cors: true, timeoutSeconds: 30, memory: '256MiB', secrets: OAUTH_SECRETS, invoker: 'public' },
   async (req, res) => {
     const appUrl = (process.env.APP_URL?.trim() ?? '').replace(/\/$/, '');
     const code = req.query.code;
