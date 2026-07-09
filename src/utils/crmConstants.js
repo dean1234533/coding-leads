@@ -374,7 +374,15 @@ export function slugify(name) {
 // Any variable with no value (missing lead field, no portfolio picked, etc.)
 // is dropped to an empty string rather than left as literal "{{business}}"
 // text — a template should be safe to send to any lead, however incomplete.
+// A cleanup pass then tidies the punctuation that leaves behind, so
+// "Hi {{contact}}," reads as "Hi," (not "Hi ,") when there's no name, and
+// "Thank you, {{contact}}!" reads as "Thank you!" instead of "Thank you, !".
 export function applyTemplateVars(text, vars) {
   if (!text) return '';
-  return text.replace(/\{\{(\w+)\}\}/g, (match, key) => vars?.[key]?.trim() ?? '');
+  const substituted = text.replace(/\{\{(\w+)\}\}/g, (match, key) => vars?.[key]?.trim() ?? '');
+  return substituted
+    .replace(/ +,/g, ',')
+    .replace(/, +!/g, '!')
+    .replace(/, +\?/g, '?')
+    .replace(/[ \t]{2,}/g, ' ');
 }

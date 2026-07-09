@@ -46,7 +46,7 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
 
   const vars = {
     business: lead?.businessName ?? '',
-    contact: lead?.contactName?.trim() || 'there',
+    contact: lead?.contactName?.trim() ?? '',
     website: lead?.website ?? '',
     industry: lead?.industry ?? '',
     issue: (lead?.issuesChecklist ?? [])[0] ?? '',

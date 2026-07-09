@@ -12,7 +12,7 @@ const SEND_DELAY_MS = 1500; // throttle between sends — avoids Gmail rate/abus
 function leadVars(lead) {
   return {
     business: lead.businessName ?? '',
-    contact: lead.contactName?.trim() || 'there',
+    contact: lead.contactName?.trim() ?? '',
     website: lead.website ?? '',
     industry: lead.industry ?? '',
     issue: (lead.issuesChecklist ?? [])[0] ?? '',
