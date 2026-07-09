@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { useState, useEffect, useRef } from 'react';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { DEFAULT_TEMPLATES } from '../../utils/crmConstants';
 import Modal from '../Modal';
@@ -10,12 +10,24 @@ export default function CrmTemplateLibrary() {
   const [templates, setTemplates] = useState(null);
   const [editing, setEditing] = useState(null); // template object or 'new' or null
   const [form, setForm] = useState(EMPTY);
-  const [seeding, setSeeding] = useState(false);
+  const seededRef = useRef(false);
 
   useEffect(() => {
     const q = query(collection(db, 'crmTemplates'), orderBy('category'), orderBy('name'));
     return onSnapshot(q, (snap) => setTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setTemplates([]));
   }, []);
+
+  // Every built-in template should just exist — no manual "load defaults" step.
+  // Self-heals if new defaults are ever added later, and only runs once per mount.
+  useEffect(() => {
+    if (templates === null || seededRef.current) return;
+    const existingNames = new Set(templates.map((t) => t.name));
+    const missing = DEFAULT_TEMPLATES.filter((t) => !existingNames.has(t.name));
+    if (missing.length === 0) return;
+    seededRef.current = true;
+    Promise.all(missing.map((t) => addDoc(collection(db, 'crmTemplates'), { ...t, createdAt: serverTimestamp() })))
+      .catch((err) => console.error('[CrmTemplateLibrary] auto-seed failed:', err));
+  }, [templates]);
 
   function startEdit(t) {
     setEditing(t ?? 'new');
@@ -61,20 +73,13 @@ export default function CrmTemplateLibrary() {
           <h2 className="text-sm font-semibold text-gray-200">Email Templates</h2>
           <p className="mt-0.5 text-xs text-gray-500">Reusable templates with {'{{business}} {{contact}} {{website}} {{industry}} {{issue}} {{portfolio}} {{myname}}'} variables.</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={loadDefaults} disabled={seeding}
-            className="rounded-lg bg-gray-800 px-3.5 py-2 text-xs font-semibold text-gray-200 transition hover:bg-gray-700 disabled:opacity-50">
-            {seeding ? 'Loading…' : 'Load Default Templates'}
-          </button>
-          <button onClick={() => startEdit(null)}
-            className="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-3.5 py-2 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400">
-            + New Template
-          </button>
-        </div>
+        <button onClick={() => startEdit(null)}
+          className="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-3.5 py-2 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400">
+          + New Template
+        </button>
       </div>
 
       {templates === null && <p className="text-sm text-gray-600">Loading…</p>}
-      {templates?.length === 0 && <p className="text-sm text-gray-600">No templates yet — load the defaults or create your own.</p>}
 
       {Object.entries(grouped).map(([category, list]) => (
         <div key={category} className="space-y-2">
