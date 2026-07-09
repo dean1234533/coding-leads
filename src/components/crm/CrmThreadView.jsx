@@ -9,16 +9,26 @@ function formatDate(value) {
   return new Date(value).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-// Finds the other party in the conversation — the first message not sent
-// from your own outreach address — so "Add to CRM" knows who to add.
+function parseAddress(raw) {
+  if (!raw) return null;
+  const match = raw.match(/^"?([^"<]*)"?\s*<(.+)>$/);
+  if (match) return { name: match[1].trim(), email: match[2].trim().toLowerCase() };
+  return { name: '', email: raw.trim().toLowerCase() };
+}
+
+// Finds the other party in the conversation so "Add to CRM" knows who to add.
+// Prefers the first inbound message (a reply from them); if the thread is
+// entirely outbound (you've sent but haven't heard back yet), falls back to
+// the "To" address of your own sent message instead.
 function extractCorrespondent(messages) {
   for (const m of messages ?? []) {
     const from = m.from ?? '';
     if (from && !from.toLowerCase().includes('dean-da-dev.co.uk')) {
-      const match = from.match(/^"?([^"<]*)"?\s*<(.+)>$/);
-      if (match) return { name: match[1].trim(), email: match[2].trim().toLowerCase() };
-      return { name: '', email: from.trim().toLowerCase() };
+      return parseAddress(from);
     }
+  }
+  for (const m of messages ?? []) {
+    if (m.to) return parseAddress(m.to);
   }
   return null;
 }
