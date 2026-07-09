@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { DEFAULT_PORTFOLIO } from '../../utils/crmConstants';
+import { DEFAULT_PORTFOLIO, slugify } from '../../utils/crmConstants';
 
 export default function CrmPortfolioSelector({ managing = false, onSelect }) {
   const [demos, setDemos] = useState(null);
@@ -12,19 +12,27 @@ export default function CrmPortfolioSelector({ managing = false, onSelect }) {
   }, []);
 
   // The 4 built-in demos should just exist with their real URLs — no manual
-  // "load defaults" step, and backfills the URL if a demo was added earlier
-  // with a blank one. Never touches a URL that's already been set.
+  // "load defaults" step. Uses a deterministic doc ID (slug of the name) so
+  // this is safe to run on every mount without ever creating a duplicate.
   useEffect(() => {
     if (demos === null || seededRef.current) return;
-    const byName = new Map(demos.map((d) => [d.name, d]));
-    const toAdd = DEFAULT_PORTFOLIO.filter((d) => !byName.has(d.name));
-    const toBackfill = DEFAULT_PORTFOLIO.filter((d) => byName.has(d.name) && !byName.get(d.name).url && d.url);
-    if (toAdd.length === 0 && toBackfill.length === 0) return;
     seededRef.current = true;
-    Promise.all([
-      ...toAdd.map((d) => addDoc(collection(db, 'crmPortfolio'), d)),
-      ...toBackfill.map((d) => updateDoc(doc(db, 'crmPortfolio', byName.get(d.name).id), { url: d.url })),
-    ]).catch((err) => console.error('[CrmPortfolioSelector] auto-seed failed:', err));
+    Promise.all(DEFAULT_PORTFOLIO.map((d) => setDoc(doc(db, 'crmPortfolio', slugify(d.name)), d, { merge: true })))
+      .catch((err) => console.error('[CrmPortfolioSelector] auto-seed failed:', err));
+  }, [demos]);
+
+  // One-time cleanup for duplicates created before the fix above.
+  useEffect(() => {
+    if (!demos || demos.length === 0) return;
+    const byName = new Map();
+    for (const d of demos) (byName.get(d.name) ?? byName.set(d.name, []).get(d.name)).push(d);
+    const extras = [...byName.values()]
+      .filter((group) => group.length > 1)
+      .flatMap((group) => group.slice(1).map((d) => d.id));
+    if (extras.length > 0) {
+      Promise.all(extras.map((id) => deleteDoc(doc(db, 'crmPortfolio', id))))
+        .catch((err) => console.error('[CrmPortfolioSelector] dedupe failed:', err));
+    }
   }, [demos]);
 
   async function updateUrl(id, url) {

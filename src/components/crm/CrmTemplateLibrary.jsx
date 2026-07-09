@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, setDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { DEFAULT_TEMPLATES } from '../../utils/crmConstants';
+import { DEFAULT_TEMPLATES, slugify } from '../../utils/crmConstants';
 import Modal from '../Modal';
 
 const EMPTY = { name: '', category: 'Outreach', subject: '', body: '' };
@@ -18,15 +18,29 @@ export default function CrmTemplateLibrary() {
   }, []);
 
   // Every built-in template should just exist — no manual "load defaults" step.
-  // Self-heals if new defaults are ever added later, and only runs once per mount.
+  // Uses a deterministic doc ID (slug of the name) instead of addDoc so this is
+  // safe to run on every mount — writing the same ID twice just overwrites the
+  // same doc instead of creating a duplicate.
   useEffect(() => {
     if (templates === null || seededRef.current) return;
-    const existingNames = new Set(templates.map((t) => t.name));
-    const missing = DEFAULT_TEMPLATES.filter((t) => !existingNames.has(t.name));
-    if (missing.length === 0) return;
     seededRef.current = true;
-    Promise.all(missing.map((t) => addDoc(collection(db, 'crmTemplates'), { ...t, createdAt: serverTimestamp() })))
+    Promise.all(DEFAULT_TEMPLATES.map((t) => setDoc(doc(db, 'crmTemplates', slugify(t.name)), { ...t, createdAt: serverTimestamp() }, { merge: true })))
       .catch((err) => console.error('[CrmTemplateLibrary] auto-seed failed:', err));
+  }, [templates]);
+
+  // One-time cleanup for duplicates created before the fix above — same name,
+  // multiple docs (random addDoc IDs from repeated mounts). Keeps the oldest.
+  useEffect(() => {
+    if (!templates || templates.length === 0) return;
+    const byName = new Map();
+    for (const t of templates) (byName.get(t.name) ?? byName.set(t.name, []).get(t.name)).push(t);
+    const extras = [...byName.values()]
+      .filter((group) => group.length > 1)
+      .flatMap((group) => group.slice(1).map((t) => t.id));
+    if (extras.length > 0) {
+      Promise.all(extras.map((id) => deleteDoc(doc(db, 'crmTemplates', id))))
+        .catch((err) => console.error('[CrmTemplateLibrary] dedupe failed:', err));
+    }
   }, [templates]);
 
   function startEdit(t) {
@@ -47,18 +61,6 @@ export default function CrmTemplateLibrary() {
 
   async function handleDelete(id) {
     await deleteDoc(doc(db, 'crmTemplates', id));
-  }
-
-  async function loadDefaults() {
-    setSeeding(true);
-    try {
-      const snap = await getDocs(collection(db, 'crmTemplates'));
-      const existingNames = new Set(snap.docs.map((d) => d.data().name));
-      const missing = DEFAULT_TEMPLATES.filter((t) => !existingNames.has(t.name));
-      await Promise.all(missing.map((t) => addDoc(collection(db, 'crmTemplates'), { ...t, createdAt: serverTimestamp() })));
-    } finally {
-      setSeeding(false);
-    }
   }
 
   const grouped = (templates ?? []).reduce((acc, t) => {

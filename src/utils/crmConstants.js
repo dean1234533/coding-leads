@@ -363,8 +363,18 @@ Thanks again,
   },
 ];
 
+// Deterministic id from a name — used so auto-seeding writes the same doc ID
+// every time instead of addDoc-ing a new one, which is what causes duplicates
+// when a component mounts more than once before a previous write lands.
+export function slugify(name) {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
 // ─── Template variable substitution ────────────────────────────────────────
+// Any variable with no value (missing lead field, no portfolio picked, etc.)
+// is dropped to an empty string rather than left as literal "{{business}}"
+// text — a template should be safe to send to any lead, however incomplete.
 export function applyTemplateVars(text, vars) {
   if (!text) return '';
-  return text.replace(/\{\{(\w+)\}\}/g, (match, key) => (vars?.[key]?.trim() ? vars[key] : match));
+  return text.replace(/\{\{(\w+)\}\}/g, (match, key) => vars?.[key]?.trim() ?? '');
 }
