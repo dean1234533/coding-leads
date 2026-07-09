@@ -3,6 +3,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '../../firebase';
 import CrmThreadView from './CrmThreadView';
 import CrmComposer from './CrmComposer';
+import Modal from '../Modal';
 
 const FOLDERS = [
   { key: 'inbox', label: 'Inbox' },
@@ -101,19 +102,9 @@ export default function CrmGmailInbox({ connected }) {
       {openThreadId && <CrmThreadView threadId={openThreadId} onClose={() => setOpenThreadId(null)} />}
 
       {composing && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-6 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-2xl rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-100">New Email</h2>
-              <button onClick={() => setComposing(false)} className="rounded-lg p-1 text-gray-500 hover:bg-gray-800 hover:text-gray-300">
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <CrmComposer onSent={() => setComposing(false)} onSaved={() => setComposing(false)} />
-          </div>
-        </div>
+        <Modal title="New Email" onClose={() => setComposing(false)} maxWidth="max-w-2xl">
+          <CrmComposer onSent={() => setComposing(false)} onSaved={() => setComposing(false)} />
+        </Modal>
       )}
     </div>
   );

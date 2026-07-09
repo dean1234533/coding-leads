@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { DEFAULT_TEMPLATES } from '../../utils/crmConstants';
+import Modal from '../Modal';
 
 const EMPTY = { name: '', category: 'Outreach', subject: '', body: '' };
 
@@ -95,9 +96,8 @@ export default function CrmTemplateLibrary() {
       ))}
 
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-6 backdrop-blur-sm sm:items-center">
-          <form onSubmit={handleSave} className="w-full max-w-xl rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-2xl">
-            <h3 className="mb-4 text-sm font-semibold text-gray-100">{editing === 'new' ? 'New Template' : 'Edit Template'}</h3>
+        <Modal title={editing === 'new' ? 'New Template' : 'Edit Template'} onClose={() => setEditing(null)} maxWidth="max-w-xl">
+          <form onSubmit={handleSave}>
             <div className="space-y-3">
               <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Template name"
                 className="w-full rounded-lg border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none" />
@@ -113,7 +113,7 @@ export default function CrmTemplateLibrary() {
               <button type="button" onClick={() => setEditing(null)} className="text-xs text-gray-500 hover:text-gray-300">Cancel</button>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
     </div>
   );
