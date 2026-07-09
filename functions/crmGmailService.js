@@ -183,6 +183,7 @@ const gmailGetThread = onCall(
         labelIds: m.labelIds ?? [],
         from: headerValue(m.payload?.headers, 'From'),
         to: headerValue(m.payload?.headers, 'To'),
+        cc: headerValue(m.payload?.headers, 'Cc'),
         subject: headerValue(m.payload?.headers, 'Subject'),
         date: headerValue(m.payload?.headers, 'Date'),
         messageIdHeader: headerValue(m.payload?.headers, 'Message-ID'),

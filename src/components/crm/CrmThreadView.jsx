@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { collection, addDoc, query, where, getDocs, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { app, db } from '../../firebase';
 import CrmComposer from './CrmComposer';
+
+const SELF_DOMAIN = 'dean-da-dev.co.uk';
 
 function formatDate(value) {
   if (!value) return '';
@@ -11,38 +13,50 @@ function formatDate(value) {
 
 function parseAddress(raw) {
   if (!raw) return null;
-  const match = raw.match(/^"?([^"<]*)"?\s*<(.+)>$/);
+  const trimmed = raw.trim();
+  const match = trimmed.match(/^"?([^"<]*)"?\s*<(.+)>$/);
   if (match) return { name: match[1].trim(), email: match[2].trim().toLowerCase() };
-  return { name: '', email: raw.trim().toLowerCase() };
+  if (!trimmed.includes('@')) return null;
+  return { name: '', email: trimmed.toLowerCase() };
 }
 
-// Finds the other party in the conversation so "Add to CRM" knows who to add.
-// Prefers the first inbound message (a reply from them); if the thread is
-// entirely outbound (you've sent but haven't heard back yet), falls back to
-// the "To" address of your own sent message instead.
-function extractCorrespondent(messages) {
+// Splits a header value into individual addresses — handles "A <a@x.com>, B <b@x.com>"
+// without breaking on commas that appear inside a display name's <...> part.
+function parseAddressList(raw) {
+  if (!raw) return [];
+  return raw
+    .split(/,(?=(?:[^<]*<[^<]*>)*[^<]*$)/)
+    .map(parseAddress)
+    .filter(Boolean);
+}
+
+// Every unique external address anywhere in the thread (From/To/Cc across all
+// messages), excluding your own outreach address — this is the full set of
+// people this conversation actually involves, not just one guessed contact.
+function extractAllCorrespondents(messages) {
+  const byEmail = new Map();
   for (const m of messages ?? []) {
-    const from = m.from ?? '';
-    if (from && !from.toLowerCase().includes('dean-da-dev.co.uk')) {
-      return parseAddress(from);
+    for (const raw of [m.from, m.to, m.cc]) {
+      for (const addr of parseAddressList(raw)) {
+        if (addr.email.includes(SELF_DOMAIN)) continue;
+        if (!byEmail.has(addr.email) || addr.name) byEmail.set(addr.email, addr);
+      }
     }
   }
-  for (const m of messages ?? []) {
-    if (m.to) return parseAddress(m.to);
-  }
-  return null;
+  return [...byEmail.values()];
 }
 
 export default function CrmThreadView({ threadId, onClose }) {
   const [thread, setThread] = useState(null);
   const [error, setError] = useState(null);
   const [replying, setReplying] = useState(false);
-  const [crmStatus, setCrmStatus] = useState(null); // null | 'adding' | 'added' | 'linked' | 'error'
+  const [adding, setAdding] = useState(false);
+  const [addResult, setAddResult] = useState(null); // { added, linked, skipped } | null
 
   useEffect(() => {
     setThread(null);
     setError(null);
-    setCrmStatus(null);
+    setAddResult(null);
     const fn = httpsCallable(getFunctions(app), 'gmailGetThread');
     fn({ threadId }).then(({ data }) => setThread(data)).catch((err) => setError(err?.message ?? 'Failed to load thread.'));
   }, [threadId]);
@@ -54,41 +68,61 @@ export default function CrmThreadView({ threadId, onClose }) {
   }, [onClose]);
 
   const lastMessage = thread?.messages?.[thread.messages.length - 1];
-  const correspondent = extractCorrespondent(thread?.messages);
-  const hasInboundMessage = thread?.messages?.some((m) => (m.from ?? '').toLowerCase() === correspondent?.email);
+  const correspondents = useMemo(() => extractAllCorrespondents(thread?.messages), [thread]);
 
   async function handleAddToCrm() {
-    if (!correspondent?.email) return;
-    setCrmStatus('adding');
-    try {
-      const dupeQuery = query(collection(db, 'crmLeads'), where('email', '==', correspondent.email));
-      const dupeSnap = await getDocs(dupeQuery);
-      if (!dupeSnap.empty) {
-        const existing = dupeSnap.docs[0];
-        if (existing.data().gmailThreadId !== threadId) {
-          await updateDoc(doc(db, 'crmLeads', existing.id), { gmailThreadId: threadId, updatedAt: serverTimestamp() });
+    if (correspondents.length === 0) return;
+    setAdding(true);
+    setAddResult(null);
+    let added = 0;
+    let linked = 0;
+    let skipped = 0;
+
+    for (const person of correspondents) {
+      try {
+        const dupeQuery = query(collection(db, 'crmLeads'), where('email', '==', person.email));
+        const dupeSnap = await getDocs(dupeQuery);
+        if (!dupeSnap.empty) {
+          const existing = dupeSnap.docs[0];
+          if (existing.data().gmailThreadId !== threadId) {
+            await updateDoc(doc(db, 'crmLeads', existing.id), { gmailThreadId: threadId, updatedAt: serverTimestamp() });
+            linked += 1;
+          } else {
+            skipped += 1;
+          }
+          continue;
         }
-        setCrmStatus('linked');
-        return;
+        const isInbound = thread.messages.some((m) => (m.from ?? '').toLowerCase().includes(person.email));
+        await addDoc(collection(db, 'crmLeads'), {
+          businessName: person.name || person.email,
+          contactName: person.name || null,
+          email: person.email,
+          gmailThreadId: threadId,
+          status: isInbound ? 'Replied' : 'Email Sent',
+          priority: 'Medium',
+          source: 'Gmail Inbox',
+          tags: [],
+          dateAdded: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        added += 1;
+      } catch (err) {
+        console.error(`[CrmThreadView] Add to CRM failed for ${person.email}:`, err);
+        skipped += 1;
       }
-      await addDoc(collection(db, 'crmLeads'), {
-        businessName: correspondent.name || correspondent.email,
-        contactName: correspondent.name || null,
-        email: correspondent.email,
-        gmailThreadId: threadId,
-        status: hasInboundMessage ? 'Replied' : 'Email Sent',
-        priority: 'Medium',
-        source: 'Gmail Inbox',
-        tags: [],
-        dateAdded: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      setCrmStatus('added');
-    } catch (err) {
-      console.error('[CrmThreadView] Add to CRM failed:', err);
-      setCrmStatus('error');
     }
+
+    setAdding(false);
+    setAddResult({ added, linked, skipped });
   }
+
+  const buttonLabel = adding
+    ? 'Adding…'
+    : addResult
+      ? `Added ${addResult.added}${addResult.linked ? `, linked ${addResult.linked}` : ''}${addResult.skipped ? `, skipped ${addResult.skipped}` : ''}`
+      : correspondents.length > 1
+        ? `Add ${correspondents.length} as Leads`
+        : 'Add to CRM';
 
   return (
     <div
@@ -101,17 +135,15 @@ export default function CrmThreadView({ threadId, onClose }) {
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-800 px-5 py-4">
           <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-100">{thread?.messages?.[0]?.subject || 'Conversation'}</h2>
-          {correspondent?.email && (
+          {correspondents.length > 0 && (
             <button
               onClick={handleAddToCrm}
-              disabled={crmStatus === 'adding' || crmStatus === 'added' || crmStatus === 'linked'}
+              disabled={adding || !!addResult}
               className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:cursor-default ${
-                crmStatus === 'added' || crmStatus === 'linked'
-                  ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30'
-                  : 'bg-teal-600 text-white hover:bg-teal-500'
+                addResult ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30' : 'bg-teal-600 text-white hover:bg-teal-500'
               }`}
             >
-              {crmStatus === 'adding' ? 'Adding…' : crmStatus === 'added' ? 'Added to CRM' : crmStatus === 'linked' ? 'Linked to Lead' : crmStatus === 'error' ? 'Failed — retry' : 'Add to CRM'}
+              {buttonLabel}
             </button>
           )}
           <button onClick={onClose} className="shrink-0 rounded-lg p-1 text-gray-500 transition hover:bg-gray-800 hover:text-gray-300">
