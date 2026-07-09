@@ -24,9 +24,11 @@ export default function CrmTemplateLibrary() {
     e.preventDefault();
     if (!form.name.trim() || !form.subject.trim()) return;
     if (editing === 'new') {
-      await addDoc(collection(db, 'crmTemplates'), { ...form, createdAt: serverTimestamp() });
+      await addDoc(collection(db, 'crmTemplates'), { ...form, isDefault: false, createdAt: serverTimestamp() });
     } else {
-      await updateDoc(doc(db, 'crmTemplates', editing.id), form);
+      // isDefault: false protects a manual edit to a built-in template from
+      // being reverted the next time CrmAutoSeed refreshes the defaults.
+      await updateDoc(doc(db, 'crmTemplates', editing.id), { ...form, isDefault: false });
     }
     setEditing(null);
   }

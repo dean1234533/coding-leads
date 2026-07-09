@@ -109,7 +109,7 @@ Best,
     name: 'Bookrightly Platform Pitch',
     category: 'Bookrightly',
     subject: `Built something I think you'd find useful — {{business}}`,
-    body: `Hey {{contact}},
+    body: `Hi {{contact}},
 
 I've been building a platform called Bookrightly and I think it'd be useful for {{business}}.
 

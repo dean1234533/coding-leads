@@ -12,7 +12,10 @@ import { DEFAULT_TEMPLATES, DEFAULT_PORTFOLIO, slugify } from '../../utils/crmCo
  *
  * Seeding uses setDoc with a deterministic ID (slug of the name), which is
  * safe to run repeatedly — writing the same ID twice just overwrites the
- * same doc rather than creating a new one.
+ * same doc rather than creating a new one. Docs are only refreshed from the
+ * code defaults while `isDefault !== false` — editing a built-in template
+ * or demo through the UI sets isDefault: false so your edit sticks instead
+ * of being silently reverted the next time the app loads.
  */
 function useAutoSeedCollection(collectionName, defaults) {
   const seededRef = useRef(false);
@@ -20,11 +23,13 @@ function useAutoSeedCollection(collectionName, defaults) {
   useEffect(() => {
     return onSnapshot(collection(db, collectionName), (snap) => {
       const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const byId = new Map(docs.map((d) => [d.id, d]));
 
       if (!seededRef.current) {
         seededRef.current = true;
+        const toWrite = defaults.filter((item) => byId.get(slugify(item.name))?.isDefault !== false);
         Promise.all(
-          defaults.map((item) => setDoc(doc(db, collectionName, slugify(item.name)), { ...item, createdAt: serverTimestamp() }, { merge: true }))
+          toWrite.map((item) => setDoc(doc(db, collectionName, slugify(item.name)), { ...item, isDefault: true, createdAt: serverTimestamp() }, { merge: true }))
         ).catch((err) => console.error(`[CrmAutoSeed] ${collectionName} seed failed:`, err));
       }
 

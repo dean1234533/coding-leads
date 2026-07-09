@@ -10,13 +10,15 @@ export default function CrmPortfolioSelector({ managing = false, onSelect }) {
   }, []);
 
   async function updateUrl(id, url) {
-    await updateDoc(doc(db, 'crmPortfolio', id), { url });
+    // isDefault: false protects a manual edit to a built-in demo's URL from
+    // being reverted the next time CrmAutoSeed refreshes the defaults.
+    await updateDoc(doc(db, 'crmPortfolio', id), { url, isDefault: false });
   }
 
   async function addDemo() {
     const name = window.prompt('Demo name (e.g. "Restaurant"):');
     if (!name?.trim()) return;
-    await addDoc(collection(db, 'crmPortfolio'), { name: name.trim(), url: '' });
+    await addDoc(collection(db, 'crmPortfolio'), { name: name.trim(), url: '', isDefault: false });
   }
 
   async function removeDemo(id) {
