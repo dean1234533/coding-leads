@@ -53,6 +53,14 @@ const DEFAULT_SOURCES = [
   { id: 'reddit-somebodymakethis',  name: 'r/SomebodyMakeThis (Reddit)',  url: 'https://www.reddit.com/r/SomebodyMakeThis/new/.rss',  enabled: true  },
   { id: 'reddit-saas',              name: 'r/SaaS (Reddit)',              url: 'https://www.reddit.com/r/SaaS/new/.rss',              enabled: false },
   { id: 'reddit-webdev',            name: 'r/webdev (Reddit)',            url: 'https://www.reddit.com/r/webdev/new/.rss',            enabled: false },
+  // Nextdoor has no public RSS/API for reading posts — it's login-gated and
+  // scraping it would violate their Terms of Use. These are additional
+  // sources that, like Reddit, publish genuinely public RSS feeds.
+  { id: 'reddit-slavelabour',       name: 'r/slavelabour (Reddit)',       url: 'https://www.reddit.com/r/slavelabour/new/.rss',       enabled: false },
+  { id: 'reddit-donedirtcheap',     name: 'r/DoneDirtCheap (Reddit)',     url: 'https://www.reddit.com/r/DoneDirtCheap/new/.rss',     enabled: false },
+  { id: 'reddit-freelance',         name: 'r/freelance (Reddit)',         url: 'https://www.reddit.com/r/freelance/new/.rss',         enabled: false },
+  { id: 'reddit-smallbusiness',     name: 'r/smallbusiness (Reddit)',     url: 'https://www.reddit.com/r/smallbusiness/new/.rss',     enabled: false },
+  { id: 'reddit-entrepreneur',      name: 'r/Entrepreneur (Reddit)',      url: 'https://www.reddit.com/r/Entrepreneur/new/.rss',      enabled: false },
 ];
 
 // ─── Scoring signals ──────────────────────────────────────────────────────────
@@ -171,7 +179,21 @@ async function ensureConfigDocs(db) {
   const sourcesRef  = db.collection('codingLeadsConfig').doc('sources');
   const [keywordsSnap, sourcesSnap] = await Promise.all([keywordsRef.get(), sourcesRef.get()]);
   if (!keywordsSnap.exists) await keywordsRef.set(DEFAULT_KEYWORDS);
-  if (!sourcesSnap.exists)  await sourcesRef.set({ list: DEFAULT_SOURCES });
+
+  if (!sourcesSnap.exists) {
+    await sourcesRef.set({ list: DEFAULT_SOURCES });
+  } else {
+    // Newly-added default sources (like the ones above) wouldn't otherwise
+    // reach a config doc that already exists — merge in any missing by id,
+    // leaving already-configured sources (and their enabled/disabled state
+    // as toggled in the UI) untouched.
+    const existingList = sourcesSnap.data().list ?? [];
+    const existingIds = new Set(existingList.map((s) => s.id));
+    const missing = DEFAULT_SOURCES.filter((s) => !existingIds.has(s.id));
+    if (missing.length > 0) {
+      await sourcesRef.update({ list: [...existingList, ...missing] });
+    }
+  }
 }
 
 // Reddit "for hire" boards use title flairs to mean opposite things:
