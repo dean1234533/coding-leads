@@ -87,6 +87,68 @@ Best,
 {{myname}}`,
   },
   {
+    name: 'Digital Agency Partner',
+    category: 'Partnerships',
+    subject: 'Technical partnership inquiry — {{business}}',
+    body: `Hi {{contact}},
+
+I've been following {{business}}'s work and love the quality of your digital projects.
+
+I'm a full-stack developer specialising in building mobile apps and websites. I handle the full development lifecycle — from design and code to store submission — and I'm looking to partner with a few select agencies that need reliable, back-office technical capacity.
+
+You can also see an example of my recent work here: {{portfolio}}
+
+If you ever have a client project requiring app or dashboard development that falls outside your current bandwidth, I'd love to be a reliable resource you can lean on.
+
+Are you open to a brief chat to see if we could be a fit for future overflow work?
+
+Best,
+{{myname}}`,
+  },
+  {
+    name: 'Bookrightly Platform Pitch',
+    category: 'Bookrightly',
+    subject: `Built something I think you'd find useful — {{business}}`,
+    body: `Hey {{contact}},
+
+I've been building a platform called Bookrightly and I think it'd be useful for {{business}}.
+
+It basically gives businesses like yours everything they need to run properly — your own booking site, online card payments, automated reminders, invoices, and a dashboard to manage everything. There's also trade-specific stuff built in (like a quote generator with a shareable client link, or workout plans for PTs).
+
+It's 90 days free to try, no card required, and takes about 10 minutes to set up.
+
+Worth having a look: bookrightly.co.uk
+
+{{myname}}`,
+  },
+  {
+    name: 'Bookrightly Subscription Pitch',
+    category: 'Bookrightly',
+    subject: 'Get online with a website and booking system — {{business}}',
+    body: `Hi {{contact}},
+
+I came across {{business}} and noticed you don't currently have a website. Without one, you're likely missing out on customers who search online before booking — and that's a big chunk of new business going elsewhere.
+
+I run a platform called Bookrightly (www.bookrightly.co.uk) built specifically for businesses like yours. For just £29/month you get:
+
+  ✓ Your own professional website
+  ✓ Online booking system so clients can book 24/7
+  ✓ Card payments built in
+  ✓ Client management and appointment reminders
+  ✓ Calendar sync with Google Calendar
+  ✓ No setup fees — up and running in days
+
+I've put together a quick mockup of what your site could look like — take a look: {{portfolio}}
+
+Most customers say it pays for itself with just one or two extra bookings a month.
+
+Would you be open to a quick 5-minute chat to see if it could work for {{business}}?
+
+Best,
+{{myname}}
+www.bookrightly.co.uk`,
+  },
+  {
     name: 'Salon',
     category: 'Industry',
     subject: 'Helping {{business}} book more appointments online',

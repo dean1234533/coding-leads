@@ -4,11 +4,8 @@
  * Searches Google Places for real local businesses and surfaces the ones
  * that are most likely to need a website or mobile app built. A business
  * with no website at all is flagged as a "Prime Lead". Results are sorted
- * highest-opportunity first.
- *
- * Props:
- *   onCopyToForm({ companyName, websiteUrl, ownerName }) — called when the
- *   user clicks "Copy to Outreach Form". Parent updates its form state.
+ * highest-opportunity first. Results can be added straight into the
+ * Outreach CRM's lead database, individually or all at once.
  */
 
 import { useState, useCallback } from 'react';
@@ -183,7 +180,7 @@ function StarRating({ rating, count }) {
   );
 }
 
-function LeadCard({ lead, onCopy, isCopied, onFigmaCopy, isFigmaCopied, businessType, onAddToCrm, crmStatus }) {
+function LeadCard({ lead, onFigmaCopy, isFigmaCopied, businessType, onAddToCrm, crmStatus }) {
   const score   = lead.opportunityScore;
   const isPrime = score >= 5;
   const isWeak  = score === 3;
@@ -315,24 +312,6 @@ function LeadCard({ lead, onCopy, isCopied, onFigmaCopy, isFigmaCopied, business
         </button>
 
         <button
-          onClick={() => onCopy(lead)}
-          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
-            isCopied
-              ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30'
-              : 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-400 hover:to-cyan-400'
-          }`}
-        >
-          {isCopied ? (
-            <>
-              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
-              </svg>
-              Copied to Form
-            </>
-          ) : 'Copy to Outreach Form'}
-        </button>
-
-        <button
           onClick={() => onFigmaCopy(lead)}
           className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
             isFigmaCopied
@@ -389,7 +368,7 @@ function SkeletonCard() {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function RssScout({ onCopyToForm }) {
+export default function RssScout() {
   const [scanMode, setScanMode]   = useState('business');
   const [location, setLocation]   = useState('London, UK');
   const [type,     setType]       = useState('restaurant');
@@ -398,7 +377,6 @@ export default function RssScout({ onCopyToForm }) {
   const [loading,  setLoading]    = useState(false);
   const [error,    setError]      = useState(null);
   const [meta,     setMeta]       = useState(null);
-  const [copiedId,      setCopiedId]      = useState(null);
   const [figmaCopiedId, setFigmaCopiedId] = useState(null);
   const [filter,        setFilter]        = useState('all');
   const [crmStatusById, setCrmStatusById] = useState({}); // leadId -> 'adding' | 'added' | 'duplicate' | 'error'
@@ -437,18 +415,6 @@ export default function RssScout({ onCopyToForm }) {
     navigator.clipboard.writeText(prompt).catch(() => {});
     setFigmaCopiedId(lead.id);
     setTimeout(() => setFigmaCopiedId(null), 2000);
-  }
-
-  function handleCopy(lead) {
-    onCopyToForm({
-      companyName:  lead.name,
-      websiteUrl:   lead.website ?? '',
-      ownerName:    lead.ownerName ?? '',
-      toEmail:      lead.contactEmail ?? '',
-      leadType:     scanMode === 'agency' ? 'digital_agency' : 'local_business',
-    });
-    setCopiedId(lead.id);
-    setTimeout(() => setCopiedId(null), 2000);
   }
 
   // ── Add to Outreach CRM ─────────────────────────────────────────────────
@@ -686,8 +652,6 @@ export default function RssScout({ onCopyToForm }) {
               <LeadCard
                 key={lead.id}
                 lead={lead}
-                onCopy={handleCopy}
-                isCopied={copiedId === lead.id}
                 onFigmaCopy={handleFigmaCopy}
                 isFigmaCopied={figmaCopiedId === lead.id}
                 businessType={type}

@@ -10,9 +10,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/"              element={<LeadDashboard />} />
+        <Route path="/"              element={<OutreachCrmPage />} />
+        <Route path="/outreach-crm"  element={<OutreachCrmPage />} />
+        <Route path="/tools"         element={<LeadDashboard />} />
         <Route path="/book" element={<BookingPage />} />
-        <Route path="/outreach-crm" element={<OutreachCrmPage />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app } from '../../firebase';
 import Modal from '../Modal';
 import { STATUSES, PRIORITIES, STATUS_COLORS } from '../../utils/crmConstants';
 import { computeNextFollowUp } from '../../utils/crmFollowUps';
@@ -20,7 +22,27 @@ function Field({ label, value }) {
 
 export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
   const [tab, setTab] = useState('Overview');
+  const [findingEmail, setFindingEmail] = useState(false);
+  const [findEmailError, setFindEmailError] = useState(null);
   const cfg = STATUS_COLORS[lead.status] ?? STATUS_COLORS['New'];
+
+  async function handleFindEmail() {
+    setFindingEmail(true);
+    setFindEmailError(null);
+    try {
+      const fn = httpsCallable(getFunctions(app), 'findLeadEmail');
+      const { data } = await fn({ website: lead.website, contactName: lead.contactName });
+      if (data.email) {
+        await onUpdate({ email: data.email });
+      } else {
+        setFindEmailError('No email found.');
+      }
+    } catch (err) {
+      setFindEmailError(err?.message ?? 'Lookup failed.');
+    } finally {
+      setFindingEmail(false);
+    }
+  }
 
   async function handleStatusChange(status) {
     const patch = { status };
@@ -86,7 +108,20 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
       {tab === 'Overview' && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <Field label="Contact Name" value={lead.contactName} />
-          <Field label="Email" value={lead.email} />
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">Email</p>
+            {lead.email ? (
+              <p className="mt-0.5 truncate text-sm text-gray-200">{lead.email}</p>
+            ) : lead.website && lead.contactName ? (
+              <button onClick={handleFindEmail} disabled={findingEmail}
+                className="mt-0.5 text-sm text-blue-400 hover:text-blue-300 disabled:opacity-50">
+                {findingEmail ? 'Searching…' : 'Find Email'}
+              </button>
+            ) : (
+              <p className="mt-0.5 text-sm text-gray-600">—</p>
+            )}
+            {findEmailError && <p className="mt-0.5 text-xs text-red-400">{findEmailError}</p>}
+          </div>
           <Field label="Phone" value={lead.phone} />
           <Field label="Website" value={lead.website} />
           <Field label="Address" value={lead.address} />
