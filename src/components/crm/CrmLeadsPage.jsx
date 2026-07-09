@@ -6,6 +6,7 @@ import { isOverdue } from '../../utils/crmFollowUps';
 import CrmLeadsTable from './CrmLeadsTable';
 import CrmLeadAddForm from './CrmLeadAddForm';
 import CrmLeadDetail from './CrmLeadDetail';
+import CrmBulkSendModal from './CrmBulkSendModal';
 
 const EMPTY_FILTERS = { status: 'all', industry: 'all', priority: 'all', followUpDue: 'all' };
 
@@ -14,6 +15,8 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
   const [search, setSearch] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [showBulkSend, setShowBulkSend] = useState(false);
 
   useEffect(() => {
     if (openLeadId) {
@@ -60,7 +63,33 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
   async function handleDeleteLead(id) {
     await deleteDoc(doc(db, 'crmLeads', id));
     if (selectedId === id) setSelectedId(null);
+    setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
   }
+
+  function toggleOne(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll(visibleIds) {
+    setSelectedIds((prev) => {
+      const allSelected = visibleIds.every((id) => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.delete(id));
+        return next;
+      }
+      return new Set([...prev, ...visibleIds]);
+    });
+  }
+
+  const selectedLeadsList = useMemo(
+    () => (leads ?? []).filter((l) => selectedIds.has(l.id)),
+    [leads, selectedIds]
+  );
 
   const loading = leads === null;
 
@@ -117,6 +146,21 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
         )}
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3">
+          <p className="text-sm text-blue-300">{selectedIds.size} selected</p>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowBulkSend(true)}
+              className="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-3.5 py-2 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400">
+              Send Email
+            </button>
+            <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-400 hover:text-gray-200">
+              Clear selection
+            </button>
+          </div>
+        </div>
+      )}
+
       <section className="rounded-xl border border-gray-800 bg-gray-900">
         <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3 sm:px-6 sm:py-4">
           <h2 className="text-sm font-semibold text-gray-200">Pipeline</h2>
@@ -129,7 +173,14 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
             {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-gray-800/40" />)}
           </div>
         ) : (
-          <CrmLeadsTable leads={filteredLeads} onSelect={(l) => setSelectedId(l.id)} onDelete={handleDeleteLead} />
+          <CrmLeadsTable
+            leads={filteredLeads}
+            onSelect={(l) => setSelectedId(l.id)}
+            onDelete={handleDeleteLead}
+            selectedIds={selectedIds}
+            onToggleOne={toggleOne}
+            onToggleAll={toggleAll}
+          />
         )}
       </section>
 
@@ -141,6 +192,14 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
           onUpdate={handleUpdateLead}
           onDelete={handleDeleteLead}
           onClose={() => setSelectedId(null)}
+        />
+      )}
+
+      {showBulkSend && (
+        <CrmBulkSendModal
+          leads={selectedLeadsList}
+          onClose={() => setShowBulkSend(false)}
+          onDone={() => { setShowBulkSend(false); setSelectedIds(new Set()); }}
         />
       )}
     </div>

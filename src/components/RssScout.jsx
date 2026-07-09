@@ -13,7 +13,8 @@
 
 import { useState, useCallback } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '../firebase';
+import { collection, addDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { app, db } from '../firebase';
 
 // ─── Scan modes ───────────────────────────────────────────────────────────────
 const SCAN_MODES = [
@@ -182,7 +183,7 @@ function StarRating({ rating, count }) {
   );
 }
 
-function LeadCard({ lead, onCopy, isCopied, onFigmaCopy, isFigmaCopied, businessType }) {
+function LeadCard({ lead, onCopy, isCopied, onFigmaCopy, isFigmaCopied, businessType, onAddToCrm, crmStatus }) {
   const score   = lead.opportunityScore;
   const isPrime = score >= 5;
   const isWeak  = score === 3;
@@ -291,6 +292,29 @@ function LeadCard({ lead, onCopy, isCopied, onFigmaCopy, isFigmaCopied, business
       {/* Action row */}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
+          onClick={() => onAddToCrm(lead)}
+          disabled={crmStatus === 'added' || crmStatus === 'duplicate' || crmStatus === 'adding'}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition disabled:cursor-default ${
+            crmStatus === 'added' || crmStatus === 'duplicate'
+              ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30'
+              : 'bg-teal-600 text-white hover:bg-teal-500'
+          }`}
+        >
+          {crmStatus === 'adding' ? (
+            'Adding…'
+          ) : crmStatus === 'added' ? (
+            <>
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
+              </svg>
+              Added to CRM
+            </>
+          ) : crmStatus === 'duplicate' ? (
+            'Already in CRM'
+          ) : 'Add to CRM'}
+        </button>
+
+        <button
           onClick={() => onCopy(lead)}
           className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
             isCopied
@@ -377,6 +401,9 @@ export default function RssScout({ onCopyToForm }) {
   const [copiedId,      setCopiedId]      = useState(null);
   const [figmaCopiedId, setFigmaCopiedId] = useState(null);
   const [filter,        setFilter]        = useState('all');
+  const [crmStatusById, setCrmStatusById] = useState({}); // leadId -> 'adding' | 'added' | 'duplicate' | 'error'
+  const [addingAll,     setAddingAll]     = useState(false);
+  const [addAllSummary, setAddAllSummary] = useState(null);
 
   function handleScanModeChange(mode) {
     setScanMode(mode);
@@ -422,6 +449,64 @@ export default function RssScout({ onCopyToForm }) {
     });
     setCopiedId(lead.id);
     setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  // ── Add to Outreach CRM ─────────────────────────────────────────────────
+  // Writes straight into crmLeads (client-direct, same pattern as CrmLeadAddForm)
+  // so scanned businesses show up in the CRM without going through the old
+  // manual-draft form / legacy `leads` collection.
+  async function addLeadToCrm(lead) {
+    setCrmStatusById((s) => ({ ...s, [lead.id]: 'adding' }));
+    try {
+      if (lead.googleMapsUrl) {
+        const dupeQuery = query(collection(db, 'crmLeads'), where('googleMapsUrl', '==', lead.googleMapsUrl));
+        const dupeSnap = await getDocs(dupeQuery);
+        if (!dupeSnap.empty) {
+          setCrmStatusById((s) => ({ ...s, [lead.id]: 'duplicate' }));
+          return 'duplicate';
+        }
+      }
+      await addDoc(collection(db, 'crmLeads'), {
+        businessName: lead.name ?? null,
+        website: lead.website ?? null,
+        email: lead.contactEmail ?? null,
+        phone: lead.phone ?? null,
+        contactName: lead.ownerName ?? null,
+        industry: BUSINESS_TYPES.find((t) => t.value === type)?.label ?? null,
+        address: lead.address ?? null,
+        googleMapsUrl: lead.googleMapsUrl ?? null,
+        overallImpression: lead.opportunityLabel ?? null,
+        status: 'New',
+        priority: 'Medium',
+        source: 'Google Maps',
+        leadScore: typeof lead.opportunityScore === 'number' ? lead.opportunityScore * 20 : null,
+        tags: [],
+        dateAdded: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      setCrmStatusById((s) => ({ ...s, [lead.id]: 'added' }));
+      return 'added';
+    } catch (err) {
+      console.error('[BusinessScout] Add to CRM failed:', err);
+      setCrmStatusById((s) => ({ ...s, [lead.id]: 'error' }));
+      return 'error';
+    }
+  }
+
+  async function handleAddAllToCrm() {
+    setAddingAll(true);
+    setAddAllSummary(null);
+    let added = 0;
+    let skipped = 0;
+    for (const lead of visible) {
+      const existing = crmStatusById[lead.id];
+      if (existing === 'added' || existing === 'duplicate') { skipped += 1; continue; }
+      const result = await addLeadToCrm(lead);
+      if (result === 'added') added += 1;
+      else skipped += 1;
+    }
+    setAddingAll(false);
+    setAddAllSummary({ added, skipped });
   }
 
   const primeCount = leads.filter(l => l.opportunityScore >= 5).length;
@@ -551,7 +636,7 @@ export default function RssScout({ onCopyToForm }) {
       {!loading && leads.length > 0 && (
         <>
           {/* Summary + filter */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-gray-200">
                 {leads.length} businesses found
@@ -563,23 +648,38 @@ export default function RssScout({ onCopyToForm }) {
                 </p>
               )}
             </div>
-            <div className="flex gap-1 rounded-xl border border-gray-800 bg-gray-900 p-1">
-              {[
-                { key: 'all',   label: `All (${leads.length})`   },
-                { key: 'prime', label: `No Website (${primeCount})` },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setFilter(key)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                    filter === key ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : 'text-gray-500 hover:text-gray-300'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleAddAllToCrm}
+                disabled={addingAll}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-teal-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {addingAll ? 'Adding all…' : 'Add All to CRM'}
+              </button>
+              <div className="flex gap-1 rounded-xl border border-gray-800 bg-gray-900 p-1">
+                {[
+                  { key: 'all',   label: `All (${leads.length})`   },
+                  { key: 'prime', label: `No Website (${primeCount})` },
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      filter === key ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
+
+          {addAllSummary && (
+            <div className="rounded-lg border border-teal-500/20 bg-teal-500/10 px-4 py-2.5 text-xs text-teal-400">
+              Added {addAllSummary.added} to the CRM{addAllSummary.skipped > 0 ? `, skipped ${addAllSummary.skipped} (already in CRM or failed)` : ''}.
+            </div>
+          )}
 
           <div className="space-y-3">
             {visible.map(lead => (
@@ -591,6 +691,8 @@ export default function RssScout({ onCopyToForm }) {
                 onFigmaCopy={handleFigmaCopy}
                 isFigmaCopied={figmaCopiedId === lead.id}
                 businessType={type}
+                onAddToCrm={addLeadToCrm}
+                crmStatus={crmStatusById[lead.id]}
               />
             ))}
           </div>

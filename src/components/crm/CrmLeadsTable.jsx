@@ -29,16 +29,26 @@ function EmptyState() {
   );
 }
 
-export default function CrmLeadsTable({ leads, onSelect, onDelete }) {
+export default function CrmLeadsTable({ leads, onSelect, onDelete, selectedIds, onToggleOne, onToggleAll }) {
   if (leads.length === 0) return <EmptyState />;
+
+  const allSelected = leads.length > 0 && leads.every((l) => selectedIds?.has(l.id));
+  const someSelected = leads.some((l) => selectedIds?.has(l.id));
 
   return (
     <>
       {/* Mobile cards */}
       <div className="divide-y divide-gray-800/50 md:hidden">
         {leads.map((lead) => (
-          <div key={lead.id} className="flex items-start justify-between gap-3 px-4 py-4" onClick={() => onSelect(lead)}>
-            <div className="min-w-0 flex-1 space-y-1.5">
+          <div key={lead.id} className="flex items-start gap-3 px-4 py-4">
+            <input
+              type="checkbox"
+              checked={selectedIds?.has(lead.id) ?? false}
+              onChange={(e) => { e.stopPropagation(); onToggleOne(lead.id); }}
+              onClick={(e) => e.stopPropagation()}
+              className="mt-1 accent-blue-500"
+            />
+            <div className="min-w-0 flex-1 space-y-1.5" onClick={() => onSelect(lead)}>
               <p className="truncate font-medium text-gray-100">{lead.businessName || 'Untitled lead'}</p>
               <p className="truncate text-xs text-gray-500">{lead.industry || '—'} · {lead.contactName || lead.email || '—'}</p>
               <div className="flex flex-wrap items-center gap-2">
@@ -59,6 +69,15 @@ export default function CrmLeadsTable({ leads, onSelect, onDelete }) {
         <table className="min-w-full divide-y divide-gray-800 text-sm">
           <thead>
             <tr>
+              <th className="w-10 px-5 py-3">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected; }}
+                  onChange={() => onToggleAll(leads.map((l) => l.id))}
+                  className="accent-blue-500"
+                />
+              </th>
               {['Business', 'Industry', 'Contact', 'Status', 'Lead Score', 'Follow Up', 'Value', ''].map((label) => (
                 <th key={label} className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-gray-500 whitespace-nowrap">
                   {label}
@@ -69,6 +88,14 @@ export default function CrmLeadsTable({ leads, onSelect, onDelete }) {
           <tbody className="divide-y divide-gray-800/50">
             {leads.map((lead) => (
               <tr key={lead.id} className="group cursor-pointer transition-colors hover:bg-gray-800/20" onClick={() => onSelect(lead)}>
+                <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds?.has(lead.id) ?? false}
+                    onChange={() => onToggleOne(lead.id)}
+                    className="accent-blue-500"
+                  />
+                </td>
                 <td className="px-5 py-4 font-medium text-gray-100">
                   <span className="block truncate max-w-[12rem]">{lead.businessName || 'Untitled lead'}</span>
                   {lead.website && (
