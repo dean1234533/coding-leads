@@ -212,6 +212,32 @@ if (import.meta.env.DEV) {
 
 ---
 
+## 9. Outreach CRM — Gmail Connect Setup (one-time, manual)
+
+The Outreach CRM module (`/outreach-crm`) adds an in-app **Connect Gmail** button that lets you (re)authorize Gmail access without touching the CLI. It reuses the same OAuth client from step 2, but needs two additions:
+
+1. **Add the callback redirect URI** in [console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → Credentials → your OAuth 2.0 Client ID → Authorized redirect URIs:
+   ```
+   https://us-central1-<YOUR_PROJECT_ID>.cloudfunctions.net/gmailOAuthCallback
+   ```
+2. **Make sure `gmail.modify` is listed** under the consent screen's scopes (broader than the `gmail.compose` scope used by the old CLI-only flow — it also covers reading the inbox and labels).
+
+Then set two new secrets:
+```bash
+# 32-byte key used to encrypt the stored refresh token at rest in Firestore
+openssl rand -base64 32
+firebase functions:secrets:set TOKEN_ENCRYPTION_KEY
+# paste the generated key when prompted
+
+# Your deployed frontend origin — where the callback redirects back to after connecting
+firebase functions:secrets:set APP_URL
+# e.g. https://dean-da-dev.co.uk  (no trailing slash)
+```
+
+Deploy the new functions, then open `/outreach-crm` → **Settings** → **Connect Gmail** and complete the Google consent screen. From then on, sending, drafts, inbox, threads, and reply detection across the whole app (including the existing outreach-draft flow) use this connection. Click **Disconnect** at any time to revoke access — no password is ever stored, only an encrypted OAuth refresh token.
+
+---
+
 ## AI Failover Order
 
 The router tries providers in this order until one succeeds:

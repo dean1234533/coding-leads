@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { collection, onSnapshot, orderBy, query, doc, deleteDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable }              from 'firebase/functions';
 import { db, app }    from '../firebase';
@@ -275,10 +276,18 @@ export default function LeadDashboard() {
               <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-400">Client Outreach</p>
               <h1 className="text-base font-semibold leading-tight text-gray-100">Lead Dashboard</h1>
             </div>
-            <div className="flex items-center gap-2 rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5">
-              <span className="h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_theme(colors.emerald.400)]" />
-              <span className="text-xs text-gray-400 hidden sm:inline">Dean Burt · deanburt1308@gmail.com</span>
-              <span className="text-xs text-gray-400 sm:hidden">Dean Burt</span>
+            <div className="flex items-center gap-2">
+              <Link
+                to="/outreach-crm"
+                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400"
+              >
+                Outreach CRM
+              </Link>
+              <div className="flex items-center gap-2 rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5">
+                <span className="h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_theme(colors.emerald.400)]" />
+                <span className="text-xs text-gray-400 hidden sm:inline">Dean Burt · deanburt1308@gmail.com</span>
+                <span className="text-xs text-gray-400 sm:hidden">Dean Burt</span>
+              </div>
             </div>
           </div>
           {/* Tab bar */}

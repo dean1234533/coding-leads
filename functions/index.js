@@ -10,9 +10,31 @@ const { getFreeBusy, createCalendarEvent, generateSlots, filterFreeSlots } = req
 const { ensureConfigDocs, runScan } = require('./codingLeadsService');
 const axios                  = require('axios');
 const Parser                 = require('rss-parser');
+const {
+  getGmailAuthUrl, gmailOAuthCallback, disconnectGmail,
+} = require('./gmailOAuth');
+const {
+  gmailListMessages, gmailGetThread, gmailSendEmail, gmailSaveDraft,
+  gmailListLabels, getGmailSentStats, checkRepliesNow, syncGmailReplies,
+  sendScheduledEmails,
+} = require('./crmGmailService');
 
 initializeApp();
 const db = getFirestore();
+
+// ─── Outreach CRM: Gmail OAuth + inbox/sent/compose/reply-detection ─────────
+exports.getGmailAuthUrl    = getGmailAuthUrl;
+exports.gmailOAuthCallback = gmailOAuthCallback;
+exports.disconnectGmail    = disconnectGmail;
+exports.gmailListMessages  = gmailListMessages;
+exports.gmailGetThread     = gmailGetThread;
+exports.gmailSendEmail     = gmailSendEmail;
+exports.gmailSaveDraft     = gmailSaveDraft;
+exports.gmailListLabels    = gmailListLabels;
+exports.getGmailSentStats  = getGmailSentStats;
+exports.checkRepliesNow    = checkRepliesNow;
+exports.syncGmailReplies   = syncGmailReplies;
+exports.sendScheduledEmails = sendScheduledEmails;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Template helpers
@@ -215,6 +237,7 @@ exports.createOutreachDraft = onCall(
       'GMAIL_CLIENT_ID',
       'GMAIL_CLIENT_SECRET',
       'GMAIL_REFRESH_TOKEN',
+      'TOKEN_ENCRYPTION_KEY',
     ],
   },
   async (request) => {
@@ -289,6 +312,7 @@ exports.createManualDraft = onCall(
       'GMAIL_CLIENT_ID',
       'GMAIL_CLIENT_SECRET',
       'GMAIL_REFRESH_TOKEN',
+      'TOKEN_ENCRYPTION_KEY',
     ],
   },
   async (request) => {
@@ -1048,7 +1072,7 @@ exports.confirmBooking = onCall(
     cors:           true,
     timeoutSeconds: 30,
     memory:         '256MiB',
-    secrets:        ['CALENDAR_CLIENT_ID', 'CALENDAR_CLIENT_SECRET', 'CALENDAR_REFRESH_TOKEN', 'GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN'],
+    secrets:        ['CALENDAR_CLIENT_ID', 'CALENDAR_CLIENT_SECRET', 'CALENDAR_REFRESH_TOKEN', 'GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN', 'TOKEN_ENCRYPTION_KEY'],
   },
   async (request) => {
     const { slotStart, slotEnd, clientName, clientEmail, clientNote } = request.data ?? {};
@@ -1100,7 +1124,7 @@ async function notifyHighScoreLeads(newHighScoreLeads) {
   }).catch(() => {}); // don't fail the scan if the email fails
 }
 
-const CODING_LEADS_SECRETS = ['GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN'];
+const CODING_LEADS_SECRETS = ['GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN', 'TOKEN_ENCRYPTION_KEY'];
 
 /**
  * Function 8: scanCodingLeadsNow (authenticated, manual trigger)
