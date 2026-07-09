@@ -1,27 +1,31 @@
-import { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
+import { useState, useEffect, useRef } from 'react';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { DEFAULT_PORTFOLIO } from '../../utils/crmConstants';
 
 export default function CrmPortfolioSelector({ managing = false, onSelect }) {
   const [demos, setDemos] = useState(null);
-  const [seeding, setSeeding] = useState(false);
+  const seededRef = useRef(false);
 
   useEffect(() => {
     return onSnapshot(collection(db, 'crmPortfolio'), (snap) => setDemos(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setDemos([]));
   }, []);
 
-  async function seedDefaults() {
-    setSeeding(true);
-    try {
-      const snap = await getDocs(collection(db, 'crmPortfolio'));
-      const existing = new Set(snap.docs.map((d) => d.data().name));
-      const missing = DEFAULT_PORTFOLIO.filter((d) => !existing.has(d.name));
-      await Promise.all(missing.map((d) => addDoc(collection(db, 'crmPortfolio'), d)));
-    } finally {
-      setSeeding(false);
-    }
-  }
+  // The 4 built-in demos should just exist with their real URLs — no manual
+  // "load defaults" step, and backfills the URL if a demo was added earlier
+  // with a blank one. Never touches a URL that's already been set.
+  useEffect(() => {
+    if (demos === null || seededRef.current) return;
+    const byName = new Map(demos.map((d) => [d.name, d]));
+    const toAdd = DEFAULT_PORTFOLIO.filter((d) => !byName.has(d.name));
+    const toBackfill = DEFAULT_PORTFOLIO.filter((d) => byName.has(d.name) && !byName.get(d.name).url && d.url);
+    if (toAdd.length === 0 && toBackfill.length === 0) return;
+    seededRef.current = true;
+    Promise.all([
+      ...toAdd.map((d) => addDoc(collection(db, 'crmPortfolio'), d)),
+      ...toBackfill.map((d) => updateDoc(doc(db, 'crmPortfolio', byName.get(d.name).id), { url: d.url })),
+    ]).catch((err) => console.error('[CrmPortfolioSelector] auto-seed failed:', err));
+  }, [demos]);
 
   async function updateUrl(id, url) {
     await updateDoc(doc(db, 'crmPortfolio', id), { url });
@@ -57,18 +61,13 @@ export default function CrmPortfolioSelector({ managing = false, onSelect }) {
           <h2 className="text-sm font-semibold text-gray-200">Portfolio Demos</h2>
           <p className="mt-0.5 text-xs text-gray-500">Choose which demo to send — the URL is stored automatically.</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={seedDefaults} disabled={seeding} className="rounded-lg bg-gray-800 px-3.5 py-2 text-xs font-semibold text-gray-200 hover:bg-gray-700 disabled:opacity-50">
-            {seeding ? 'Loading…' : 'Load Defaults'}
-          </button>
-          <button onClick={addDemo} className="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-3.5 py-2 text-xs font-semibold text-white hover:from-blue-400 hover:to-cyan-400">
-            + Add Demo
-          </button>
-        </div>
+        <button onClick={addDemo} className="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-3.5 py-2 text-xs font-semibold text-white hover:from-blue-400 hover:to-cyan-400">
+          + Add Demo
+        </button>
       </div>
       <div className="mt-4 space-y-2">
         {(demos ?? []).map((d) => (
-          <div key={d.id} className="flex items-center gap-2">
+          <div key={`${d.id}:${d.url}`} className="flex items-center gap-2">
             <span className="w-28 shrink-0 truncate text-sm text-gray-300">{d.name}</span>
             <input
               defaultValue={d.url}
@@ -83,7 +82,7 @@ export default function CrmPortfolioSelector({ managing = false, onSelect }) {
             </button>
           </div>
         ))}
-        {demos?.length === 0 && <p className="text-xs text-gray-600">No demos yet — load the defaults to get started.</p>}
+        {demos?.length === 0 && <p className="text-xs text-gray-600">Loading demos…</p>}
       </div>
     </section>
   );

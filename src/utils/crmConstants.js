@@ -62,10 +62,10 @@ export const WEBSITE_ISSUES = [
 
 // ─── Portfolio demos (seed data — Dean fills in real URLs) ────────────────
 export const DEFAULT_PORTFOLIO = [
-  { name: 'Beauty Studio', url: '' },
-  { name: 'Gym',           url: '' },
-  { name: 'Law Firm',      url: '' },
-  { name: 'Boxing Club',   url: '' },
+  { name: 'Beauty Studio', url: 'https://dean1234533.github.io/The-Beauty-Studio-Premium-Booking-Website-Demo/' },
+  { name: 'Gym',           url: 'https://dean1234533.github.io/Da-Gym-Premium-Fitness-Website-Mockup/' },
+  { name: 'Law Firm',      url: 'https://dean1234533.github.io/Da-Law-Firm-Premium-Law-Firm-Website-Mockup/' },
+  { name: 'Boxing Club',   url: 'https://dean1234533.github.io/Apex-boxing-club-Premium-Website-Mockup/' },
 ];
 
 // ─── Email templates ────────────────────────────────────────────────────
