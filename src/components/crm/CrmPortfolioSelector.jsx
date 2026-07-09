@@ -1,39 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { DEFAULT_PORTFOLIO, slugify } from '../../utils/crmConstants';
 
 export default function CrmPortfolioSelector({ managing = false, onSelect }) {
   const [demos, setDemos] = useState(null);
-  const seededRef = useRef(false);
 
   useEffect(() => {
     return onSnapshot(collection(db, 'crmPortfolio'), (snap) => setDemos(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setDemos([]));
   }, []);
-
-  // The 4 built-in demos should just exist with their real URLs — no manual
-  // "load defaults" step. Uses a deterministic doc ID (slug of the name) so
-  // this is safe to run on every mount without ever creating a duplicate.
-  useEffect(() => {
-    if (demos === null || seededRef.current) return;
-    seededRef.current = true;
-    Promise.all(DEFAULT_PORTFOLIO.map((d) => setDoc(doc(db, 'crmPortfolio', slugify(d.name)), d, { merge: true })))
-      .catch((err) => console.error('[CrmPortfolioSelector] auto-seed failed:', err));
-  }, [demos]);
-
-  // One-time cleanup for duplicates created before the fix above.
-  useEffect(() => {
-    if (!demos || demos.length === 0) return;
-    const byName = new Map();
-    for (const d of demos) (byName.get(d.name) ?? byName.set(d.name, []).get(d.name)).push(d);
-    const extras = [...byName.values()]
-      .filter((group) => group.length > 1)
-      .flatMap((group) => group.slice(1).map((d) => d.id));
-    if (extras.length > 0) {
-      Promise.all(extras.map((id) => deleteDoc(doc(db, 'crmPortfolio', id))))
-        .catch((err) => console.error('[CrmPortfolioSelector] dedupe failed:', err));
-    }
-  }, [demos]);
 
   async function updateUrl(id, url) {
     await updateDoc(doc(db, 'crmPortfolio', id), { url });

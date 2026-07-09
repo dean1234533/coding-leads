@@ -10,6 +10,8 @@ import CrmGmailInbox from '../components/crm/CrmGmailInbox';
 import CrmTemplateLibrary from '../components/crm/CrmTemplateLibrary';
 import CrmPortfolioSelector from '../components/crm/CrmPortfolioSelector';
 import RssScout from '../components/RssScout';
+import InstallBanner from '../components/InstallBanner';
+import CrmAutoSeed from '../components/crm/CrmAutoSeed';
 
 const SUB_TABS = [
   { key: 'dashboard', label: 'Dashboard' },
@@ -121,6 +123,9 @@ export default function OutreachCrmPage() {
           </div>
         </div>
       </header>
+
+      <CrmAutoSeed />
+      <InstallBanner />
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         {gmailStatus && !gmailStatus.connected && subTab !== 'settings' && (

@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'Lead Dashboard',
-        short_name: 'Leads',
-        description: 'Client outreach and lead management dashboard',
+        name: 'Outreach CRM',
+        short_name: 'Outreach CRM',
+        description: 'Gmail-integrated outreach CRM for dean-da-dev',
         theme_color: '#030712',
         background_color: '#030712',
         display: 'standalone',
