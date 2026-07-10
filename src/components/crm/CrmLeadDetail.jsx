@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '../../firebase';
 import Modal from '../Modal';
-import { STATUSES, PRIORITIES, STATUS_COLORS } from '../../utils/crmConstants';
+import { STATUSES, PRIORITIES, INDUSTRIES, STATUS_COLORS } from '../../utils/crmConstants';
 import { computeNextFollowUp } from '../../utils/crmFollowUps';
 import CrmWebsiteReview from './CrmWebsiteReview';
 import CrmNotesTimeline from './CrmNotesTimeline';
@@ -12,12 +12,40 @@ import CrmCallScript from './CrmCallScript';
 
 const TABS = ['Overview', 'Website Review', 'Notes', 'Tasks', 'Emails', 'Call Script'];
 
-function Field({ label, value }) {
+// Every core lead field is editable in place — saves on blur (or on change
+// for selects), so bad/missing data (e.g. a lead auto-created with an email
+// address standing in for a business name) can actually be corrected instead
+// of being stuck forever short of deleting and losing the lead's history.
+function EditableField({ label, value, onSave, type = 'text' }) {
+  const [val, setVal] = useState(value ?? '');
+  useEffect(() => setVal(value ?? ''), [value]);
   return (
-    <div>
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">{label}</p>
-      <p className="mt-0.5 truncate text-sm text-gray-200">{value || '—'}</p>
-    </div>
+    <label className="flex flex-col gap-1">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">{label}</span>
+      <input
+        type={type}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={() => { if (val !== (value ?? '')) onSave(val); }}
+        className="rounded-lg border border-gray-800 bg-gray-800/30 px-2.5 py-1.5 text-sm text-gray-200 transition focus:border-blue-500 focus:bg-gray-800/60 focus:outline-none"
+      />
+    </label>
+  );
+}
+
+function EditableSelect({ label, value, options, onSave }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">{label}</span>
+      <select
+        value={value ?? ''}
+        onChange={(e) => onSave(e.target.value)}
+        className="rounded-lg border border-gray-800 bg-gray-800/30 px-2.5 py-1.5 text-sm text-gray-200 transition focus:border-blue-500 focus:bg-gray-800/60 focus:outline-none"
+      >
+        <option value="" className="bg-gray-900">—</option>
+        {options.map((o) => <option key={o} value={o} className="bg-gray-900">{o}</option>)}
+      </select>
+    </label>
   );
 }
 
@@ -108,42 +136,44 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
 
       {tab === 'Overview' && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <Field label="Contact Name" value={lead.contactName} />
+          <EditableField label="Business Name" value={lead.businessName} onSave={(v) => onUpdate({ businessName: v })} />
+          <EditableField label="Contact Name" value={lead.contactName} onSave={(v) => onUpdate({ contactName: v })} />
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">Email</p>
-            {lead.email ? (
-              <p className="mt-0.5 truncate text-sm text-gray-200">{lead.email}</p>
-            ) : lead.website && lead.contactName ? (
+            <EditableField label="Email" type="email" value={lead.email} onSave={(v) => onUpdate({ email: v })} />
+            {!lead.email && lead.website && lead.contactName && (
               <button onClick={handleFindEmail} disabled={findingEmail}
-                className="mt-0.5 text-sm text-blue-400 hover:text-blue-300 disabled:opacity-50">
+                className="mt-1 text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50">
                 {findingEmail ? 'Searching…' : 'Find Email'}
               </button>
-            ) : (
-              <p className="mt-0.5 text-sm text-gray-600">—</p>
             )}
-            {findEmailError && <p className="mt-0.5 text-xs text-red-400">{findEmailError}</p>}
+            {findEmailError && <p className="mt-1 text-xs text-red-400">{findEmailError}</p>}
           </div>
-          <Field label="Phone" value={lead.phone} />
-          <Field label="Website" value={lead.website} />
-          <Field label="Address" value={lead.address} />
-          <Field label="Industry" value={lead.industry} />
-          <Field label="Lead Score" value={lead.leadScore} />
-          <Field label="Estimated Value" value={lead.estimatedProjectValue ? `£${Number(lead.estimatedProjectValue).toLocaleString()}` : null} />
-          <Field label="Source" value={lead.source} />
-          <Field label="Next Action" value={lead.nextAction} />
-          <Field label="Tags" value={(lead.tags ?? []).join(', ')} />
-          <Field label="Follow Up Date" value={lead.followUpDate ? (lead.followUpDate.toDate?.() ?? new Date(lead.followUpDate)).toLocaleDateString('en-GB') : null} />
+          <EditableField label="Phone" value={lead.phone} onSave={(v) => onUpdate({ phone: v })} />
+          <EditableField label="Website" value={lead.website} onSave={(v) => onUpdate({ website: v })} />
+          <EditableField label="Address" value={lead.address} onSave={(v) => onUpdate({ address: v })} />
+          <EditableSelect label="Industry" value={lead.industry} options={INDUSTRIES} onSave={(v) => onUpdate({ industry: v })} />
+          <EditableField label="Lead Score" type="number" value={lead.leadScore} onSave={(v) => onUpdate({ leadScore: v ? Number(v) : null })} />
+          <EditableField label="Estimated Value (£)" type="number" value={lead.estimatedProjectValue} onSave={(v) => onUpdate({ estimatedProjectValue: v ? Number(v) : null })} />
+          <EditableField label="Source" value={lead.source} onSave={(v) => onUpdate({ source: v })} />
+          <EditableField label="Next Action" value={lead.nextAction} onSave={(v) => onUpdate({ nextAction: v })} />
+          <EditableField label="Tags (comma separated)" value={(lead.tags ?? []).join(', ')} onSave={(v) => onUpdate({ tags: v.split(',').map((t) => t.trim()).filter(Boolean) })} />
+          <EditableField label="Google Maps URL" value={lead.googleMapsUrl} onSave={(v) => onUpdate({ googleMapsUrl: v })} />
           {lead.googleMapsUrl && (
-            <a href={lead.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 hover:text-blue-300 col-span-2 sm:col-span-3">
+            <a href={lead.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="self-end text-sm text-blue-400 hover:text-blue-300">
               Open in Google Maps →
             </a>
           )}
-          {lead.notes && (
-            <div className="col-span-2 sm:col-span-3">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">Notes</p>
-              <p className="mt-0.5 whitespace-pre-line break-words text-sm text-gray-300">{lead.notes}</p>
-            </div>
-          )}
+          <div className="col-span-2 sm:col-span-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">Notes</span>
+              <textarea
+                rows={3}
+                defaultValue={lead.notes ?? ''}
+                onBlur={(e) => { if (e.target.value !== (lead.notes ?? '')) onUpdate({ notes: e.target.value }); }}
+                className="rounded-lg border border-gray-800 bg-gray-800/30 px-2.5 py-1.5 text-sm text-gray-200 transition focus:border-blue-500 focus:bg-gray-800/60 focus:outline-none"
+              />
+            </label>
+          </div>
         </div>
       )}
 
