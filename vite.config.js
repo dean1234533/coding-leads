@@ -32,6 +32,14 @@ export default defineConfig({
         // Never cache Firebase/Google API calls — they use streaming and can't be cached
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [],
+        // Without these, Workbox's default behavior waits for every open tab
+        // to be closed before a new service worker activates — a page reload
+        // (even a hard one) isn't enough, since the *old* SW is still the one
+        // intercepting the reload and serving its own cached files. This app
+        // gets updated frequently, so new deploys should take over immediately.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
       },
     }),
   ],
