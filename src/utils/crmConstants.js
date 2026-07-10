@@ -72,9 +72,10 @@ export const DEFAULT_PORTFOLIO = [
 // Variables: {{business}} {{contact}} {{website}} {{industry}} {{issue}} {{portfolio}} {{myname}}
 // Plus computed fallback-safe variables built from the above (see
 // buildTemplateVars() below, used by CrmComposer.jsx / CrmBulkSendModal.jsx):
-//   {{portfolio_line}} — a "Website: <MY_WEBSITE>" + "Portfolio example: <demo url>"
-//     block (with its own leading blank line). Always includes the main
-//     website; the portfolio line only appears once a demo's been picked.
+//   {{portfolio_line}} — a "Portfolio: <MY_PORTFOLIO>" block (with its own
+//     leading blank line). An "Example project: <demo url>" line is added
+//     once a demo's been picked. The main website isn't repeated here since
+//     it's already in {{signature}}.
 //   {{issue_note}} / {{issue_highlight}} — parenthetical/dash clauses built
 //     from {{issue}} so the surrounding sentence still reads as a complete
 //     thought when no website issue has been logged for the lead.
@@ -493,7 +494,7 @@ export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
     industry: lead?.industry ?? '',
     issue,
     portfolio: demoUrl,
-    portfolio_line: `\n\nYou can view my portfolio and live demos here:\n\nWebsite: ${MY_WEBSITE}\nPortfolio: ${MY_PORTFOLIO}${demoUrl ? `\nExample project: ${demoUrl}` : ''}`,
+    portfolio_line: `\n\nYou can view my portfolio and live demos here:\n\nPortfolio: ${MY_PORTFOLIO}${demoUrl ? `\nExample project: ${demoUrl}` : ''}`,
     issue_note: issue ? ` (${issue})` : '',
     issue_highlight: issue ? ` — ${issue} stood out to me` : '',
     myname: myName ?? '',
