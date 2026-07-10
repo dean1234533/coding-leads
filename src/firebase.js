@@ -1,6 +1,7 @@
 import { initializeApp }          from 'firebase/app';
 import { getFirestore }           from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getMessaging, isSupported as isMessagingSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -14,6 +15,10 @@ const firebaseConfig = {
 export const app  = initializeApp(firebaseConfig);
 export const db   = getFirestore(app);
 export const auth = getAuth(app);
+
+// Not every browser/context supports Messaging (e.g. some in-app browsers,
+// or non-HTTPS) — resolve to null instead of throwing on init.
+export const messagingPromise = isMessagingSupported().then((supported) => (supported ? getMessaging(app) : null));
 
 // Silently sign in anonymously so that:
 //   1. Firestore security rules (request.auth != null) are satisfied

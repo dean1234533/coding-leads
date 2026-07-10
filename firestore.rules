@@ -40,5 +40,10 @@ service cloud.firestore {
     match /gmailTokens/{docId} {
       allow read, write: if false;
     }
+    // Written only by the savePushToken Cloud Function (Admin SDK bypasses
+    // rules) and cleaned up server-side when FCM reports a token as dead.
+    match /pushTokens/{token} {
+      allow read, write: if false;
+    }
   }
 }

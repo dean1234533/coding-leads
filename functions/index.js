@@ -18,6 +18,7 @@ const {
   sendScheduledEmails,
 } = require('./crmGmailService');
 const { findLeadEmail, migrateLegacyLeads } = require('./crmMigration');
+const { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow } = require('./pushNotifications');
 
 initializeApp();
 const db = getFirestore();
@@ -37,6 +38,9 @@ exports.syncGmailReplies   = syncGmailReplies;
 exports.sendScheduledEmails = sendScheduledEmails;
 exports.findLeadEmail      = findLeadEmail;
 exports.migrateLegacyLeads = migrateLegacyLeads;
+exports.savePushToken      = savePushToken;
+exports.sendFollowUpDigest = sendFollowUpDigest;
+exports.sendFollowUpDigestNow = sendFollowUpDigestNow;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Function 3: scanBusinessLeads
