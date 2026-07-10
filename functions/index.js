@@ -806,7 +806,7 @@ const CODING_LEADS_SECRETS = ['GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_R
  * as leads. Safe to call repeatedly — already-seen posts are skipped.
  */
 exports.scanCodingLeadsNow = onCall(
-  { cors: true, timeoutSeconds: 120, memory: '256MiB', secrets: CODING_LEADS_SECRETS },
+  { cors: true, timeoutSeconds: 180, memory: '256MiB', secrets: CODING_LEADS_SECRETS },
   async () => {
     await ensureConfigDocs(db);
     const result = await runScan(db, FieldValue);

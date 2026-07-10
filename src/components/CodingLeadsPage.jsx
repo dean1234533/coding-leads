@@ -95,7 +95,10 @@ export default function CodingLeadsPage() {
     setScanError(null);
     setScanResult(null);
     try {
-      const fn = httpsCallable(getFunctions(app), 'scanCodingLeadsNow');
+      // Default httpsCallable timeout (70s) isn't enough now that there are more
+      // sources staggered 3s apart to avoid Reddit's rate limit — matches the
+      // backend function's own timeoutSeconds.
+      const fn = httpsCallable(getFunctions(app), 'scanCodingLeadsNow', { timeout: 180000 });
       const { data } = await fn();
       setScanResult(data);
     } catch (err) {
