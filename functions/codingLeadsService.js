@@ -48,19 +48,26 @@ const DEFAULT_KEYWORDS = {
   location: ['london', 'uk', 'remote', 'local business', 'small business'],
 };
 
+// Reddit's search.rss endpoint searches EVERY subreddit at once, not just one —
+// this is a much bigger lever than adding curated subreddits one at a time,
+// since a post asking for a developer could land in any of thousands of subs
+// (r/smallbusiness, a local city sub, r/Entrepreneur, etc.), not just the
+// handful anyone would think to hand-pick. Nextdoor has no equivalent public
+// search/RSS — it's login-gated and scraping it would violate their ToS.
 const DEFAULT_SOURCES = [
+  { id: 'reddit-search-webdev',     name: 'Reddit search: web/website developer', url: 'https://www.reddit.com/search.rss?q=%22need+a+web+developer%22+OR+%22looking+for+a+web+developer%22+OR+%22need+a+website+designer%22+OR+%22need+a+website+for+my+business%22+OR+%22website+developer+needed%22&sort=new', enabled: true },
+  { id: 'reddit-search-appdev',     name: 'Reddit search: app developer',         url: 'https://www.reddit.com/search.rss?q=%22need+an+app+developer%22+OR+%22looking+for+an+app+developer%22+OR+%22need+someone+to+build+an+app%22+OR+%22app+developer+needed%22&sort=new', enabled: true },
+  { id: 'reddit-search-general',    name: 'Reddit search: developer/dev help',    url: 'https://www.reddit.com/search.rss?q=%22need+a+developer%22+OR+%22hire+a+developer%22+OR+%22recommend+a+developer%22+OR+%22know+a+good+developer%22&sort=new', enabled: true },
+  { id: 'reddit-search-mvp',        name: 'Reddit search: MVP/SaaS/dashboard',    url: 'https://www.reddit.com/search.rss?q=%22need+an+mvp+built%22+OR+%22looking+for+a+developer+for+my+startup%22+OR+%22need+a+dashboard+built%22+OR+%22need+a+booking+system%22&sort=new', enabled: true },
   { id: 'reddit-forhire',           name: 'r/forhire (Reddit)',           url: 'https://www.reddit.com/r/forhire/new/.rss',           enabled: true  },
   { id: 'reddit-somebodymakethis',  name: 'r/SomebodyMakeThis (Reddit)',  url: 'https://www.reddit.com/r/SomebodyMakeThis/new/.rss',  enabled: true  },
+  { id: 'reddit-slavelabour',       name: 'r/slavelabour (Reddit)',       url: 'https://www.reddit.com/r/slavelabour/new/.rss',       enabled: true  },
+  { id: 'reddit-donedirtcheap',     name: 'r/DoneDirtCheap (Reddit)',     url: 'https://www.reddit.com/r/DoneDirtCheap/new/.rss',     enabled: true  },
+  { id: 'reddit-smallbusiness',     name: 'r/smallbusiness (Reddit)',     url: 'https://www.reddit.com/r/smallbusiness/new/.rss',     enabled: true  },
+  { id: 'reddit-entrepreneur',      name: 'r/Entrepreneur (Reddit)',      url: 'https://www.reddit.com/r/Entrepreneur/new/.rss',      enabled: true  },
+  { id: 'reddit-freelance',         name: 'r/freelance (Reddit)',         url: 'https://www.reddit.com/r/freelance/new/.rss',         enabled: false },
   { id: 'reddit-saas',              name: 'r/SaaS (Reddit)',              url: 'https://www.reddit.com/r/SaaS/new/.rss',              enabled: false },
   { id: 'reddit-webdev',            name: 'r/webdev (Reddit)',            url: 'https://www.reddit.com/r/webdev/new/.rss',            enabled: false },
-  // Nextdoor has no public RSS/API for reading posts — it's login-gated and
-  // scraping it would violate their Terms of Use. These are additional
-  // sources that, like Reddit, publish genuinely public RSS feeds.
-  { id: 'reddit-slavelabour',       name: 'r/slavelabour (Reddit)',       url: 'https://www.reddit.com/r/slavelabour/new/.rss',       enabled: false },
-  { id: 'reddit-donedirtcheap',     name: 'r/DoneDirtCheap (Reddit)',     url: 'https://www.reddit.com/r/DoneDirtCheap/new/.rss',     enabled: false },
-  { id: 'reddit-freelance',         name: 'r/freelance (Reddit)',         url: 'https://www.reddit.com/r/freelance/new/.rss',         enabled: false },
-  { id: 'reddit-smallbusiness',     name: 'r/smallbusiness (Reddit)',     url: 'https://www.reddit.com/r/smallbusiness/new/.rss',     enabled: false },
-  { id: 'reddit-entrepreneur',      name: 'r/Entrepreneur (Reddit)',      url: 'https://www.reddit.com/r/Entrepreneur/new/.rss',      enabled: false },
 ];
 
 // ─── Scoring signals ──────────────────────────────────────────────────────────
@@ -68,6 +75,7 @@ const DEFAULT_SOURCES = [
 const HIGH_SIGNALS = [
   'need', 'looking for', 'developer needed', 'paid', 'budget', 'asap', 'urgent',
   'quote', 'hire', 'ready to start', 'this week', 'this month', 'mvp', 'launch',
+  'recommend', 'anyone know', 'can anyone', 'who can', 'willing to pay', 'compensate',
 ];
 
 const MEDIUM_SIGNALS = [
@@ -215,8 +223,11 @@ function titleStartsWithFlair(title, pattern) {
 const TOPIC_KEYWORDS = [
   ...new Set(LEAD_TYPE_RULES.flatMap((r) => r.keywords)),
   'developer', 'programmer', 'coder', 'coding', 'software', 'website', 'web app',
-  'build me', 'build my', 'build a', 'automation', 'script', 'api integration',
-  'database', 'no-code', 'low-code', 'automate', 'tech help', 'technical help', 'app idea',
+  'web design', 'web designer', 'site built', 'build me', 'build my', 'build a',
+  'automation', 'script', 'api integration', 'database', 'no-code', 'low-code',
+  'automate', 'tech help', 'technical help', 'app idea', 'freelance developer',
+  'freelance web', 'online presence', 'digital presence', 'my business online',
+  'my shop online', 'get online',
 ];
 
 function hasTopicalRelevance(text) {
@@ -235,7 +246,7 @@ function hashId(str) {
 
 // ─── RSS scan ─────────────────────────────────────────────────────────────────
 
-const MIN_SCORE_TO_KEEP = 25;
+const MIN_SCORE_TO_KEEP = 18;
 const NOTIFY_SCORE_THRESHOLD = 60;
 
 async function runScan(db, FieldValue) {

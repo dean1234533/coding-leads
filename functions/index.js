@@ -821,7 +821,7 @@ exports.scanCodingLeadsNow = onCall(
  * needing to click "Scan Now".
  */
 exports.scheduledCodingLeadsScan = onSchedule(
-  { schedule: 'every 6 hours', timeoutSeconds: 300, memory: '256MiB', secrets: CODING_LEADS_SECRETS },
+  { schedule: 'every 2 hours', timeoutSeconds: 300, memory: '256MiB', secrets: CODING_LEADS_SECRETS },
   async () => {
     await ensureConfigDocs(db);
     const result = await runScan(db, FieldValue);
