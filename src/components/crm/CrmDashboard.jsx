@@ -20,21 +20,24 @@ function formatDate(value) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-function LeadRow({ lead, onClick }) {
+function LeadRow({ lead, onClick, trailing }) {
   const cfg = STATUS_COLORS[lead.status] ?? STATUS_COLORS['New'];
   return (
     <button
       onClick={onClick}
       className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-gray-800/40"
     >
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-gray-200">{lead.businessName || 'Untitled lead'}</p>
         <p className="truncate text-xs text-gray-500">{lead.contactName || lead.email || '—'}</p>
       </div>
-      <span className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${cfg.bg} ${cfg.text}`}>
-        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-        {lead.status || 'New'}
-      </span>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${cfg.bg} ${cfg.text}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+          {lead.status || 'New'}
+        </span>
+        {trailing}
+      </div>
     </button>
   );
 }
@@ -120,10 +123,12 @@ export default function CrmDashboard({ leads, onOpenLead, onGoToLeads, onGoToInb
               <p className="px-4 py-8 text-center text-sm text-gray-600">Nothing yet — add your first lead to get started.</p>
             )}
             {recentActivity.map((lead) => (
-              <div key={lead.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                <LeadRow lead={lead} onClick={() => onOpenLead(lead.id)} />
-                <span className="shrink-0 text-xs text-gray-600">{formatDate(lead.updatedAt)}</span>
-              </div>
+              <LeadRow
+                key={lead.id}
+                lead={lead}
+                onClick={() => onOpenLead(lead.id)}
+                trailing={<span className="text-xs text-gray-600">{formatDate(lead.updatedAt)}</span>}
+              />
             ))}
           </div>
         </section>
