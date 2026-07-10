@@ -70,15 +70,15 @@ export const DEFAULT_PORTFOLIO = [
 
 // ─── Email templates ────────────────────────────────────────────────────
 // Variables: {{business}} {{contact}} {{website}} {{industry}} {{issue}} {{portfolio}} {{myname}}
-// Plus two computed fallback-safe variables built from the above (see
-// applyTemplateVars callers in CrmComposer.jsx / CrmBulkSendModal.jsx):
-//   {{portfolio_line}} — a full "Here's an example of my work: <url>" clause
-//     (with its own leading blank line) when a demo is picked, otherwise
-//     empty. Templates use this instead of a bare {{portfolio}} so there's
-//     never a dangling "Example: " with nothing after it.
+// Plus computed fallback-safe variables built from the above (see
+// buildTemplateVars() below, used by CrmComposer.jsx / CrmBulkSendModal.jsx):
+//   {{portfolio_line}} — a "Website: <MY_WEBSITE>" + "Portfolio example: <demo url>"
+//     block (with its own leading blank line). Always includes the main
+//     website; the portfolio line only appears once a demo's been picked.
 //   {{issue_note}} / {{issue_highlight}} — parenthetical/dash clauses built
 //     from {{issue}} so the surrounding sentence still reads as a complete
 //     thought when no website issue has been logged for the lead.
+//   {{signature}} — the full sign-off block (name, dean-da-dev, email, site).
 export const DEFAULT_TEMPLATES = [
   {
     name: 'General Outreach',
@@ -86,14 +86,17 @@ export const DEFAULT_TEMPLATES = [
     subject: 'A quick idea for {{business}}',
     body: `Hi {{contact}},
 
-I came across {{business}} and had a couple of ideas for how a modern website could help bring in more customers.
+I hope you're doing well.
 
-I'm {{myname}}, a web designer/developer.{{portfolio_line}}
+I came across {{business}} recently and had a look at your online presence. I noticed a few areas where I believe your website could be improved — whether that's the overall design, how it performs on mobile, page loading speed, or something else that could be quietly costing you enquiries from potential customers.
 
-Would you be open to a quick chat this week?
+I'm {{myname}}, and I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
 
-Best,
-{{myname}}`,
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Digital Agency Partner',
@@ -101,16 +104,19 @@ Best,
     subject: 'Technical partnership inquiry — {{business}}',
     body: `Hi {{contact}},
 
-I've been following {{business}}'s work and love the quality of your digital projects.
+I hope you're doing well.
 
-I'm a full-stack developer specialising in building mobile apps and websites. I handle the full development lifecycle — from design and code to store submission — and I'm looking to partner with a few select agencies that need reliable, back-office technical capacity.{{portfolio_line}}
+I've been following {{business}}'s work and love the quality of your digital projects — it's clear a lot of care goes into what you put out.
 
-If you ever have a client project requiring app or dashboard development that falls outside your current bandwidth, I'd love to be a reliable resource you can lean on.
+I'm a full-stack developer specialising in building mobile apps and websites, and I handle the full development lifecycle from design and code through to store submission. I'm looking to partner with a small number of select agencies that need reliable, back-office technical capacity for the projects that fall outside their current bandwidth.{{portfolio_line}}
 
-Are you open to a brief chat to see if we could be a fit for future overflow work?
+If you ever have a client project requiring app or dashboard development, I'd love to be a resource you can lean on with confidence.
 
-Best,
-{{myname}}`,
+If you'd be interested in a no-obligation chat about how this could work, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Bookrightly Platform Pitch',
@@ -118,15 +124,19 @@ Best,
     subject: `Built something I think you'd find useful — {{business}}`,
     body: `Hi {{contact}},
 
-I've been building a platform called Bookrightly and I think it'd be useful for {{business}}.
+I hope you're doing well.
 
-It basically gives businesses like yours everything they need to run properly — your own booking site, online card payments, automated reminders, invoices, and a dashboard to manage everything. There's also trade-specific stuff built in (like a quote generator with a shareable client link, or workout plans for PTs).
+I've been building a platform called Bookrightly, and having looked at {{business}}, I think it could genuinely be useful to you.
 
-It's 90 days free to try, no card required, and takes about 10 minutes to set up.
+It gives businesses like yours everything needed to run day-to-day operations properly in one place — your own booking site, online card payments, automated reminders, invoices, and a dashboard to manage all of it. There's trade-specific functionality built in too, like a quote generator with a shareable client link, or workout plans if you train clients.
 
-Worth having a look: bookrightly.co.uk
+It's 90 days free to try, no card required, and takes about 10 minutes to set up: https://bookrightly.co.uk
 
-{{myname}}`,
+If you'd be interested in a no-obligation chat about whether it's a good fit for {{business}}, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Bookrightly Subscription Pitch',
@@ -134,24 +144,26 @@ Worth having a look: bookrightly.co.uk
     subject: 'Get online with a website and booking system — {{business}}',
     body: `Hi {{contact}},
 
-I came across {{business}} and noticed you don't currently have a website. Without one, you're likely missing out on customers who search online before booking — and that's a big chunk of new business going elsewhere.
+I hope you're doing well.
 
-I run a platform called Bookrightly (www.bookrightly.co.uk) built specifically for businesses like yours. For just £29/month you get:
+I came across {{business}} and noticed you don't currently have a website. Without one, you're likely missing out on customers who search online before booking — and that can be a significant chunk of new business going elsewhere to a competitor who does show up.
+
+I run a platform called Bookrightly (https://bookrightly.co.uk), built specifically for businesses like yours. For just £29/month you get:
 
   ✓ Your own professional website
   ✓ Online booking system so clients can book 24/7
   ✓ Card payments built in
   ✓ Client management and appointment reminders
   ✓ Calendar sync with Google Calendar
-  ✓ No setup fees — up and running in days{{portfolio_line}}
+  ✓ No setup fees — up and running within days
 
-Most customers say it pays for itself with just one or two extra bookings a month.
+Most customers tell us it pays for itself with just one or two extra bookings a month.{{portfolio_line}}
 
-Would you be open to a quick 5-minute chat to see if it could work for {{business}}?
+If you'd be interested in a no-obligation chat about whether it could work for {{business}}, just reply to this email and I'd be happy to help.
 
-Best,
-{{myname}}
-www.bookrightly.co.uk`,
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Salon',
@@ -159,13 +171,17 @@ www.bookrightly.co.uk`,
     subject: 'Helping {{business}} book more appointments online',
     body: `Hi {{contact}},
 
-I noticed {{business}} doesn't have an easy way for clients to book online — that's a lot of missed bookings outside opening hours.
+I hope you're doing well.
 
-I build websites with built-in booking systems for salons like yours.{{portfolio_line}}
+I had a look at {{business}} and noticed there isn't currently an easy way for clients to book online. In practice that usually means a steady trickle of missed bookings from people browsing outside your opening hours, who move on to a salon that lets them book instantly.
 
-Worth a quick chat?
+I build premium, mobile-friendly websites with a built-in booking system for salons like yours — designed to look professional, work smoothly on a phone, and make it effortless for clients to book whenever suits them.{{portfolio_line}}
 
-{{myname}}`,
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Gym',
@@ -173,11 +189,15 @@ Worth a quick chat?
     subject: 'A modern website + booking system for {{business}}',
     body: `Hi {{contact}},
 
-I help gyms like {{business}} get a modern website with class bookings and membership sign-ups built in.{{portfolio_line}}
+I hope you're doing well.
 
-Let me know if you'd like to chat.
+I had a look at {{business}} online and thought there was an opportunity worth mentioning. I help gyms get a modern, mobile-friendly website with class bookings and membership sign-ups built directly in — so prospective members can see your schedule and sign up without having to call or message you first.{{portfolio_line}}
 
-{{myname}}`,
+If you'd be interested in a no-obligation chat about what this could look like for {{business}}, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Law Firm',
@@ -185,11 +205,17 @@ Let me know if you'd like to chat.
     subject: 'A more professional online presence for {{business}}',
     body: `Hi {{contact}},
 
-First impressions matter a lot in your industry — I had a look at {{business}}'s website and think a refresh could help win more client enquiries.{{portfolio_line}}
+I hope you're doing well.
 
-Happy to talk through some ideas.
+First impressions matter a great deal in your industry, and I had a look at {{business}}'s website with that in mind. I believe a refresh could help present the firm more strongly and win more client enquiries from people comparing their options online.
 
-{{myname}}`,
+I build premium, professional websites for firms like yours — designed to build trust quickly and make it easy for a prospective client to get in touch.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Restaurant',
@@ -197,11 +223,15 @@ Happy to talk through some ideas.
     subject: 'Getting {{business}} more online orders/bookings',
     body: `Hi {{contact}},
 
-I help restaurants like {{business}} get a website that makes it easy for customers to see the menu, book a table, or order online.{{portfolio_line}}
+I hope you're doing well.
 
-Would you be open to a quick chat?
+I had a look at {{business}} online and wanted to reach out. I help restaurants get a website that makes it simple for customers to see the menu, book a table, or order online — all from their phone, without friction.{{portfolio_line}}
 
-{{myname}}`,
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Trades',
@@ -209,13 +239,15 @@ Would you be open to a quick chat?
     subject: 'A website that brings {{business}} more enquiries',
     body: `Hi {{contact}},
 
-Most people search online before hiring a tradesperson — if {{business}} doesn't show up well, you're losing jobs to competitors.
+I hope you're doing well.
 
-I build simple, fast websites for trades.{{portfolio_line}}
+Most people search online before hiring a tradesperson these days — if {{business}} doesn't show up well in that search, those jobs are quietly going to a competitor instead. I build simple, fast, mobile-friendly websites for trades that make it easy for a customer to find you and get in touch.{{portfolio_line}}
 
-Worth a quick call?
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
 
-{{myname}}`,
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Dentist',
@@ -223,11 +255,15 @@ Worth a quick call?
     subject: 'Helping {{business}} book more patients online',
     body: `Hi {{contact}},
 
-I noticed {{business}} could benefit from an easier online booking experience for new patients.{{portfolio_line}}
+I hope you're doing well.
 
-Happy to chat if useful.
+I had a look at {{business}} online and thought there was an opportunity worth mentioning. I believe an easier online booking experience could help you pick up new patients who'd rather book a check-up in a couple of taps than pick up the phone.{{portfolio_line}}
 
-{{myname}}`,
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Electrician',
@@ -235,11 +271,15 @@ Happy to chat if useful.
     subject: 'More enquiries for {{business}} online',
     body: `Hi {{contact}},
 
-I build simple, fast websites for electricians that make it easy for customers to request a quote.{{portfolio_line}}
+I hope you're doing well.
 
-Let me know if you'd like to see more.
+I build simple, fast, mobile-friendly websites for electricians that make it easy for a customer to see what you offer and request a quote — often the difference between winning a job and them moving straight on to the next search result.{{portfolio_line}}
 
-{{myname}}`,
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Plumber',
@@ -247,11 +287,15 @@ Let me know if you'd like to see more.
     subject: 'Getting {{business}} found online',
     body: `Hi {{contact}},
 
-I help trades like {{business}} get a website that ranks well and converts visitors into calls.{{portfolio_line}}
+I hope you're doing well.
 
-Worth a quick chat?
+I help tradespeople like {{business}} get a website that ranks well in local search and actually converts visitors into calls — rather than one that just sits there looking dated while jobs go elsewhere.{{portfolio_line}}
 
-{{myname}}`,
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Broken Website',
@@ -259,13 +303,17 @@ Worth a quick chat?
     subject: 'Noticed an issue on {{website}}',
     body: `Hi {{contact}},
 
-I was checking out {{website}} and noticed a few things that could be improved{{issue_note}} — that's likely costing {{business}} visitors and enquiries.
+I hope you're doing well.
 
-I can fix this and give you a modern site that works properly.{{portfolio_line}}
+I was checking out {{website}} and noticed a few things that could be improved{{issue_note}} — issues like this are easy to miss day-to-day, but they're likely quietly costing {{business}} visitors and enquiries that would otherwise convert.
 
-Want me to send over some ideas?
+I specialise in fixing exactly this kind of issue and rebuilding sites so they're fast, reliable, and mobile-friendly.{{portfolio_line}}
 
-{{myname}}`,
+If you'd be interested in a no-obligation chat about what I found, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Slow Website',
@@ -273,13 +321,17 @@ Want me to send over some ideas?
     subject: '{{website}} is loading slowly — quick fix ideas',
     body: `Hi {{contact}},
 
-I ran a quick check on {{website}} and it's loading slower than it should — this can hurt both user experience and Google rankings.
+I hope you're doing well.
 
-I specialise in fast, modern websites.{{portfolio_line}}
+I ran a quick check on {{website}} and it's loading slower than it should. This matters more than it might seem — it affects how visitors experience the site, and it can also hurt where you rank in Google, which compounds the problem over time.
 
-Happy to share a few quick wins.
+I specialise in fast, modern, mobile-friendly websites and would be glad to share a few quick wins.{{portfolio_line}}
 
-{{myname}}`,
+If you'd be interested in a no-obligation chat about it, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Outdated Website',
@@ -287,13 +339,17 @@ Happy to share a few quick wins.
     subject: 'A modern refresh for {{business}}',
     body: `Hi {{contact}},
 
-{{business}}'s website looks like it could use a modern refresh{{issue_highlight}}.
+I hope you're doing well.
 
-Here's the kind of website I build.{{portfolio_line}}
+{{business}}'s website looks like it could use a modern refresh{{issue_highlight}}. First impressions form fast online, and an outdated design can quietly turn visitors away before they even read what you offer.
 
-Let me know if you'd like some ideas.
+I build premium, mobile-friendly websites designed to look professional and perform well across all devices, helping turn more visitors into enquiries.{{portfolio_line}}
 
-{{myname}}`,
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Missing Booking System',
@@ -301,13 +357,17 @@ Let me know if you'd like some ideas.
     subject: 'Add online booking to {{business}}',
     body: `Hi {{contact}},
 
-I noticed {{business}} doesn't currently have an online booking system — that means missed bookings outside working hours.
+I hope you're doing well.
 
-I can build this in.{{portfolio_line}}
+I noticed {{business}} doesn't currently have an online booking system. In practice that usually means missed bookings from customers browsing outside your working hours who'd rather book instantly than wait to call.
 
-Worth a quick chat?
+I build this kind of booking functionality directly into premium, mobile-friendly websites, so customers can book whenever suits them.{{portfolio_line}}
 
-{{myname}}`,
+If you'd be interested in a no-obligation chat about what this could look like for {{business}}, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Follow Up',
@@ -315,9 +375,19 @@ Worth a quick chat?
     subject: 'Following up — {{business}}',
     body: `Hi {{contact}},
 
-Just following up on my last email — happy to answer any questions or send over more examples of my work.
+I hope you're doing well.
 
-{{myname}}`,
+I just wanted to follow up on my previous email in case you hadn't had a chance to read it.
+
+When I visited your website, I noticed a few areas where I believe it could be improved. Whether that was an outdated design, mobile usability issues, slow loading, or another issue, I'd be happy to discuss it further if it's something you're already considering.
+
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Quote Follow Up',
@@ -325,11 +395,15 @@ Just following up on my last email — happy to answer any questions or send ove
     subject: 'Checking in on the quote for {{business}}',
     body: `Hi {{contact}},
 
-Just checking in to see if you had any questions about the quote I sent over for {{business}}.
+I hope you're doing well.
 
-Happy to jump on a call if that's easier.
+I just wanted to check in and see if you had any questions about the quote I sent over for {{business}}. I know these things can sit in a busy inbox, so no worries at all if you haven't had a chance to look yet.
 
-{{myname}}`,
+I'm happy to jump on a call if that's easier than going back and forth over email, or to adjust the scope if anything needs revisiting.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
   {
     name: 'Thank You',
@@ -337,11 +411,13 @@ Happy to jump on a call if that's easier.
     subject: 'Thank you, {{contact}}!',
     body: `Hi {{contact}},
 
-Thanks so much for choosing to work with me on {{business}} — really looking forward to getting started.
+I just wanted to say a proper thank you for choosing to work with me on {{business}} — I really appreciate the trust, and I'm genuinely looking forward to getting started.
 
-I'll be in touch shortly with next steps.
+I'll be in touch shortly with next steps, and please don't hesitate to reach out in the meantime if anything comes to mind.
 
-{{myname}}`,
+Thank you again.
+
+{{signature}}`,
   },
   {
     name: 'Referral Request',
@@ -349,10 +425,13 @@ I'll be in touch shortly with next steps.
     subject: 'Quick favour, {{contact}}?',
     body: `Hi {{contact}},
 
-Glad {{business}}'s new site is working out well! If you know anyone else who could use a similar website, I'd really appreciate the introduction.
+I hope you're doing well, and that {{business}}'s new site has been working out well for you.
 
-Thanks again,
-{{myname}}`,
+If you know anyone else who could use a similar website — another local business owner, a friend, a supplier you work with — I'd really appreciate the introduction. Referrals like that mean a lot to a small business like mine.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
   },
 ];
 
@@ -393,6 +472,9 @@ export function applyTemplateVars(text, vars) {
  * issue_highlight) so templates never end up with a dangling "Example: "
  * or a broken sentence when a demo/issue hasn't been picked/logged.
  */
+const MY_WEBSITE = 'https://dean-da-dev.co.uk';
+const MY_EMAIL = 'dean@dean-da-dev.co.uk';
+
 export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
   const issue = (lead?.issuesChecklist ?? [])[0] ?? '';
   return {
@@ -402,9 +484,10 @@ export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
     industry: lead?.industry ?? '',
     issue,
     portfolio: demoUrl,
-    portfolio_line: demoUrl ? `\n\nHere's an example of my work: ${demoUrl}` : '',
+    portfolio_line: `\n\nWebsite: ${MY_WEBSITE}${demoUrl ? `\nPortfolio example: ${demoUrl}` : ''}`,
     issue_note: issue ? ` (${issue})` : '',
     issue_highlight: issue ? ` — ${issue} stood out to me` : '',
     myname: myName ?? '',
+    signature: myName ? `Kind regards,\n\n${myName}\ndean-da-dev\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}` : '',
   };
 }

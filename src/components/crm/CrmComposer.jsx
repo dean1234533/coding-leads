@@ -5,7 +5,7 @@ import { db, app } from '../../firebase';
 import { applyTemplateVars, buildTemplateVars } from '../../utils/crmConstants';
 
 const MY_NAME = 'Dean Burt';
-const SIGNATURE = `<p>Dean Burt<br>dean@dean-da-dev.co.uk<br>https://dean-da-dev.co.uk</p>`;
+const SIGNATURE = `<p>Kind regards,</p><p>Dean Burt<br>dean-da-dev<br>📧 dean@dean-da-dev.co.uk<br>🌐 https://dean-da-dev.co.uk</p>`;
 
 const TOOLBAR = [
   { cmd: 'bold', label: 'B', className: 'font-bold' },

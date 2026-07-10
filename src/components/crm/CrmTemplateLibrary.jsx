@@ -48,7 +48,7 @@ export default function CrmTemplateLibrary() {
         <div>
           <h2 className="text-sm font-semibold text-gray-200">Email Templates</h2>
           <p className="mt-0.5 text-xs text-gray-500">
-            Reusable templates with {'{{business}} {{contact}} {{website}} {{industry}} {{myname}}'} variables, plus fallback-safe {'{{portfolio_line}}'} and {'{{issue_note}}'}/{'{{issue_highlight}}'} — use these instead of bare {'{{portfolio}}'}/{'{{issue}}'} so the sentence still reads fine when no demo's picked or no issue's logged.
+            Reusable templates with {'{{business}} {{contact}} {{website}} {{industry}} {{myname}}'} variables, plus fallback-safe {'{{portfolio_line}}'}, {'{{issue_note}}'}/{'{{issue_highlight}}'}, and {'{{signature}}'} — use these instead of bare {'{{portfolio}}'}/{'{{issue}}'}/{'{{myname}}'} so the sentence and sign-off still read fine no matter what's known about the lead.
           </p>
         </div>
         <button onClick={() => startEdit(null)}
