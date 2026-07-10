@@ -11,6 +11,16 @@ function formatDate(value) {
   return new Date(value).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+// A raw email address makes a poor business name in outreach copy ("useful
+// for info@katieyoga.com.au"). When there's no display name to use, guess a
+// readable name from the domain instead (e.g. "katieyoga.com.au" → "Katieyoga").
+function guessBusinessNameFromEmail(email) {
+  const domain = email?.split('@')[1] ?? '';
+  const label = domain.split('.')[0] ?? '';
+  if (!label) return email ?? '';
+  return label.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function parseAddress(raw) {
   if (!raw) return null;
   const trimmed = raw.trim();
@@ -94,7 +104,7 @@ export default function CrmThreadView({ threadId, onClose }) {
         }
         const isInbound = thread.messages.some((m) => (m.from ?? '').toLowerCase().includes(person.email));
         await addDoc(collection(db, 'crmLeads'), {
-          businessName: person.name || person.email,
+          businessName: person.name || guessBusinessNameFromEmail(person.email),
           contactName: person.name || null,
           email: person.email,
           gmailThreadId: threadId,
