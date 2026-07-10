@@ -9,15 +9,9 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getGmailClient } = require('./gmailService');
 const { OAUTH_SECRETS } = require('./gmailOAuth');
 const { OUTREACH_FROM_ADDRESS } = require('./emailConfig');
+const { encodeMimeHeader } = require('./mimeHeader');
 
 const CRM_GMAIL_SECRETS = [...new Set([...OAUTH_SECRETS, 'GMAIL_REFRESH_TOKEN'])];
-
-// ─── MIME helpers ───────────────────────────────────────────────────────────
-
-function encodeHeaderValue(value) {
-  // Keep it simple — assume ASCII-safe values (UK business emails/names).
-  return value;
-}
 
 /**
  * Builds a raw base64url RFC 2822 message, optionally multipart with attachments.
@@ -30,7 +24,7 @@ function buildRawMessage({ to, cc, subject, bodyHtml, bodyText, attachments = []
     `From: ${OUTREACH_FROM_ADDRESS}`,
     `To: ${to}`,
     cc ? `Cc: ${cc}` : '',
-    `Subject: ${encodeHeaderValue(subject ?? '')}`,
+    `Subject: ${encodeMimeHeader(subject ?? '')}`,
     'MIME-Version: 1.0',
     threadHeaders.inReplyTo ? `In-Reply-To: ${threadHeaders.inReplyTo}` : '',
     threadHeaders.references ? `References: ${threadHeaders.references}` : '',

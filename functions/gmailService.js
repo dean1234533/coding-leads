@@ -2,6 +2,7 @@
 
 const { google } = require('googleapis');
 const { OUTREACH_FROM_ADDRESS } = require('./emailConfig');
+const { encodeMimeHeader } = require('./mimeHeader');
 
 /**
  * Builds an authenticated Gmail API client using OAuth2.
@@ -55,7 +56,7 @@ async function createGmailDraft({ to, subject, body }) {
   const rawLines = [
     `From: ${OUTREACH_FROM_ADDRESS}`,
     to ? `To: ${to}` : '',
-    `Subject: ${subject}`,
+    `Subject: ${encodeMimeHeader(subject)}`,
     'Content-Type: text/plain; charset=utf-8',
     'MIME-Version: 1.0',
     '',
@@ -89,7 +90,7 @@ async function sendEmail({ to, subject, body }) {
   const rawLines = [
     `From: ${OUTREACH_FROM_ADDRESS}`,
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: ${encodeMimeHeader(subject)}`,
     'Content-Type: text/plain; charset=utf-8',
     'MIME-Version: 1.0',
     '',
