@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { STATUSES, INDUSTRIES } from '../../utils/crmConstants';
-import { isOverdue } from '../../utils/crmFollowUps';
+import { isOverdue, groupFollowUps } from '../../utils/crmFollowUps';
 import CrmLeadsTable from './CrmLeadsTable';
 import CrmLeadAddForm from './CrmLeadAddForm';
 import CrmLeadDetail from './CrmLeadDetail';
@@ -91,6 +91,18 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
     [leads, selectedIds]
   );
 
+  // "Due now" = today or overdue — the set you'd actually sit down and work
+  // through in one go, as opposed to tomorrow/this-week which aren't due yet.
+  const dueForFollowUpIds = useMemo(() => {
+    if (!leads) return [];
+    const { today, late } = groupFollowUps(leads);
+    return [...today, ...late].map((l) => l.id);
+  }, [leads]);
+
+  function selectAllDueForFollowUp() {
+    setSelectedIds(new Set(dueForFollowUpIds));
+  }
+
   const loading = leads === null;
 
   return (
@@ -100,10 +112,18 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
           <h1 className="text-xl font-bold text-white">Leads</h1>
           <p className="text-xs text-gray-500">Every business you find becomes a lead here.</p>
         </div>
-        <button onClick={() => setShowAddForm(true)}
-          className="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-3.5 py-2 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400">
-          + Add Lead
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {dueForFollowUpIds.length > 0 && (
+            <button onClick={selectAllDueForFollowUp}
+              className="rounded-lg bg-amber-500/15 px-3.5 py-2 text-xs font-semibold text-amber-400 ring-1 ring-inset ring-amber-500/30 transition hover:bg-amber-500/25">
+              Select All Due For Follow-Up ({dueForFollowUpIds.length})
+            </button>
+          )}
+          <button onClick={() => setShowAddForm(true)}
+            className="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-3.5 py-2 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400">
+            + Add Lead
+          </button>
+        </div>
       </div>
 
       {/* Search + filters */}
@@ -162,11 +182,21 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
       )}
 
       <section className="rounded-xl border border-gray-800 bg-gray-900">
-        <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3 sm:px-6 sm:py-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-800 px-4 py-3 sm:px-6 sm:py-4">
           <h2 className="text-sm font-semibold text-gray-200">Pipeline</h2>
-          <span className="rounded-full bg-gray-800 px-2.5 py-0.5 text-xs font-medium text-gray-400">
-            {filteredLeads.length} / {leads?.length ?? 0}
-          </span>
+          <div className="flex items-center gap-3">
+            {filteredLeads.length > 0 && (
+              <button
+                onClick={() => toggleAll(filteredLeads.map((l) => l.id))}
+                className="text-xs text-blue-400 hover:text-blue-300"
+              >
+                {filteredLeads.every((l) => selectedIds.has(l.id)) ? 'Deselect all' : 'Select all filtered'}
+              </button>
+            )}
+            <span className="rounded-full bg-gray-800 px-2.5 py-0.5 text-xs font-medium text-gray-400">
+              {filteredLeads.length} / {leads?.length ?? 0}
+            </span>
+          </div>
         </div>
         {loading ? (
           <div className="space-y-3 p-4">

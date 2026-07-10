@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase';
-import { applyTemplateVars } from '../../utils/crmConstants';
+import { applyTemplateVars, buildTemplateVars } from '../../utils/crmConstants';
 import { computeNextFollowUp } from '../../utils/crmFollowUps';
 import Modal from '../Modal';
 
@@ -10,15 +10,7 @@ const MY_NAME = 'Dean Burt';
 const SEND_DELAY_MS = 1500; // throttle between sends — avoids Gmail rate/abuse limits
 
 function leadVars(lead, demoUrl) {
-  return {
-    business: lead.businessName ?? '',
-    contact: lead.contactName?.trim() ?? '',
-    website: lead.website ?? '',
-    industry: lead.industry ?? '',
-    issue: (lead.issuesChecklist ?? [])[0] ?? '',
-    portfolio: demoUrl ?? '',
-    myname: MY_NAME,
-  };
+  return buildTemplateVars(lead, { demoUrl: demoUrl ?? '', myName: MY_NAME });
 }
 
 function sleep(ms) {

@@ -47,7 +47,9 @@ export default function CrmTemplateLibrary() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-200">Email Templates</h2>
-          <p className="mt-0.5 text-xs text-gray-500">Reusable templates with {'{{business}} {{contact}} {{website}} {{industry}} {{issue}} {{portfolio}} {{myname}}'} variables.</p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Reusable templates with {'{{business}} {{contact}} {{website}} {{industry}} {{myname}}'} variables, plus fallback-safe {'{{portfolio_line}}'} and {'{{issue_note}}'}/{'{{issue_highlight}}'} — use these instead of bare {'{{portfolio}}'}/{'{{issue}}'} so the sentence still reads fine when no demo's picked or no issue's logged.
+          </p>
         </div>
         <button onClick={() => startEdit(null)}
           className="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-3.5 py-2 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400">

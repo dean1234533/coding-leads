@@ -70,6 +70,15 @@ export const DEFAULT_PORTFOLIO = [
 
 // ─── Email templates ────────────────────────────────────────────────────
 // Variables: {{business}} {{contact}} {{website}} {{industry}} {{issue}} {{portfolio}} {{myname}}
+// Plus two computed fallback-safe variables built from the above (see
+// applyTemplateVars callers in CrmComposer.jsx / CrmBulkSendModal.jsx):
+//   {{portfolio_line}} — a full "Here's an example of my work: <url>" clause
+//     (with its own leading blank line) when a demo is picked, otherwise
+//     empty. Templates use this instead of a bare {{portfolio}} so there's
+//     never a dangling "Example: " with nothing after it.
+//   {{issue_note}} / {{issue_highlight}} — parenthetical/dash clauses built
+//     from {{issue}} so the surrounding sentence still reads as a complete
+//     thought when no website issue has been logged for the lead.
 export const DEFAULT_TEMPLATES = [
   {
     name: 'General Outreach',
@@ -77,9 +86,9 @@ export const DEFAULT_TEMPLATES = [
     subject: 'A quick idea for {{business}}',
     body: `Hi {{contact}},
 
-I came across {{business}} and had a couple of ideas for how a refreshed website could help bring in more customers.
+I came across {{business}} and had a couple of ideas for how a modern website could help bring in more customers.
 
-I'm {{myname}}, a web designer/developer, and I'd love to show you a quick example of what's possible: {{portfolio}}
+I'm {{myname}}, a web designer/developer.{{portfolio_line}}
 
 Would you be open to a quick chat this week?
 
@@ -94,9 +103,7 @@ Best,
 
 I've been following {{business}}'s work and love the quality of your digital projects.
 
-I'm a full-stack developer specialising in building mobile apps and websites. I handle the full development lifecycle — from design and code to store submission — and I'm looking to partner with a few select agencies that need reliable, back-office technical capacity.
-
-You can also see an example of my recent work here: {{portfolio}}
+I'm a full-stack developer specialising in building mobile apps and websites. I handle the full development lifecycle — from design and code to store submission — and I'm looking to partner with a few select agencies that need reliable, back-office technical capacity.{{portfolio_line}}
 
 If you ever have a client project requiring app or dashboard development that falls outside your current bandwidth, I'd love to be a reliable resource you can lean on.
 
@@ -136,9 +143,7 @@ I run a platform called Bookrightly (www.bookrightly.co.uk) built specifically f
   ✓ Card payments built in
   ✓ Client management and appointment reminders
   ✓ Calendar sync with Google Calendar
-  ✓ No setup fees — up and running in days
-
-I've put together a quick mockup of what your site could look like — take a look: {{portfolio}}
+  ✓ No setup fees — up and running in days{{portfolio_line}}
 
 Most customers say it pays for itself with just one or two extra bookings a month.
 
@@ -156,7 +161,7 @@ www.bookrightly.co.uk`,
 
 I noticed {{business}} doesn't have an easy way for clients to book online — that's a lot of missed bookings outside opening hours.
 
-I build websites with built-in booking systems for salons like yours. Here's an example: {{portfolio}}
+I build websites with built-in booking systems for salons like yours.{{portfolio_line}}
 
 Worth a quick chat?
 
@@ -168,9 +173,7 @@ Worth a quick chat?
     subject: 'A modern website + booking system for {{business}}',
     body: `Hi {{contact}},
 
-I help gyms like {{business}} get a modern website with class bookings and membership sign-ups built in.
-
-Here's a demo you can look at: {{portfolio}}
+I help gyms like {{business}} get a modern website with class bookings and membership sign-ups built in.{{portfolio_line}}
 
 Let me know if you'd like to chat.
 
@@ -182,9 +185,7 @@ Let me know if you'd like to chat.
     subject: 'A more professional online presence for {{business}}',
     body: `Hi {{contact}},
 
-First impressions matter a lot in your industry — I had a look at {{business}}'s website and think a refresh could help win more client enquiries.
-
-Example of my work: {{portfolio}}
+First impressions matter a lot in your industry — I had a look at {{business}}'s website and think a refresh could help win more client enquiries.{{portfolio_line}}
 
 Happy to talk through some ideas.
 
@@ -196,9 +197,7 @@ Happy to talk through some ideas.
     subject: 'Getting {{business}} more online orders/bookings',
     body: `Hi {{contact}},
 
-I help restaurants like {{business}} get a website that makes it easy for customers to see the menu, book a table, or order online.
-
-Example: {{portfolio}}
+I help restaurants like {{business}} get a website that makes it easy for customers to see the menu, book a table, or order online.{{portfolio_line}}
 
 Would you be open to a quick chat?
 
@@ -210,9 +209,9 @@ Would you be open to a quick chat?
     subject: 'A website that brings {{business}} more enquiries',
     body: `Hi {{contact}},
 
-Most people search online before calling a {{industry}} — if {{business}} doesn't show up well, you're losing jobs to competitors.
+Most people search online before hiring a tradesperson — if {{business}} doesn't show up well, you're losing jobs to competitors.
 
-I build simple, fast websites for trades. Example: {{portfolio}}
+I build simple, fast websites for trades.{{portfolio_line}}
 
 Worth a quick call?
 
@@ -224,9 +223,7 @@ Worth a quick call?
     subject: 'Helping {{business}} book more patients online',
     body: `Hi {{contact}},
 
-I noticed {{business}} could benefit from an easier online booking experience for new patients.
-
-Here's an example of what I build: {{portfolio}}
+I noticed {{business}} could benefit from an easier online booking experience for new patients.{{portfolio_line}}
 
 Happy to chat if useful.
 
@@ -238,9 +235,7 @@ Happy to chat if useful.
     subject: 'More enquiries for {{business}} online',
     body: `Hi {{contact}},
 
-I build simple, fast websites for electricians that make it easy for customers to request a quote.
-
-Example: {{portfolio}}
+I build simple, fast websites for electricians that make it easy for customers to request a quote.{{portfolio_line}}
 
 Let me know if you'd like to see more.
 
@@ -252,9 +247,7 @@ Let me know if you'd like to see more.
     subject: 'Getting {{business}} found online',
     body: `Hi {{contact}},
 
-I help trades like {{business}} get a website that ranks well and converts visitors into calls.
-
-Example: {{portfolio}}
+I help trades like {{business}} get a website that ranks well and converts visitors into calls.{{portfolio_line}}
 
 Worth a quick chat?
 
@@ -266,9 +259,9 @@ Worth a quick chat?
     subject: 'Noticed an issue on {{website}}',
     body: `Hi {{contact}},
 
-I was checking out {{website}} and noticed {{issue}} — that's likely costing {{business}} visitors and enquiries.
+I was checking out {{website}} and noticed a few things that could be improved{{issue_note}} — that's likely costing {{business}} visitors and enquiries.
 
-I can fix this and give you a modern site that works properly. Example: {{portfolio}}
+I can fix this and give you a modern site that works properly.{{portfolio_line}}
 
 Want me to send over some ideas?
 
@@ -282,7 +275,7 @@ Want me to send over some ideas?
 
 I ran a quick check on {{website}} and it's loading slower than it should — this can hurt both user experience and Google rankings.
 
-I specialise in fast, modern websites. Example: {{portfolio}}
+I specialise in fast, modern websites.{{portfolio_line}}
 
 Happy to share a few quick wins.
 
@@ -294,9 +287,9 @@ Happy to share a few quick wins.
     subject: 'A modern refresh for {{business}}',
     body: `Hi {{contact}},
 
-{{business}}'s website looks like it could use a modern refresh — {{issue}} stood out to me.
+{{business}}'s website looks like it could use a modern refresh{{issue_highlight}}.
 
-Here's an example of the kind of website I build: {{portfolio}}
+Here's the kind of website I build.{{portfolio_line}}
 
 Let me know if you'd like some ideas.
 
@@ -310,7 +303,7 @@ Let me know if you'd like some ideas.
 
 I noticed {{business}} doesn't currently have an online booking system — that means missed bookings outside working hours.
 
-I can build this in. Example: {{portfolio}}
+I can build this in.{{portfolio_line}}
 
 Worth a quick chat?
 
@@ -379,10 +372,39 @@ export function slugify(name) {
 // "Thank you, {{contact}}!" reads as "Thank you!" instead of "Thank you, !".
 export function applyTemplateVars(text, vars) {
   if (!text) return '';
-  const substituted = text.replace(/\{\{(\w+)\}\}/g, (match, key) => vars?.[key]?.trim() ?? '');
+  // Check non-emptiness via trim(), but substitute the raw (untrimmed) value —
+  // computed clauses like portfolio_line intentionally start with "\n\n" to
+  // open a new paragraph, and .trim()-ing the substitution would silently
+  // eat that.
+  const substituted = text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+    const val = vars?.[key];
+    return typeof val === 'string' && val.trim() ? val : '';
+  });
   return substituted
     .replace(/ +,/g, ',')
     .replace(/, +!/g, '!')
     .replace(/, +\?/g, '?')
     .replace(/[ \t]{2,}/g, ' ');
+}
+
+/**
+ * Builds the full variable set used to render a template for a lead,
+ * including computed fallback-safe clauses (portfolio_line, issue_note,
+ * issue_highlight) so templates never end up with a dangling "Example: "
+ * or a broken sentence when a demo/issue hasn't been picked/logged.
+ */
+export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
+  const issue = (lead?.issuesChecklist ?? [])[0] ?? '';
+  return {
+    business: lead?.businessName ?? '',
+    contact: lead?.contactName?.trim() ?? '',
+    website: lead?.website ?? '',
+    industry: lead?.industry ?? '',
+    issue,
+    portfolio: demoUrl,
+    portfolio_line: demoUrl ? `\n\nHere's an example of my work: ${demoUrl}` : '',
+    issue_note: issue ? ` (${issue})` : '',
+    issue_highlight: issue ? ` — ${issue} stood out to me` : '',
+    myname: myName ?? '',
+  };
 }

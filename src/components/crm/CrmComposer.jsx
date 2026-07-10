@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase';
-import { applyTemplateVars } from '../../utils/crmConstants';
+import { applyTemplateVars, buildTemplateVars } from '../../utils/crmConstants';
 
 const MY_NAME = 'Dean Burt';
 const SIGNATURE = `<p>Dean Burt<br>dean@dean-da-dev.co.uk<br>https://dean-da-dev.co.uk</p>`;
@@ -46,16 +46,7 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
   }, []);
 
   const selectedDemo = portfolioDemos.find((p) => p.id === selectedDemoId);
-
-  const vars = {
-    business: lead?.businessName ?? '',
-    contact: lead?.contactName?.trim() ?? '',
-    website: lead?.website ?? '',
-    industry: lead?.industry ?? '',
-    issue: (lead?.issuesChecklist ?? [])[0] ?? '',
-    portfolio: selectedDemo?.url ?? '',
-    myname: MY_NAME,
-  };
+  const vars = buildTemplateVars(lead, { demoUrl: selectedDemo?.url ?? '', myName: MY_NAME });
 
   function insertAtCursor(html) {
     if (richMode && editorRef.current) {
