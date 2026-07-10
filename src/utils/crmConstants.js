@@ -307,6 +307,24 @@ Thank you for your time, and I hope to hear from you.
 {{signature}}`,
   },
   {
+    name: 'No Website',
+    category: 'Issue-based',
+    subject: 'Getting {{business}} online',
+    body: `Hi {{contact}},
+
+I hope you're doing well.
+
+I had a look and noticed {{business}} doesn't currently have a website. That means potential customers searching online can't easily find you, and are likely finding a competitor instead.
+
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about getting a website set up, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`,
+  },
+  {
     name: 'Broken Website',
     category: 'Issue-based',
     subject: 'Noticed an issue on {{website}}',
