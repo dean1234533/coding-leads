@@ -3,7 +3,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '../../firebase';
 import Modal from '../Modal';
 import { STATUSES, PRIORITIES, INDUSTRIES, STATUS_COLORS } from '../../utils/crmConstants';
-import { computeNextFollowUp } from '../../utils/crmFollowUps';
+import { computeNextFollowUp, followUpPatchForSend } from '../../utils/crmFollowUps';
 import CrmWebsiteReview from './CrmWebsiteReview';
 import CrmNotesTimeline from './CrmNotesTimeline';
 import CrmTasksList from './CrmTasksList';
@@ -96,7 +96,9 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
 
   async function handleThreadLinked(threadId) {
     if (!threadId) return;
-    await onUpdate({ gmailThreadId: threadId, lastContactDate: new Date() });
+    // Sending an email should advance the follow-up ladder on its own —
+    // no more manually flipping the status dropdown after every send.
+    await onUpdate({ gmailThreadId: threadId, ...followUpPatchForSend(lead) });
   }
 
   return (

@@ -37,6 +37,28 @@ function isSameDay(a, b) {
 
 const ACTIVE_STATUSES = new Set(['Won', 'Lost', 'Archive']);
 
+/**
+ * The Firestore patch to apply whenever an email is actually sent to a lead —
+ * advances the follow-up ladder by one step automatically (or starts it, if
+ * this is the first send) instead of requiring a manual status change every
+ * time. Used by both the single-lead composer and bulk send, so re-sending
+ * to a lead that's already partway through the ladder advances it rather
+ * than resetting back to stage 0. Leaves closed-out leads alone.
+ */
+export function followUpPatchForSend(lead, sentDate = new Date()) {
+  if (ACTIVE_STATUSES.has(lead.status)) {
+    return { lastContactDate: sentDate };
+  }
+  const stage = (lead.followUpStage ?? -1) + 1;
+  const nextDate = computeNextFollowUp(stage, sentDate);
+  return {
+    status: nextDate ? (stage === 0 ? 'Email Sent' : 'Follow Up Due') : 'Archive',
+    followUpStage: stage,
+    followUpDate: nextDate,
+    lastContactDate: sentDate,
+  };
+}
+
 /** Groups leads with a followUpDate into today / tomorrow / this week / late buckets. */
 export function groupFollowUps(leads) {
   const today = new Date(); today.setHours(0, 0, 0, 0);

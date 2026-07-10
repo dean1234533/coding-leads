@@ -3,7 +3,7 @@ import { collection, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase';
 import { applyTemplateVars, buildTemplateVars } from '../../utils/crmConstants';
-import { computeNextFollowUp } from '../../utils/crmFollowUps';
+import { followUpPatchForSend } from '../../utils/crmFollowUps';
 import Modal from '../Modal';
 
 const MY_NAME = 'Dean Burt';
@@ -62,13 +62,12 @@ export default function CrmBulkSendModal({ leads, onClose, onDone }) {
         const fn = httpsCallable(getFunctions(app), 'gmailSendEmail');
         const { data } = await fn({ to: lead.email.trim(), subject, bodyHtml });
 
-        const followUpDate = computeNextFollowUp(0, new Date());
+        // Advances the ladder from wherever this lead currently is, rather
+        // than always resetting back to stage 0 — a lead that's already had
+        // a follow-up sent shouldn't have that progress wiped by a bulk send.
         await updateDoc(doc(db, 'crmLeads', lead.id), {
-          status: 'Email Sent',
           gmailThreadId: data.threadId,
-          followUpDate,
-          followUpStage: 0,
-          lastContactDate: new Date(),
+          ...followUpPatchForSend(lead),
           updatedAt: serverTimestamp(),
         });
 
