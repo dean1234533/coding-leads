@@ -86,11 +86,15 @@ export const DEFAULT_TEMPLATES = [
     subject: 'A quick idea for {{business}}',
     body: `Hi {{contact}},
 
-I came across {{business}} recently and had a look at your online presence. A few things stood out as worth improving — whether that's the overall design, how it performs on mobile, page loading speed, or something else that could be quietly costing you enquiries from potential customers.
+I hope you're doing well.
 
-I'm {{myname}}, and I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and turn more visitors into enquiries.{{portfolio_line}}
+I came across {{business}} and had a look at your website. I noticed a few areas where I believe it could be improved — whether that's the design, mobile usability, loading speed, or something else that could be affecting enquiries from potential customers.
 
-No pressure at all — if it's useful, just reply and I'll share a few specific thoughts on what I noticed.
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -104,7 +108,9 @@ I've been following {{business}}'s work and love the quality of your digital pro
 
 I'm a full-stack developer specialising in mobile apps and websites, handling the full development lifecycle from design and code through to store submission. I'm looking to partner with a small number of agencies that occasionally need reliable, back-office technical capacity for projects that fall outside their current bandwidth — the kind of overflow work you can hand off with confidence and not worry about.{{portfolio_line}}
 
-Would it be worth a short call to see if there's a fit for future projects?
+If you'd be interested in a no-obligation chat about how this could work, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -161,11 +167,15 @@ Thank you for your time, and I hope to hear from you.
     subject: 'Helping {{business}} book more appointments online',
     body: `Hi {{contact}},
 
-A lot of salon bookings happen outside opening hours — someone's scrolling in the evening, decides they want an appointment, and if they can't book there and then, they'll often just message the next salon on the list instead.
+I hope you're doing well.
 
-I noticed {{business}} doesn't currently have a way for clients to book online, which means those late-evening and weekend browsers are probably going elsewhere. I build websites for salons with a booking system built straight in, plus a proper gallery so your work speaks for itself — clients pick a time that suits them, no back-and-forth over DMs or phone calls needed.{{portfolio_line}}
+I had a look at {{business}} and noticed there isn't currently an easy way for clients to book online. That usually means missed bookings from people browsing outside your opening hours, who end up booking with a salon that lets them book instantly instead.
 
-Would it be worth a quick 10-minute call to see what this could look like for {{business}}?
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -175,11 +185,15 @@ Would it be worth a quick 10-minute call to see what this could look like for {{
     subject: 'A modern website + booking system for {{business}}',
     body: `Hi {{contact}},
 
-Signing up to a new gym is a bit of a leap of faith — most people want to see the space, check the class timetable, and get a feel for the place before they ever walk in. If that's hard to do on {{business}}'s current site (or there isn't one), you're likely losing a chunk of people at that first step.
+I hope you're doing well.
 
-I build gym websites with the class timetable, membership sign-up, and booking all built directly in, so a prospective member can see what's on, pick a class, and sign up without waiting for someone to get back to them.{{portfolio_line}}
+I had a look at {{business}} and noticed the website doesn't currently make it easy to see class times or sign up for a membership online. That's often enough to make someone try a different gym instead.
 
-Happy to put together a mockup so you can see it in action — worth a quick chat this week?
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -189,11 +203,15 @@ Happy to put together a mockup so you can see it in action — worth a quick cha
     subject: 'A more professional online presence for {{business}}',
     body: `Hi {{contact}},
 
-Before someone calls a solicitor, they almost always look them up first — and in a field built on trust, a dated or generic-looking website can quietly cost you the enquiry before you ever get the chance to speak to them.
+I hope you're doing well.
 
-I had a look at {{business}}'s website with that in mind. I build clean, professional sites for firms that are designed to build credibility fast and make it obvious how to get in touch — clear practice areas, straightforward contact routes, no clutter.{{portfolio_line}}
+I had a look at {{business}}'s website and noticed it could do more to build trust with new visitors before they ever pick up the phone. First impressions matter a great deal in your industry.
 
-Would you be open to a short call to talk through some ideas for {{business}}?
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -203,11 +221,15 @@ Would you be open to a short call to talk through some ideas for {{business}}?
     subject: 'Getting {{business}} more online orders/bookings',
     body: `Hi {{contact}},
 
-When someone searches for a place to eat, they usually want three things fast: the menu, whether you take bookings, and what the place looks like. If {{business}}'s website makes that hard — or there isn't one — a fair few of those searches end up at a competitor instead.
+I hope you're doing well.
 
-I build restaurant websites that put the menu and table booking front and centre, look great on a phone (which is how most people are browsing), and make ordering or booking a simple couple of taps.{{portfolio_line}}
+I had a look at {{business}}'s website and noticed it isn't easy to see the menu or book a table online. That's often enough for someone to choose a different restaurant instead.
 
-Would it be worth a quick chat about what this could do for {{business}}?
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -217,11 +239,15 @@ Would it be worth a quick chat about what this could do for {{business}}?
     subject: 'A website that brings {{business}} more enquiries',
     body: `Hi {{contact}},
 
-Most people search online before hiring a tradesperson now, and they're quick to judge — a bare-bones or missing website often reads as "not established," even when the work itself is excellent. That impression costs jobs before you ever get a chance to quote.
+I hope you're doing well.
 
-I build simple, fast websites for trades that show off previous work, make it obvious what areas you cover, and give people an easy way to request a quote — the kind of site that builds trust in the first few seconds.{{portfolio_line}}
+I had a look at {{business}} online and noticed the website could do more to build trust with potential customers before they decide who to call.
 
-Worth a quick call to see what this could look like for {{business}}?
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -231,11 +257,15 @@ Worth a quick call to see what this could look like for {{business}}?
     subject: 'Helping {{business}} book more patients online',
     body: `Hi {{contact}},
 
-A lot of people put off booking a dentist simply because picking up the phone feels like a bigger step than it should be. If {{business}} makes it easy to book a check-up online instead, in a couple of taps, some of that hesitation disappears — and you pick up patients who'd otherwise have kept putting it off.
+I hope you're doing well.
 
-I build websites for dental practices with online booking built in, alongside clear information about treatments and new-patient registration, so it's as easy as possible for someone to take that first step.{{portfolio_line}}
+I had a look at {{business}}'s website and noticed there isn't an easy way for new patients to book online. That extra step of having to call can be enough to put some people off.
 
-Would you be open to a quick chat about this for {{business}}?
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -245,11 +275,15 @@ Would you be open to a quick chat about this for {{business}}?
     subject: 'More enquiries for {{business}} online',
     body: `Hi {{contact}},
 
-When someone needs an electrician, they're often comparing two or three options within minutes — whoever looks most established and makes it easiest to request a quote tends to get the call. A weak or missing website puts {{business}} at a real disadvantage in that moment, regardless of the quality of the work.
+I hope you're doing well.
 
-I build fast, simple websites for electricians that show your certifications, the work you cover, and give visitors a quick way to request a quote — built to convert a search into an enquiry.{{portfolio_line}}
+I had a look at {{business}} online and noticed the website could do more to help customers request a quote quickly.
 
-Let me know if you'd like to see what this could look like — worth a quick call?
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -259,11 +293,15 @@ Let me know if you'd like to see what this could look like — worth a quick cal
     subject: 'Getting {{business}} found online',
     body: `Hi {{contact}},
 
-Plumbing enquiries are often urgent — someone's searching right now, on their phone, and they'll call whoever looks reliable and comes up first. If {{business}} isn't ranking well locally or the site looks dated, those jobs are going to a competitor by default.
+I hope you're doing well.
 
-I build websites for tradespeople that are built to rank well in local search and make it fast and obvious for someone to call or request a quote — the goal is converting that search into a job, not just having a page that exists.{{portfolio_line}}
+I had a look at {{business}} online and noticed the website could do more to help customers find you and get in touch quickly, especially for more urgent jobs.
 
-Worth a quick chat about what this could do for {{business}}?
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -273,11 +311,15 @@ Worth a quick chat about what this could do for {{business}}?
     subject: 'Noticed an issue on {{website}}',
     body: `Hi {{contact}},
 
-I was checking out {{website}} and noticed a specific issue worth flagging{{issue_note}}. It's the kind of thing that's easy to miss day-to-day since you're not looking at your own site with fresh eyes, but it's likely turning visitors away before they get to see what {{business}} actually offers.
+I hope you're doing well.
 
-I specialise in fixing exactly this kind of issue and rebuilding sites so they're fast, reliable, and work properly on every device.{{portfolio_line}}
+I was checking out {{website}} and noticed a few areas where I believe it could be improved{{issue_note}}. That's likely costing {{business}} visitors and enquiries.
 
-Want me to send over what I found and a few thoughts on fixing it?
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -287,11 +329,15 @@ Want me to send over what I found and a few thoughts on fixing it?
     subject: '{{website}} is loading slowly — quick fix ideas',
     body: `Hi {{contact}},
 
-I ran a quick check on {{website}} and it's loading noticeably slower than it should. It's an easy thing to overlook, but it matters more than it looks — most visitors give up on a slow page within a few seconds, and Google factors load speed into how highly you rank, so it compounds over time.
+I hope you're doing well.
 
-I specialise in fast, modern websites and would be glad to share the specific things that are slowing {{website}} down.{{portfolio_line}}
+I ran a quick check on {{website}} and noticed it's loading slower than it should, which can affect both how visitors experience the site and where it ranks in Google.
 
-Happy to send over a few quick wins if that would be useful?
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -301,11 +347,15 @@ Happy to send over a few quick wins if that would be useful?
     subject: 'A modern refresh for {{business}}',
     body: `Hi {{contact}},
 
-First impressions online form in seconds, and {{business}}'s website looks like it could use a modern refresh{{issue_highlight}}. An outdated design doesn't necessarily reflect the quality of the business behind it, but visitors don't know that — they'll often judge on looks alone and move on before reading further.
+I hope you're doing well.
 
-I build modern, mobile-friendly websites designed to make a strong first impression and turn more of those visitors into enquiries.{{portfolio_line}}
+I had a look at {{business}}'s website and noticed it could use a modern refresh{{issue_highlight}}.
 
-Would it be worth a quick chat about a refresh for {{business}}?
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -315,11 +365,15 @@ Would it be worth a quick chat about a refresh for {{business}}?
     subject: 'Add online booking to {{business}}',
     body: `Hi {{contact}},
 
-I noticed {{business}} doesn't currently have a way to book online. In practice, that usually means losing customers who browse outside your working hours and would rather book instantly than wait to call — a gap that's easy to miss because you never see the people who leave.
+I hope you're doing well.
 
-I build this kind of booking functionality directly into premium, mobile-friendly websites, so customers can book whenever suits them.{{portfolio_line}}
+I had a look at {{business}}'s website and noticed there isn't currently a way for customers to book online.
 
-Would it be worth a quick chat about what this could look like for {{business}}?
+I build premium, mobile-friendly websites for local businesses that are designed to look professional, perform well across all devices, and help turn more visitors into enquiries.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -438,7 +492,7 @@ export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
     industry: lead?.industry ?? '',
     issue,
     portfolio: demoUrl,
-    portfolio_line: `\n\nWebsite: ${MY_WEBSITE}${demoUrl ? `\nPortfolio example: ${demoUrl}` : ''}`,
+    portfolio_line: `\n\nYou can view my portfolio and live demos here:\n\nWebsite: ${MY_WEBSITE}${demoUrl ? `\nPortfolio: ${demoUrl}` : ''}`,
     issue_note: issue ? ` (${issue})` : '',
     issue_highlight: issue ? ` — ${issue} stood out to me` : '',
     myname: myName ?? '',
