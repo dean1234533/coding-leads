@@ -52,7 +52,7 @@ export default function CrmPortfolioSelector({ managing = false, onSelect }) {
       <div className="mt-4 space-y-2">
         {(demos ?? []).map((d) => (
           <div key={`${d.id}:${d.url}`} className="flex items-center gap-2">
-            <span className="w-28 shrink-0 truncate text-sm text-gray-300">{d.name}</span>
+            <span className="w-20 shrink-0 truncate text-sm text-gray-300 sm:w-28">{d.name}</span>
             <input
               defaultValue={d.url}
               onBlur={(e) => updateUrl(d.id, e.target.value)}

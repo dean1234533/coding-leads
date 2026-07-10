@@ -30,12 +30,12 @@ export default function LeadDashboard() {
       {/* ── Nav ── */}
       <header className="sticky top-0 z-10 border-b border-gray-800 bg-gray-950/90 backdrop-blur-sm">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="flex items-center justify-between py-3 sm:py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 py-3 sm:py-4">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-400">dean-da-dev</p>
               <h1 className="text-base font-semibold leading-tight text-gray-100">Tools</h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Link
                 to="/"
                 className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400"
@@ -50,12 +50,12 @@ export default function LeadDashboard() {
             </div>
           </div>
           {/* Tab bar */}
-          <div className="flex gap-1 -mb-px">
+          <div className="flex gap-1 -mb-px overflow-x-auto">
             {NAV_TABS.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
-                className={`px-4 py-2 text-xs font-semibold border-b-2 transition ${
+                className={`whitespace-nowrap px-4 py-2 text-xs font-semibold border-b-2 transition ${
                   activeTab === key
                     ? 'border-blue-500 text-blue-400'
                     : 'border-transparent text-gray-500 hover:text-gray-300'

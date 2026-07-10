@@ -89,7 +89,7 @@ export default function CrmGmailInbox({ connected }) {
             <button key={m.id} onClick={() => setOpenThreadId(m.threadId)}
               className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-gray-800/30">
               <span className={`h-2 w-2 shrink-0 rounded-full ${m.unread ? 'bg-blue-400' : 'bg-transparent'}`} />
-              <span className="w-40 shrink-0 truncate text-sm text-gray-300">{m.from?.replace(/<.*>/, '').trim() || m.from}</span>
+              <span className="w-20 shrink-0 truncate text-sm text-gray-300 sm:w-40">{m.from?.replace(/<.*>/, '').trim() || m.from}</span>
               <span className="min-w-0 flex-1 truncate text-sm text-gray-200">
                 {m.subject || '(no subject)'} <span className="text-gray-600">— {m.snippet}</span>
               </span>

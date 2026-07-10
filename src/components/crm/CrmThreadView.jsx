@@ -146,7 +146,7 @@ export default function CrmThreadView({ threadId, onClose }) {
               {buttonLabel}
             </button>
           )}
-          <button onClick={onClose} className="shrink-0 rounded-lg p-1 text-gray-500 transition hover:bg-gray-800 hover:text-gray-300">
+          <button onClick={onClose} className="shrink-0 rounded-lg p-2 text-gray-500 transition hover:bg-gray-800 hover:text-gray-300">
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
