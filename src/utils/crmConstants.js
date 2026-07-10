@@ -480,7 +480,8 @@ export function applyTemplateVars(text, vars) {
  * issue_highlight) so templates never end up with a dangling "Example: "
  * or a broken sentence when a demo/issue hasn't been picked/logged.
  */
-const MY_WEBSITE = 'https://dean-da-dev.co.uk';
+const MY_WEBSITE = 'https://www.dean-da-dev.co.uk';
+const MY_PORTFOLIO = 'https://www.dean-da-dev.co.uk/portfolio';
 const MY_EMAIL = 'dean@dean-da-dev.co.uk';
 
 export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
@@ -492,7 +493,7 @@ export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
     industry: lead?.industry ?? '',
     issue,
     portfolio: demoUrl,
-    portfolio_line: `\n\nYou can view my portfolio and live demos here:\n\nWebsite: ${MY_WEBSITE}${demoUrl ? `\nPortfolio: ${demoUrl}` : ''}`,
+    portfolio_line: `\n\nYou can view my portfolio and live demos here:\n\nWebsite: ${MY_WEBSITE}\nPortfolio: ${MY_PORTFOLIO}${demoUrl ? `\nExample project: ${demoUrl}` : ''}`,
     issue_note: issue ? ` (${issue})` : '',
     issue_highlight: issue ? ` — ${issue} stood out to me` : '',
     myname: myName ?? '',
