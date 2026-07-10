@@ -6,16 +6,16 @@ import { DEFAULT_TEMPLATES, DEFAULT_PORTFOLIO, slugify } from '../../utils/crmCo
 /**
  * Keeps crmTemplates and crmPortfolio populated with the built-in defaults
  * and free of duplicates. Mounted once at the top of the CRM (not inside the
- * Templates/Settings tabs) so it runs regardless of which tab is open —
- * duplicates used to survive indefinitely if you never visited those tabs,
- * since the seed/dedupe logic only ran when they mounted.
+ * Templates/Settings tabs) so it runs regardless of which tab is open.
  *
- * Seeding uses setDoc with a deterministic ID (slug of the name), which is
- * safe to run repeatedly — writing the same ID twice just overwrites the
- * same doc rather than creating a new one. Docs are only refreshed from the
- * code defaults while `isDefault !== false` — editing a built-in template
- * or demo through the UI sets isDefault: false so your edit sticks instead
- * of being silently reverted the next time the app loads.
+ * Looks up existing docs BY NAME first (not by assuming the doc ID equals
+ * slugify(name)) and updates them in place using their real ID — templates
+ * created before deterministic IDs existed have random Firestore auto-IDs,
+ * and treating slugify(name) as "the" doc ID for those caused a second,
+ * duplicate doc to be created every load, with the dedupe pass unpredictably
+ * keeping the old stale one over the freshly-written one. Docs are only
+ * refreshed while `isDefault !== false` — editing a built-in template or demo
+ * through the UI sets isDefault: false so your edit sticks.
  */
 function useAutoSeedCollection(collectionName, defaults) {
   const seededRef = useRef(false);
@@ -23,22 +23,33 @@ function useAutoSeedCollection(collectionName, defaults) {
   useEffect(() => {
     return onSnapshot(collection(db, collectionName), (snap) => {
       const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const byId = new Map(docs.map((d) => [d.id, d]));
 
       if (!seededRef.current) {
         seededRef.current = true;
-        const toWrite = defaults.filter((item) => byId.get(slugify(item.name))?.isDefault !== false);
-        Promise.all(
-          toWrite.map((item) => setDoc(doc(db, collectionName, slugify(item.name)), { ...item, isDefault: true, createdAt: serverTimestamp() }, { merge: true }))
-        ).catch((err) => console.error(`[CrmAutoSeed] ${collectionName} seed failed:`, err));
+        const byName = new Map(docs.map((d) => [d.name, d]));
+        const writes = defaults
+          .map((item) => {
+            const existing = byName.get(item.name);
+            if (existing && existing.isDefault === false) return null; // user-edited, leave it alone
+            const targetId = existing ? existing.id : slugify(item.name);
+            return setDoc(doc(db, collectionName, targetId), { ...item, isDefault: true, createdAt: serverTimestamp() }, { merge: true });
+          })
+          .filter(Boolean);
+        Promise.all(writes).catch((err) => console.error(`[CrmAutoSeed] ${collectionName} seed failed:`, err));
       }
 
-      // Dedupe anything created before this fix existed (same name, multiple docs).
+      // Dedupe any duplicates (from before this fix, or from a name collision) —
+      // prefer keeping the doc at the canonical slug ID when one exists among
+      // the duplicates, since that's the one seeding above will keep refreshing.
       const byName = new Map();
       for (const d of docs) (byName.get(d.name) ?? byName.set(d.name, []).get(d.name)).push(d);
-      const extras = [...byName.values()]
-        .filter((group) => group.length > 1)
-        .flatMap((group) => group.slice(1).map((d) => d.id));
+      const extras = [];
+      for (const group of byName.values()) {
+        if (group.length <= 1) continue;
+        const canonicalId = slugify(group[0].name);
+        const keep = group.find((d) => d.id === canonicalId) ?? group[0];
+        extras.push(...group.filter((d) => d !== keep).map((d) => d.id));
+      }
       if (extras.length > 0) {
         Promise.all(extras.map((id) => deleteDoc(doc(db, collectionName, id))))
           .catch((err) => console.error(`[CrmAutoSeed] ${collectionName} dedupe failed:`, err));
