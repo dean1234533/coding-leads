@@ -110,8 +110,8 @@ export default function CrmBulkSendModal({ leads, onClose, onDone }) {
               <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-600">
                 Preview — {previewLead.businessName || 'first lead'}
               </p>
-              <p className="text-sm font-medium text-gray-200">{applyTemplateVars(template.subject, leadVars(previewLead))}</p>
-              <p className="whitespace-pre-line text-xs text-gray-400">{applyTemplateVars(template.body, leadVars(previewLead))}</p>
+              <p className="break-words text-sm font-medium text-gray-200">{applyTemplateVars(template.subject, leadVars(previewLead))}</p>
+              <p className="whitespace-pre-line break-words text-xs text-gray-400">{applyTemplateVars(template.body, leadVars(previewLead))}</p>
             </div>
           )}
 

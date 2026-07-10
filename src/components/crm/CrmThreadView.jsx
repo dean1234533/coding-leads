@@ -164,9 +164,13 @@ export default function CrmThreadView({ threadId, onClose }) {
                   <span>{formatDate(m.date)}</span>
                 </div>
                 {m.bodyHtml ? (
-                  <div className="mt-2 text-sm text-gray-200" dangerouslySetInnerHTML={{ __html: m.bodyHtml }} />
+                  // Gmail HTML emails often contain fixed-width tables/images that
+                  // would otherwise blow out the page width on mobile — contain
+                  // any overflow to a scrollbar inside the bubble instead.
+                  <div className="mt-2 max-w-full overflow-x-auto break-words text-sm text-gray-200 [&_img]:max-w-full [&_table]:max-w-full"
+                    dangerouslySetInnerHTML={{ __html: m.bodyHtml }} />
                 ) : (
-                  <p className="mt-2 whitespace-pre-line text-sm text-gray-200">{m.bodyText}</p>
+                  <p className="mt-2 whitespace-pre-line break-words text-sm text-gray-200">{m.bodyText}</p>
                 )}
               </div>
             ))}

@@ -203,11 +203,11 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
 
       {/* Body */}
       {preview ? (
-        <div className="min-h-[10rem] rounded-lg border border-gray-800 bg-gray-950/60 p-4 text-sm text-gray-200"
+        <div className="min-h-[10rem] max-w-full overflow-x-auto break-words rounded-lg border border-gray-800 bg-gray-950/60 p-4 text-sm text-gray-200 [&_img]:max-w-full [&_table]:max-w-full"
           dangerouslySetInnerHTML={{ __html: richMode ? (editorRef.current?.innerHTML ?? '') : plainText.replace(/\n/g, '<br>') }} />
       ) : richMode ? (
         <div ref={editorRef} contentEditable suppressContentEditableWarning
-          className="min-h-[10rem] rounded-lg border border-gray-700 bg-gray-800/50 p-4 text-sm text-gray-100 focus:border-blue-500 focus:outline-none" />
+          className="min-h-[10rem] overflow-x-auto break-words rounded-lg border border-gray-700 bg-gray-800/50 p-4 text-sm text-gray-100 focus:border-blue-500 focus:outline-none" />
       ) : (
         <textarea rows={8} value={plainText} onChange={(e) => setPlainText(e.target.value)}
           className="w-full rounded-lg border border-gray-700 bg-gray-800/50 p-4 text-sm text-gray-100 focus:border-blue-500 focus:outline-none" />

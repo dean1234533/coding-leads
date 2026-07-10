@@ -8,8 +8,9 @@ import CrmWebsiteReview from './CrmWebsiteReview';
 import CrmNotesTimeline from './CrmNotesTimeline';
 import CrmTasksList from './CrmTasksList';
 import CrmComposer from './CrmComposer';
+import CrmCallScript from './CrmCallScript';
 
-const TABS = ['Overview', 'Website Review', 'Notes', 'Tasks', 'Emails'];
+const TABS = ['Overview', 'Website Review', 'Notes', 'Tasks', 'Emails', 'Call Script'];
 
 function Field({ label, value }) {
   return (
@@ -140,7 +141,7 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
           {lead.notes && (
             <div className="col-span-2 sm:col-span-3">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">Notes</p>
-              <p className="mt-0.5 whitespace-pre-line text-sm text-gray-300">{lead.notes}</p>
+              <p className="mt-0.5 whitespace-pre-line break-words text-sm text-gray-300">{lead.notes}</p>
             </div>
           )}
         </div>
@@ -164,6 +165,7 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
           />
         </div>
       )}
+      {tab === 'Call Script' && <CrmCallScript lead={lead} />}
     </Modal>
   );
 }

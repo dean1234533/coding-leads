@@ -65,7 +65,7 @@ export default function CrmTemplateLibrary() {
               <div key={t.id} className="rounded-xl border border-gray-800 bg-gray-900 p-4">
                 <p className="font-medium text-gray-100">{t.name}</p>
                 <p className="mt-1 truncate text-xs text-gray-500">{t.subject}</p>
-                <p className="mt-2 line-clamp-3 text-xs text-gray-600 whitespace-pre-line">{t.body}</p>
+                <p className="mt-2 line-clamp-3 break-words text-xs text-gray-600 whitespace-pre-line">{t.body}</p>
                 <div className="mt-3 flex gap-3">
                   <button onClick={() => startEdit(t)} className="text-xs text-blue-400 hover:text-blue-300">Edit</button>
                   <button onClick={() => handleDelete(t.id)} className="text-xs text-gray-600 hover:text-red-400">Delete</button>
