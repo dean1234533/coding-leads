@@ -241,6 +241,91 @@ function CrmAutoFollowUp() {
   );
 }
 
+function CrmAutoAuditEmail() {
+  const [enabled, setEnabled] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+
+  useEffect(() => {
+    getDoc(doc(db, 'autoAuditEmailConfig', 'settings'))
+      .then((snap) => setEnabled(snap.exists() ? !!snap.data().enabled : false))
+      .catch((err) => { console.error('[CrmAutoAuditEmail] load failed:', err); setError(err?.message ?? 'Failed to load.'); setEnabled(false); });
+  }, []);
+
+  async function toggle() {
+    const next = !enabled;
+    setSaving(true);
+    setError(null);
+    try {
+      await setDoc(doc(db, 'autoAuditEmailConfig', 'settings'), { enabled: next });
+      setEnabled(next);
+    } catch (err) {
+      console.error('[CrmAutoAuditEmail] save failed:', err);
+      setError(err?.message ?? 'Failed to save.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSendNow() {
+    setTesting(true);
+    setError(null);
+    setTestResult(null);
+    try {
+      const fn = httpsCallable(getFunctions(app), 'sendAuditEmailsNow', { timeout: 300000 });
+      const { data } = await fn();
+      setTestResult(data);
+    } catch (err) {
+      console.error('[CrmAutoAuditEmail] send now failed:', err);
+      setError(err?.message ?? 'Send failed.');
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  if (enabled === null) {
+    return (
+      <section className="rounded-xl border border-gray-800 bg-gray-900 p-4 sm:p-6">
+        <h2 className="text-sm font-semibold text-gray-200">Auto Audit Email</h2>
+        <p className="mt-2 text-xs text-gray-500">Loading…</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-gray-800 bg-gray-900 p-4 sm:p-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-gray-200">Auto Audit Email</h2>
+        <button
+          onClick={toggle}
+          disabled={saving}
+          className={`relative h-6 w-11 rounded-full transition disabled:opacity-50 ${enabled ? 'bg-emerald-500' : 'bg-gray-700'}`}
+        >
+          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${enabled ? 'left-5' : 'left-0.5'}`} />
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-gray-500">
+        Every morning at 9:15am, automatically sends the "Website Audit Findings" email to any new lead that has an email address, is still "New", hasn't been contacted yet, and whose website audit found issues — covers leads from Auto Scan, Quick Lookup, or a manual audit alike. This sends real emails with no review step, so double-check the "Website Audit Findings" template in your Template Library reads how you want before turning this on. Turned {enabled ? 'on' : 'off'} right now.
+      </p>
+      <button
+        onClick={handleSendNow}
+        disabled={testing}
+        className="mt-3 rounded-lg border border-gray-700 px-4 py-2 text-xs font-semibold text-gray-300 transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {testing ? 'Sending…' : 'Send Now'}
+      </button>
+      {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
+      {testResult && (
+        <p className="mt-3 text-xs text-gray-400">
+          Sent {testResult.sent} of {testResult.candidates} candidate{testResult.candidates === 1 ? '' : 's'} found.
+        </p>
+      )}
+    </section>
+  );
+}
+
 function CrmAutoScan() {
   const [config, setConfig] = useState(null);
   const [dirty, setDirty] = useState(false);
@@ -703,6 +788,7 @@ export default function OutreachCrmPage() {
             </section>
             <CrmPortfolioSelector managing />
             <CrmAutoFollowUp />
+            <CrmAutoAuditEmail />
             <CrmAutoScan />
             <CrmBacklinkProspecting />
             <CrmPushNotifications />

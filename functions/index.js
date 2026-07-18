@@ -15,7 +15,7 @@ const {
 const {
   gmailListMessages, gmailGetThread, gmailSendEmail, gmailSaveDraft,
   gmailListLabels, getGmailSentStats, checkRepliesNow, syncGmailReplies,
-  sendScheduledEmails, scheduledAutoFollowUp,
+  sendScheduledEmails, scheduledAutoFollowUp, scheduledAutoAuditEmail, sendAuditEmailsNow,
 } = require('./crmGmailService');
 const { findLeadEmail, migrateLegacyLeads, recoverBacklinkPageTitles } = require('./crmMigration');
 const { ensureBacklinkConfig, runBacklinkScan } = require('./backlinkScanner');
@@ -39,6 +39,8 @@ exports.checkRepliesNow    = checkRepliesNow;
 exports.syncGmailReplies   = syncGmailReplies;
 exports.sendScheduledEmails = sendScheduledEmails;
 exports.scheduledAutoFollowUp = scheduledAutoFollowUp;
+exports.scheduledAutoAuditEmail = scheduledAutoAuditEmail;
+exports.sendAuditEmailsNow = sendAuditEmailsNow;
 exports.findLeadEmail      = findLeadEmail;
 exports.migrateLegacyLeads = migrateLegacyLeads;
 exports.recoverBacklinkPageTitles = recoverBacklinkPageTitles;
