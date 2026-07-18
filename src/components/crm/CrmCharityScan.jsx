@@ -163,17 +163,19 @@ export default function CrmCharityScan() {
             const status = crmStatusById[lead.id];
             return (
               <div key={lead.id} className="rounded-lg border border-gray-800 bg-gray-800/40 p-3.5">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-sm font-semibold text-gray-100">{lead.name}</p>
+                      <p className="break-words text-sm font-semibold text-gray-100">{lead.name}</p>
                       <OpportunityBadge lead={lead} />
                       {lead.industryLabel && <span className="text-[10px] uppercase tracking-wider text-gray-600">{lead.industryLabel}</span>}
                     </div>
-                    <p className="truncate text-xs text-gray-500">{lead.address}{lead.rating ? ` · ★ ${lead.rating} (${lead.reviewCount ?? 0})` : ''}</p>
-                    <p className="mt-1 text-xs text-gray-400">
-                      {lead.website ? <a href={lead.website} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">{lead.website}</a> : 'No website found'}
-                      {lead.contactEmail ? ` · ${lead.contactEmail}` : ' · No email found'}
+                    <p className="break-words text-xs text-gray-500">{lead.address}{lead.rating ? ` · ★ ${lead.rating} (${lead.reviewCount ?? 0})` : ''}</p>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-gray-400">
+                      {lead.website
+                        ? <a href={lead.website} target="_blank" rel="noreferrer" className="break-all text-blue-400 hover:underline">{lead.website}</a>
+                        : <span>No website found</span>}
+                      <span className="break-all">{lead.contactEmail ? `· ${lead.contactEmail}` : '· No email found'}</span>
                     </p>
                   </div>
                   <button
