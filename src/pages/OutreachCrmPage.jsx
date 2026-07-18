@@ -17,12 +17,13 @@ import { enablePushNotifications, onForegroundPush } from '../utils/pushNotifica
 import Modal from '../components/Modal';
 
 const SUB_TABS = [
-  { key: 'dashboard', label: 'Dashboard' },
-  { key: 'leads',     label: 'Leads'     },
-  { key: 'inbox',     label: 'Inbox'     },
-  { key: 'scanner',   label: 'Scanner'   },
-  { key: 'templates', label: 'Templates' },
-  { key: 'settings',  label: 'Settings'  },
+  { key: 'dashboard',  label: 'Dashboard'  },
+  { key: 'leads',      label: 'Leads'      },
+  { key: 'backlinks',  label: 'Backlinks'  },
+  { key: 'inbox',      label: 'Inbox'      },
+  { key: 'scanner',    label: 'Scanner'    },
+  { key: 'templates',  label: 'Templates'  },
+  { key: 'settings',   label: 'Settings'   },
 ];
 
 function MigrateLegacyLeads() {
@@ -569,7 +570,7 @@ function CrmBacklinkProspecting() {
     <section className="rounded-xl border border-gray-800 bg-gray-900 p-4 sm:p-6">
       <h2 className="text-sm font-semibold text-gray-200">Backlink Prospecting</h2>
       <p className="mt-1 text-xs text-gray-500">
-        Searches two angles: resource/tools-list pages your free tools could be added to, and web dev/design/tech blogs that openly accept guest writers ("write for us" pages, guest post guidelines) — a real reason to offer a free article. Runs automatically every Monday, or trigger it manually below. Each match is tagged "Tool Mention" or "Guest Post" so you know which template to use — "Backlink Outreach" or "Guest Post Pitch". Requires a SerpAPI key set up as the <code className="text-gray-400">SERPAPI_KEY</code> secret.
+        Searches two angles: resource/tools-list pages your free tools could be added to, and web dev/design/tech blogs that openly accept guest writers ("write for us" pages, guest post guidelines) — a real reason to offer a free article. Runs automatically every Monday, or trigger it manually below. Matches show up in the Backlinks tab (not Leads), tagged "Tool Mention" or "Guest Post" so you know which template to use — "Backlink Outreach" or "Guest Post Pitch". Requires a SerpAPI key set up as the <code className="text-gray-400">SERPAPI_KEY</code> secret.
       </p>
 
       <div className="mt-4">
@@ -767,6 +768,13 @@ export default function OutreachCrmPage() {
     setSubTab('leads');
   }
 
+  // Backlink prospects (category: 'Backlink', from the Backlink Scanner)
+  // aren't real sales leads — mixing them into the main Leads list and
+  // dashboard KPIs just buries actual business leads under a wall of
+  // directory/guest-post targets. Kept in their own tab instead.
+  const businessLeads = useMemo(() => (leads ? leads.filter((l) => l.category !== 'Backlink') : leads), [leads]);
+  const backlinkLeads = useMemo(() => (leads ? leads.filter((l) => l.category === 'Backlink') : leads), [leads]);
+
   return (
     <div className="min-h-screen bg-gray-950 font-sans text-gray-100 antialiased">
       <header className="sticky top-0 z-10 border-b border-gray-800 bg-gray-950/90 backdrop-blur-sm">
@@ -819,10 +827,13 @@ export default function OutreachCrmPage() {
         )}
 
         {subTab === 'dashboard' && (
-          <CrmDashboard leads={leads ?? []} onOpenLead={openLead} onGoToLeads={() => setSubTab('leads')} onGoToInbox={() => setSubTab('inbox')} />
+          <CrmDashboard leads={businessLeads ?? []} onOpenLead={openLead} onGoToLeads={() => setSubTab('leads')} onGoToInbox={() => setSubTab('inbox')} />
         )}
         {subTab === 'leads' && (
-          <CrmLeadsPage leads={leads} openLeadId={openLeadId} onOpenLeadHandled={() => setOpenLeadId(null)} />
+          <CrmLeadsPage leads={businessLeads} openLeadId={openLeadId} onOpenLeadHandled={() => setOpenLeadId(null)} />
+        )}
+        {subTab === 'backlinks' && (
+          <CrmLeadsPage leads={backlinkLeads} openLeadId={openLeadId} onOpenLeadHandled={() => setOpenLeadId(null)} />
         )}
         {subTab === 'inbox' && <CrmGmailInbox connected={!!gmailStatus?.connected} />}
         {subTab === 'scanner' && (
