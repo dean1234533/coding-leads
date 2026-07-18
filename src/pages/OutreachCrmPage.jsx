@@ -468,7 +468,7 @@ function CrmBacklinkProspecting() {
     <section className="rounded-xl border border-gray-800 bg-gray-900 p-4 sm:p-6">
       <h2 className="text-sm font-semibold text-gray-200">Backlink Prospecting</h2>
       <p className="mt-1 text-xs text-gray-500">
-        Searches for resource pages and "best free tools" roundups that could link to your tools on dean-da-dev.co.uk. Runs automatically every Monday, or trigger it manually below. Matches are added to Leads with source "Backlink Scanner" — use the "Backlink Outreach" template to email them. Requires a SerpAPI key set up as the <code className="text-gray-400">SERPAPI_KEY</code> secret.
+        Searches two angles: resource/tools-list pages your free tools could be added to, and web dev/design/tech blogs that openly accept guest writers ("write for us" pages, guest post guidelines) — a real reason to offer a free article. Runs automatically every Monday, or trigger it manually below. Each match is tagged "Tool Mention" or "Guest Post" so you know which template to use — "Backlink Outreach" or "Guest Post Pitch". Requires a SerpAPI key set up as the <code className="text-gray-400">SERPAPI_KEY</code> secret.
       </p>
 
       <div className="mt-4">

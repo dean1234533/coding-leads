@@ -553,6 +553,23 @@ Thanks for your time either way.
 Dean
 dean-da-dev.co.uk`,
   },
+  {
+    name: 'Guest Post Pitch',
+    category: 'Backlink',
+    subject: 'Guest post idea for {{business}}',
+    body: `Hi {{contact}},
+
+I came across {{business}} while looking for web dev/design blogs that take guest contributions, and wanted to reach out with an idea.
+
+I'm {{myname}}, a web developer who builds custom sites for small businesses through dean-da-dev.co.uk. I'd like to write a free, genuinely useful article for your readers — no charge, just credit and a link back to my site in return. Happy to fit it to whatever your readers actually care about; a few directions that tend to work well:
+  • Practical website tips for small business owners
+  • What actually makes a site convert visitors into enquiries
+  • A beginner-friendly explainer on a specific web/design topic your audience would find useful
+
+Let me know if that's of interest and I'll send over a draft outline first, so you can see it's a good fit before committing to anything.
+
+{{signature}}`,
+  },
 ];
 
 // ─── Free tools on dean-da-dev.co.uk (for backlink outreach) ──────────────

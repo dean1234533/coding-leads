@@ -1200,10 +1200,13 @@ const BACKLINK_SECRETS = ['SERPAPI_KEY'];
 
 /**
  * Function 10: scanBacklinkProspectsNow (authenticated, manual trigger)
- * Runs a set of configured Google searches (via SerpAPI) for pages that
- * already list similar free tools (resource pages, "best free tools"
- * roundups) and saves new matches into crmLeads (category: 'Backlink') for
- * outreach. Safe to call repeatedly — already-seen domains are skipped.
+ * Runs a set of configured Google searches (via SerpAPI) across two angles —
+ * resource/"best free tools" pages a tool could be added to, and web dev/
+ * design/tech blogs that openly accept guest writers ("write for us" pages,
+ * guest post guidelines) — and saves new matches into crmLeads (category:
+ * 'Backlink'), tagged by which angle fit so the right outreach template
+ * (tool suggestion vs. guest post pitch) is obvious. Safe to call
+ * repeatedly — already-seen domains are skipped.
  */
 exports.scanBacklinkProspectsNow = onCall(
   { cors: true, timeoutSeconds: 180, memory: '256MiB', secrets: BACKLINK_SECRETS },
