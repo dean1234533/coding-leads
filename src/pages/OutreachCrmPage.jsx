@@ -10,6 +10,7 @@ import CrmGmailInbox from '../components/crm/CrmGmailInbox';
 import CrmTemplateLibrary from '../components/crm/CrmTemplateLibrary';
 import CrmPortfolioSelector from '../components/crm/CrmPortfolioSelector';
 import RssScout from '../components/RssScout';
+import QuickLookup from '../components/QuickLookup';
 import InstallBanner from '../components/InstallBanner';
 import CrmAutoSeed from '../components/crm/CrmAutoSeed';
 import { enablePushNotifications, onForegroundPush } from '../utils/pushNotifications';
@@ -677,7 +678,12 @@ export default function OutreachCrmPage() {
           <CrmLeadsPage leads={leads} openLeadId={openLeadId} onOpenLeadHandled={() => setOpenLeadId(null)} />
         )}
         {subTab === 'inbox' && <CrmGmailInbox connected={!!gmailStatus?.connected} />}
-        {subTab === 'scanner' && <RssScout />}
+        {subTab === 'scanner' && (
+          <div className="space-y-6">
+            <QuickLookup />
+            <RssScout />
+          </div>
+        )}
         {subTab === 'templates' && <CrmTemplateLibrary />}
         {subTab === 'settings' && (
           <div className="space-y-6">

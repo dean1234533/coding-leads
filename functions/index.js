@@ -896,6 +896,92 @@ exports.scanBusinessLeads = onCall(
   }
 );
 
+const QUICK_LOOKUP_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY'];
+
+/**
+ * "Walk-by" lookup: search for a business by name (optionally biased toward
+ * the caller's current location), returning a short list of candidate
+ * matches to pick from — a plain name search can return several similarly
+ * named businesses, so this doesn't guess which one is meant.
+ */
+exports.searchBusinessByName = onCall(
+  { cors: true, timeoutSeconds: 20, memory: '256MiB', secrets: ['GOOGLE_PLACES_KEY'] },
+  async (request) => {
+    const { query, lat, lng } = request.data ?? {};
+    if (!query || !String(query).trim()) {
+      throw new HttpsError('invalid-argument', 'A business name is required.');
+    }
+    const apiKey = process.env.GOOGLE_PLACES_KEY;
+    if (!apiKey) throw new HttpsError('internal', 'GOOGLE_PLACES_KEY secret not set.');
+
+    const params = { query: String(query).trim(), key: apiKey };
+    if (typeof lat === 'number' && typeof lng === 'number') {
+      // Biases toward nearby results without excluding a clear match further away.
+      params.location = `${lat},${lng}`;
+      params.radius = 8000;
+    }
+
+    let res;
+    try {
+      res = await axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', { params, timeout: 10_000 });
+    } catch (err) {
+      throw new HttpsError('internal', `Search failed: ${err.message}`);
+    }
+
+    const results = (res.data.results ?? []).slice(0, 5).map((p) => ({
+      placeId: p.place_id,
+      name: p.name,
+      address: p.formatted_address ?? '',
+      rating: p.rating ?? null,
+    }));
+
+    return { results };
+  }
+);
+
+/**
+ * Second step of the walk-by lookup — once Dean picks the right candidate,
+ * this fetches its website and runs it through the same owner-name +
+ * contact-email pipeline as the Scanner/Auto Scan (Hunter/Serper/Prospeo/
+ * GetProspect/RocketReach/Snov, then raw scraping) so it returns a real,
+ * usable contact on the spot.
+ */
+exports.getBusinessContactByPlaceId = onCall(
+  { cors: true, timeoutSeconds: 60, memory: '512MiB', secrets: QUICK_LOOKUP_SECRETS },
+  async (request) => {
+    const { placeId } = request.data ?? {};
+    if (!placeId) throw new HttpsError('invalid-argument', 'A place ID is required.');
+    const apiKey = process.env.GOOGLE_PLACES_KEY;
+    if (!apiKey) throw new HttpsError('internal', 'GOOGLE_PLACES_KEY secret not set.');
+
+    let d;
+    try {
+      const detailRes = await axios.get('https://maps.googleapis.com/maps/api/place/details/json', {
+        params: { place_id: placeId, fields: 'name,formatted_address,formatted_phone_number,website,url', key: apiKey },
+        timeout: 10_000,
+      });
+      d = detailRes.data.result ?? {};
+    } catch (err) {
+      throw new HttpsError('internal', `Details lookup failed: ${err.message}`);
+    }
+
+    const ownerResult = await findOwnerName(d.name ?? '');
+    const ownerName = ownerResult?.name ?? null;
+    const contactEmail = await findContactEmail(d.website ?? null, ownerName, d.name ?? '');
+
+    return {
+      name:            d.name ?? null,
+      address:         d.formatted_address ?? null,
+      phone:           d.formatted_phone_number ?? null,
+      website:         d.website ?? null,
+      googleMapsUrl:   d.url ?? null,
+      ownerName,
+      ownerNameSource: ownerResult?.source ?? null,
+      contactEmail:    contactEmail ?? null,
+    };
+  }
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Booking Functions
 // ─────────────────────────────────────────────────────────────────────────────
