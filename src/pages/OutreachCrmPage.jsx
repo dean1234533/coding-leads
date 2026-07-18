@@ -618,6 +618,22 @@ function CrmPushNotifications() {
   const [testResult, setTestResult] = useState(null);
   const [showPermissionHelp, setShowPermissionHelp] = useState(false);
 
+  // The "enabled" state above is only ever set by the button click, so
+  // closing and reopening the app (or just this tab remounting) always
+  // forgot it — the button reverted to "Enable" even though permission was
+  // already granted. On iOS the underlying FCM token can also actually go
+  // stale after the app's been closed a while, silently breaking real
+  // delivery, not just the UI. If permission's already granted, silently
+  // re-register on mount — refreshes the token with the backend and
+  // restores the correct button state, with no prompt shown since the
+  // browser already has an answer.
+  useEffect(() => {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    enablePushNotifications().then((result) => {
+      if (result.success) setStatus('enabled');
+    });
+  }, []);
+
   async function handleEnable() {
     setStatus('enabling');
     setError(null);
