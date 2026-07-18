@@ -97,6 +97,7 @@ export default function CrmCharityScan() {
         email: lead.contactEmail ?? null,
         phone: lead.phone ?? null,
         contactName: lead.ownerName ?? null,
+        instagramUrl: lead.instagramUrl ?? null,
         industry: lead.industryLabel ?? 'Charity / Non-Profit',
         category: 'Charity',
         address: lead.address ?? null,
@@ -177,6 +178,13 @@ export default function CrmCharityScan() {
                         : <span>No website found</span>}
                       <span className="break-all">{lead.contactEmail ? `· ${lead.contactEmail}` : '· No email found'}</span>
                     </p>
+                    {lead.instagramUrl && (
+                      <p className="mt-0.5 text-xs">
+                        <a href={lead.instagramUrl} target="_blank" rel="noreferrer" className="text-pink-400 hover:underline">
+                          {lead.instagramUrl.replace(/^https?:\/\/(www\.)?instagram\.com\//, '@').replace(/\/$/, '')}
+                        </a>
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={() => addLeadToCrm(lead)}

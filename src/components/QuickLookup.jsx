@@ -94,6 +94,7 @@ export default function QuickLookup() {
         email: contact.contactEmail ?? null,
         phone: contact.phone ?? null,
         contactName: contact.ownerName ?? null,
+        instagramUrl: contact.instagramUrl ?? null,
         industry: null,
         address: contact.address ?? null,
         googleMapsUrl: contact.googleMapsUrl ?? null,
@@ -204,6 +205,16 @@ export default function QuickLookup() {
               <div className="flex gap-2">
                 <dt className="w-16 shrink-0 text-gray-500">Contact</dt>
                 <dd className="text-gray-200">{contact.ownerName}</dd>
+              </div>
+            )}
+            {contact.instagramUrl && (
+              <div className="flex gap-2">
+                <dt className="w-16 shrink-0 text-gray-500">Instagram</dt>
+                <dd>
+                  <a href={contact.instagramUrl} target="_blank" rel="noreferrer" className="text-pink-400 hover:underline">
+                    {contact.instagramUrl.replace(/^https?:\/\/(www\.)?instagram\.com\//, '@').replace(/\/$/, '')}
+                  </a>
+                </dd>
               </div>
             )}
           </dl>

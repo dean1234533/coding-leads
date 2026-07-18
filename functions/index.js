@@ -701,6 +701,42 @@ async function findContactEmail(website, ownerName, businessName) {
   return null;
 }
 
+// Matches an Instagram profile URL (instagram.com/handle) but not a post,
+// reel, tag page, or the generic /explore/ etc. — those aren't a business's
+// own profile and would be a wrong/useless link to hand back.
+const INSTAGRAM_PROFILE_RE = /^https?:\/\/(?:www\.)?instagram\.com\/([a-zA-Z0-9._]{1,30})\/?$/;
+const INSTAGRAM_NON_PROFILE_PATHS = new Set(['p', 'reel', 'reels', 'explore', 'stories', 'accounts', 'tv', 'directory']);
+
+/**
+ * Falls back to finding a business's Instagram profile when no website/
+ * email exists to work with — plenty of small businesses (especially ones
+ * with no real website) run entirely off an Instagram page instead. Search
+ * only (via Serper); actually messaging them isn't something Instagram's
+ * API allows for cold outreach, so this just surfaces the profile link for
+ * Dean to reach out manually.
+ */
+async function findInstagramHandle(businessName, location) {
+  const serperKey = process.env.SERPER_KEY;
+  if (!serperKey || !businessName) return null;
+
+  try {
+    const { data } = await axios.post(
+      'https://google.serper.dev/search',
+      { q: `"${businessName}" ${location ?? ''} instagram`.trim(), num: 5 },
+      { headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' }, timeout: 5_000 }
+    );
+    for (const row of data.organic ?? []) {
+      const match = row.link?.match(INSTAGRAM_PROFILE_RE);
+      if (match && !INSTAGRAM_NON_PROFILE_PATHS.has(match[1].toLowerCase())) {
+        return { url: `https://www.instagram.com/${match[1]}/`, handle: match[1] };
+      }
+    }
+  } catch (err) {
+    console.warn('[findInstagramHandle] search failed:', err.response?.data?.message ?? err.message);
+  }
+  return null;
+}
+
 /**
  * Master owner-name resolver.
  *   1. Business name parsing  (instant — "Sarah's Salon" → "Sarah")
@@ -862,6 +898,7 @@ async function runBusinessScan({
         opportunityLabel: opportunityLabel(d),
         ownerName:        null,
         contactEmail:     null,
+        instagramUrl:     null,
         industryLabel:    places[i].__industryLabel ?? null,
       };
     });
@@ -885,7 +922,8 @@ async function runBusinessScan({
           lead.ownerName       = cached.ownerName ?? null;
           lead.ownerNameSource = cached.ownerNameSource ?? null;
           lead.contactEmail    = cached.email ?? null;
-          console.log(`[owner] "${lead.name}" → cached: ${cached.ownerName ?? 'null'} | email: ${cached.email ?? 'none'}`);
+          lead.instagramUrl    = cached.instagramUrl ?? null;
+          console.log(`[owner] "${lead.name}" → cached: ${cached.ownerName ?? 'null'} | email: ${cached.email ?? 'none'} | instagram: ${cached.instagramUrl ?? 'none'}`);
           return;
         }
 
@@ -893,8 +931,19 @@ async function runBusinessScan({
         lead.ownerName       = ownerResult?.name   ?? null;
         lead.ownerNameSource = ownerResult?.source ?? null;
         const email = await findContactEmail(lead.website, lead.ownerName, lead.name);
-        console.log(`[owner] "${lead.name}" → ${ownerResult ? `${ownerResult.name} (${ownerResult.source})` : 'null'} | email: ${email ?? 'none'}`);
         lead.contactEmail    = email ?? null;
+
+        // No website and no email to fall back on — plenty of small
+        // businesses run entirely off Instagram instead of a real site, so
+        // this is a genuine alternative contact channel, not a consolation
+        // prize. Only bothers looking when there's nothing else, to avoid
+        // burning Serper quota on leads that already have a real email.
+        if (!lead.contactEmail) {
+          const ig = await findInstagramHandle(lead.name, lead.address);
+          lead.instagramUrl = ig?.url ?? null;
+        }
+
+        console.log(`[owner] "${lead.name}" → ${ownerResult ? `${ownerResult.name} (${ownerResult.source})` : 'null'} | email: ${email ?? 'none'} | instagram: ${lead.instagramUrl ?? 'none'}`);
 
         // Cache the result either way — a confirmed "no email found" is just
         // as worth remembering as a hit, so a dead end isn't re-queried
@@ -903,6 +952,7 @@ async function runBusinessScan({
           email: lead.contactEmail,
           ownerName: lead.ownerName,
           ownerNameSource: lead.ownerNameSource,
+          instagramUrl: lead.instagramUrl,
           checkedAt: FieldValue.serverTimestamp(),
         }).catch((err) => console.warn(`[owner] cache write failed for ${lead.id}:`, err.message));
       })
@@ -1022,6 +1072,10 @@ exports.getBusinessContactByPlaceId = onCall(
         : Promise.resolve(null),
     ]);
 
+    // No website and no email — try Instagram as a last resort, same as
+    // the batch scan.
+    const instagram = !contactEmail ? await findInstagramHandle(d.name ?? '', d.formatted_address ?? '') : null;
+
     return {
       name:            d.name ?? null,
       address:         d.formatted_address ?? null,
@@ -1031,6 +1085,7 @@ exports.getBusinessContactByPlaceId = onCall(
       ownerName,
       ownerNameSource: ownerResult?.source ?? null,
       contactEmail:    contactEmail ?? null,
+      instagramUrl:    instagram?.url ?? null,
       websiteScore:      audit?.websiteScore ?? null,
       issuesChecklist:   audit?.issuesChecklist ?? [],
       overallImpression: audit?.auditFailed
@@ -1384,6 +1439,7 @@ async function addBusinessLeadToCrm(lead, fallbackIndustryLabel, pagespeedKey, v
     email: lead.contactEmail ?? null,
     phone: lead.phone ?? null,
     contactName: lead.ownerName ?? null,
+    instagramUrl: lead.instagramUrl ?? null,
     // Each lead carries which of the (possibly several) selected categories
     // actually found it, so a multi-type scan doesn't lump every result
     // under whichever type happened to be first.
@@ -1466,13 +1522,15 @@ async function runAutoBusinessScan({ bypassHourCheck = false, overrides = null }
     return { ran: true, error: err.message };
   }
 
-  // Nobody's reviewing these overnight — a lead with no email found is
-  // just dead weight in the CRM with no way to actually contact it, so
-  // it's skipped here rather than added anyway (unlike the manual Scanner
-  // tab, where "Has Email" is just a display filter Dean can toggle).
+  // Nobody's reviewing these overnight — a lead with no email AND no
+  // Instagram is just dead weight in the CRM with no way to actually
+  // contact it, so it's skipped here rather than added anyway (unlike the
+  // manual Scanner tab, where "Has Email" is just a display filter Dean can
+  // toggle). An Instagram-only lead still counts, since that's now a real
+  // (manual) contact channel, not just consolation data.
   const totalFound = leads.length;
-  leads = leads.filter((l) => l.contactEmail);
-  console.log(`[autoBusinessScan] ${leads.length}/${totalFound} candidates have an email; skipping the rest.`);
+  leads = leads.filter((l) => l.contactEmail || l.instagramUrl);
+  console.log(`[autoBusinessScan] ${leads.length}/${totalFound} candidates have an email or Instagram; skipping the rest.`);
 
   const fallbackIndustryLabel = BUSINESS_TYPES.find((t) => t.value === businessTypes[0])?.label ?? null;
   const pagespeedKey = process.env.GOOGLE_PAGESPEED_KEY;

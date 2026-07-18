@@ -166,6 +166,14 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
               </a>
             )}
           </div>
+          <div>
+            <EditableField label="Instagram" value={lead.instagramUrl} onSave={(v) => onUpdate({ instagramUrl: v })} />
+            {lead.instagramUrl && (
+              <a href={lead.instagramUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs text-pink-400 hover:text-pink-300">
+                Open Instagram →
+              </a>
+            )}
+          </div>
           <EditableField label="Address" value={lead.address} onSave={(v) => onUpdate({ address: v })} />
           <EditableSelect label="Industry" value={lead.industry} options={INDUSTRIES} onSave={(v) => onUpdate({ industry: v })} />
           <EditableField label="Lead Score" type="number" value={lead.leadScore} onSave={(v) => onUpdate({ leadScore: v ? Number(v) : null })} />

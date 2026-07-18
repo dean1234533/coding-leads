@@ -321,6 +321,20 @@ function LeadCard({ lead, onFigmaCopy, isFigmaCopied, businessType, onAddToCrm, 
         </div>
       )}
 
+      {/* Instagram row — only looked up when there's no email to fall back on */}
+      {lead.instagramUrl && (
+        <div className="flex items-center gap-1.5 text-xs">
+          <svg className="h-3 w-3 flex-shrink-0 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="5" strokeWidth={2} />
+            <circle cx="12" cy="12" r="4" strokeWidth={2} />
+            <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+          </svg>
+          <a href={lead.instagramUrl} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:underline">
+            {lead.instagramUrl.replace(/^https?:\/\/(www\.)?instagram\.com\//, '@').replace(/\/$/, '')}
+          </a>
+        </div>
+      )}
+
       {/* Action row */}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
@@ -499,6 +513,7 @@ export default function RssScout() {
         email: lead.contactEmail ?? null,
         phone: lead.phone ?? null,
         contactName: lead.ownerName ?? null,
+        instagramUrl: lead.instagramUrl ?? null,
         industry: lead.industryLabel ?? BUSINESS_TYPES.find((t) => types.includes(t.value))?.label ?? null,
         address: lead.address ?? null,
         googleMapsUrl: lead.googleMapsUrl ?? null,
