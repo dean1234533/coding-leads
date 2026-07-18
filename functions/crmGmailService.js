@@ -495,7 +495,7 @@ const scheduledAutoFollowUp = onSchedule(
 // so a bad or off-tone AI output never reaches a real business unreviewed.
 // Off by default (gated on autoAuditEmailConfig/settings.enabled).
 // ─────────────────────────────────────────────────────────────────────────────
-const AUDIT_EMAIL_AI_SECRETS = ['GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY'];
+const AUDIT_EMAIL_AI_SECRETS = ['GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY'];
 
 // A lead is only a candidate if it's still fresh (never contacted, still
 // 'New'), has somewhere to send to, hasn't already had a draft written for
@@ -521,6 +521,7 @@ async function runAutoAuditEmail() {
     groq: process.env.GROQ_API_KEY,
     mistral: process.env.MISTRAL_API_KEY,
     openrouter: process.env.OPENROUTER_API_KEY,
+    cerebras: process.env.CEREBRAS_API_KEY,
   };
 
   const gmail = await getGmailClient();

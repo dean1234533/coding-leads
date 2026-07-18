@@ -102,6 +102,10 @@ async function generateAuditEmail(lead, myName, keys) {
     { name: 'groq', key: keys?.groq, run: () => writeWithOpenAiCompatible(prompt, keys.groq, { baseUrl: 'https://api.groq.com/openai/v1', model: 'meta-llama/llama-4-scout-17b-16e-instruct' }) },
     { name: 'mistral', key: keys?.mistral, run: () => writeWithOpenAiCompatible(prompt, keys.mistral, { baseUrl: 'https://api.mistral.ai/v1', model: 'pixtral-12b-2409' }) },
     { name: 'openrouter', key: keys?.openrouter, run: () => writeWithOpenAiCompatible(prompt, keys.openrouter, { baseUrl: 'https://openrouter.ai/api/v1', model: 'nvidia/nemotron-nano-12b-v2-vl:free' }) },
+    // Cerebras — verified live, but multimodal is off for this account
+    // ("multimodal_not_enabled"), so it's text-only and can't join the
+    // website design audit's vision chain. Fine here since this is plain text.
+    { name: 'cerebras', key: keys?.cerebras, run: () => writeWithOpenAiCompatible(prompt, keys.cerebras, { baseUrl: 'https://api.cerebras.ai/v1', model: 'gpt-oss-120b' }) },
   ];
 
   for (const provider of providers) {

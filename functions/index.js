@@ -1440,7 +1440,7 @@ exports.scheduledBacklinkScan = onSchedule(
  */
 const PAGESPEED_CONCURRENCY = 4;
 
-const AUDIT_SECRETS = ['GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY'];
+const AUDIT_SECRETS = ['GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY'];
 
 exports.auditWebsitesNow = onCall(
   { cors: true, timeoutSeconds: 540, memory: '256MiB', secrets: AUDIT_SECRETS },
@@ -1493,6 +1493,7 @@ exports.generateAuditEmailNow = onCall(
       groq: process.env.GROQ_API_KEY,
       mistral: process.env.MISTRAL_API_KEY,
       openrouter: process.env.OPENROUTER_API_KEY,
+      cerebras: process.env.CEREBRAS_API_KEY,
     };
     const body = await generateAuditEmail(lead, myName || 'Dean', keys);
     if (!body) throw new HttpsError('internal', 'Every AI provider failed — try again in a moment.');
