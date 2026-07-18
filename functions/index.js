@@ -1364,28 +1364,33 @@ function currentHourInLondon() {
   return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hour12: false }).format(new Date()));
 }
 
-async function runAutoBusinessScan({ bypassHourCheck = false } = {}) {
+async function runAutoBusinessScan({ bypassHourCheck = false, overrides = null } = {}) {
   const configSnap = await db.collection('autoScanConfig').doc('settings').get();
   const config = configSnap.exists ? configSnap.data() : null;
-  if (!config?.enabled) {
+  if (!overrides && !config?.enabled) {
     console.log('[autoBusinessScan] skipped: auto scan is disabled in Settings.');
     return { ran: false, reason: 'disabled' };
   }
 
-  const scanHour = typeof config.scanHour === 'number' ? config.scanHour : 2;
+  const scanHour = typeof config?.scanHour === 'number' ? config.scanHour : 2;
   const nowHour = currentHourInLondon();
-  if (!bypassHourCheck && nowHour !== scanHour) {
+  if (!bypassHourCheck && !overrides && nowHour !== scanHour) {
     console.log(`[autoBusinessScan] skipped: current London hour is ${nowHour}, configured scanHour is ${scanHour}.`);
     return { ran: false, reason: 'not-scan-hour', nowHour, scanHour };
   }
 
+  // "Scan Now" lets Dean run an ad-hoc scan with different parameters than
+  // his saved daily settings (e.g. a wider radius or a different area) —
+  // overrides layer on top of the saved config rather than replacing it, so
+  // he only has to specify what's different for this one run.
+  const merged = { ...(config ?? {}), ...(overrides ?? {}) };
   const {
     location = 'London, UK',
     radius = 2000,
     businessTypes = ['restaurant'],
     dailyLimit = 10,
     scanMode = 'business',
-  } = config;
+  } = merged;
 
   let leads;
   try {
@@ -1442,7 +1447,15 @@ exports.scheduledAutoBusinessScan = onSchedule(
 // real hourly tick.
 exports.triggerAutoBusinessScanNow = onCall(
   { timeoutSeconds: 540, memory: '512MiB', secrets: AUTO_SCAN_SECRETS },
-  async () => {
-    return await runAutoBusinessScan({ bypassHourCheck: true });
+  async (request) => {
+    const { location, radius, businessTypes, dailyLimit, scanMode } = request.data ?? {};
+    const overrides = {};
+    if (location) overrides.location = location;
+    if (typeof radius === 'number') overrides.radius = radius;
+    if (Array.isArray(businessTypes) && businessTypes.length > 0) overrides.businessTypes = businessTypes;
+    if (typeof dailyLimit === 'number') overrides.dailyLimit = dailyLimit;
+    if (scanMode) overrides.scanMode = scanMode;
+
+    return await runAutoBusinessScan({ bypassHourCheck: true, overrides: Object.keys(overrides).length > 0 ? overrides : null });
   }
 );

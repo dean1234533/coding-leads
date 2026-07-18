@@ -332,18 +332,38 @@ function CrmAutoScan() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState(null);
+
+  // "Scan Now" — a one-off scan Dean can run whenever, with its own
+  // parameters, separate from the saved daily Auto Scan settings above (so
+  // running it doesn't require saving/overwriting the daily config first,
+  // and he can point it at a different area/type without losing his
+  // regular overnight settings).
+  const [scanNow, setScanNow] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
 
   useEffect(() => {
     getDoc(doc(db, 'autoScanConfig', 'settings'))
       .then((snap) => {
-        setConfig(snap.exists() ? { ...DEFAULT_AUTO_SCAN_CONFIG, ...snap.data() } : DEFAULT_AUTO_SCAN_CONFIG);
+        const loaded = snap.exists() ? { ...DEFAULT_AUTO_SCAN_CONFIG, ...snap.data() } : DEFAULT_AUTO_SCAN_CONFIG;
+        setConfig(loaded);
+        setScanNow({
+          location: loaded.location,
+          radius: loaded.radius,
+          businessTypes: loaded.businessTypes,
+          dailyLimit: loaded.dailyLimit,
+        });
       })
       .catch((err) => {
         console.error('[CrmAutoScan] load failed:', err);
         setError(err?.message ?? 'Failed to load.');
         setConfig(DEFAULT_AUTO_SCAN_CONFIG);
+        setScanNow({
+          location: DEFAULT_AUTO_SCAN_CONFIG.location,
+          radius: DEFAULT_AUTO_SCAN_CONFIG.radius,
+          businessTypes: DEFAULT_AUTO_SCAN_CONFIG.businessTypes,
+          dailyLimit: DEFAULT_AUTO_SCAN_CONFIG.dailyLimit,
+        });
       });
   }, []);
 
@@ -351,6 +371,10 @@ function CrmAutoScan() {
     setConfig((c) => ({ ...c, [key]: value }));
     setDirty(true);
     setSaved(false);
+  }
+
+  function setScanNowField(key, value) {
+    setScanNow((s) => ({ ...s, [key]: value }));
   }
 
   async function handleSave() {
@@ -368,23 +392,23 @@ function CrmAutoScan() {
     }
   }
 
-  async function handleTestNow() {
-    setTesting(true);
+  async function handleScanNow() {
+    setScanning(true);
     setError(null);
-    setTestResult(null);
+    setScanResult(null);
     try {
       const fn = httpsCallable(getFunctions(app), 'triggerAutoBusinessScanNow', { timeout: 540000 });
-      const { data } = await fn();
-      setTestResult(data);
+      const { data } = await fn(scanNow);
+      setScanResult(data);
     } catch (err) {
-      console.error('[CrmAutoScan] test run failed:', err);
-      setError(err?.message ?? 'Test run failed.');
+      console.error('[CrmAutoScan] scan now failed:', err);
+      setError(err?.message ?? 'Scan failed.');
     } finally {
-      setTesting(false);
+      setScanning(false);
     }
   }
 
-  if (!config) {
+  if (!config || !scanNow) {
     return (
       <section className="rounded-xl border border-gray-800 bg-gray-900 p-4 sm:p-6">
         <h2 className="text-sm font-semibold text-gray-200">Auto Scan</h2>
@@ -487,24 +511,91 @@ function CrmAutoScan() {
         >
           {saving ? 'Saving…' : 'Save Settings'}
         </button>
-        <button
-          onClick={handleTestNow}
-          disabled={testing || dirty}
-          title={dirty ? 'Save your settings first' : 'Runs a scan right now using your saved settings, ignoring the scan time'}
-          className="rounded-lg border border-gray-700 px-4 py-2 text-xs font-semibold text-gray-300 transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {testing ? 'Running…' : 'Test Now'}
-        </button>
         {saved && !dirty && <span className="text-xs text-emerald-400">Saved.</span>}
       </div>
       {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
-      {testResult && (
-        <p className="mt-3 text-xs text-gray-400">
-          {testResult.reason === 'disabled' && 'Skipped — auto scan is turned off.'}
-          {testResult.error && `Scan failed: ${testResult.error}`}
-          {testResult.added !== undefined && `Test run complete — added ${testResult.added} new lead${testResult.added === 1 ? '' : 's'} (${testResult.candidatesFound} candidate${testResult.candidatesFound === 1 ? '' : 's'} had an email).`}
+
+      <div className="mt-6 border-t border-gray-800 pt-4">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500">Scan Now</h3>
+        <p className="mt-1 text-xs text-gray-500">
+          Run a one-off scan right now with whatever you want below — doesn't touch or need your saved Auto Scan settings above, and works even while Auto Scan is turned off. Note: it skips any business already in your CRM, so re-scanning the exact same area/types repeatedly will find fewer new ones each time — widen the radius, change the types, or try a different area to find more.
         </p>
-      )}
+
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">Location</span>
+            <input
+              value={scanNow.location}
+              onChange={(e) => setScanNowField('location', e.target.value)}
+              placeholder="e.g. London, UK"
+              className="w-full rounded-lg border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">Radius</span>
+            <select
+              value={scanNow.radius}
+              onChange={(e) => setScanNowField('radius', Number(e.target.value))}
+              className="w-full rounded-lg border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-gray-100 focus:border-blue-500 focus:outline-none"
+            >
+              {AUTO_SCAN_RADII.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+          </label>
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">
+              Business Types {scanNow.businessTypes?.length > 0 && <span className="normal-case text-gray-600">({scanNow.businessTypes.length} selected)</span>}
+            </span>
+            <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-700 bg-gray-800/50 p-2">
+              <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+                {AUTO_SCAN_BUSINESS_TYPES.map((t) => {
+                  const checked = (scanNow.businessTypes ?? []).includes(t.value);
+                  return (
+                    <label key={t.value} className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs transition ${
+                      checked ? 'bg-blue-500/15 text-blue-300' : 'text-gray-400 hover:bg-gray-800'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          const current = scanNow.businessTypes ?? [];
+                          setScanNowField('businessTypes', current.includes(t.value) ? current.filter((v) => v !== t.value) : [...current, t.value]);
+                        }}
+                        className="accent-blue-500"
+                      />
+                      {t.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">How Many Leads</span>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={scanNow.dailyLimit}
+              onChange={(e) => setScanNowField('dailyLimit', Number(e.target.value))}
+              className="w-full rounded-lg border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-gray-100 focus:border-blue-500 focus:outline-none"
+            />
+          </label>
+        </div>
+
+        <button
+          onClick={handleScanNow}
+          disabled={scanning || !scanNow.businessTypes?.length}
+          className="mt-4 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {scanning ? 'Scanning…' : 'Scan Now'}
+        </button>
+        {scanResult && (
+          <p className="mt-3 text-xs text-gray-400">
+            {scanResult.error && `Scan failed: ${scanResult.error}`}
+            {scanResult.added !== undefined && `Done — added ${scanResult.added} new lead${scanResult.added === 1 ? '' : 's'} (${scanResult.candidatesFound} candidate${scanResult.candidatesFound === 1 ? '' : 's'} had an email).`}
+          </p>
+        )}
+      </div>
     </section>
   );
 }
