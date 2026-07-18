@@ -10,6 +10,7 @@ const { getGmailClient } = require('./gmailService');
 const { OAUTH_SECRETS } = require('./gmailOAuth');
 const { OUTREACH_FROM_ADDRESS } = require('./emailConfig');
 const { encodeMimeHeader } = require('./mimeHeader');
+const { generateAuditEmail } = require('./aiEmailWriter');
 
 const CRM_GMAIL_SECRETS = [...new Set([...OAUTH_SECRETS, 'GMAIL_REFRESH_TOKEN'])];
 
@@ -485,77 +486,26 @@ const scheduledAutoFollowUp = onSchedule(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// scheduledAutoAuditEmail — sends the "Website Audit Findings" email to any
-// new lead whose website was auto-audited and came back with issues, no
-// manual send needed. Off by default (gated on autoAuditEmailConfig/
-// settings.enabled) for the same reason as auto follow-up: this contacts
-// real businesses with no human review. Mirrors the "Website Audit
-// Findings" template in src/utils/crmConstants.js — keep the two in sync if
-// either is edited.
+// scheduledAutoAuditEmail — writes a personalized outreach email (via the
+// same "senior conversion-focused web strategist" AI prompt used by the
+// manual "Generate with AI" button in the composer) for any new lead whose
+// website was auto-audited and came back with issues, and saves it as a
+// Gmail DRAFT rather than sending it. Dean still has to open the draft and
+// hit send himself — this only automates the writing, never the sending,
+// so a bad or off-tone AI output never reaches a real business unreviewed.
+// Off by default (gated on autoAuditEmailConfig/settings.enabled).
 // ─────────────────────────────────────────────────────────────────────────────
-const ISSUE_DETAILS = {
-  'Outdated Design': 'the design looks dated next to competitors, which can make people question how established the business is',
-  'Slow Loading': "it takes too long to load, and most visitors leave before it even finishes",
-  'Not Mobile Friendly': "it doesn't work properly on mobile, where most visitors are browsing from",
-  'Broken Links': 'there are broken links, which makes the site feel unfinished',
-  'Broken Images': "several images aren't loading properly, which looks unprofessional",
-  'Missing SSL': `the site isn't secured with SSL, so browsers flag it as "Not Secure" — enough on its own to make people leave`,
-  'Poor Navigation': "it's hard to find key information, which loses visitors before they get to what you offer",
-  'No Booking System': "there's no way to book online, so you're relying on people calling during business hours",
-  'No Contact Form': "there's no contact form, so getting in touch takes more effort than it should",
-  'Poor CTA': "there's no clear next step for visitors, so a lot of interest is probably going nowhere",
-  'Text Hard To Read': 'the text is hard to read, which pushes visitors away before they take anything in',
-  'Low Quality Images': 'the images are low quality, which undersells the actual work',
-  'No Testimonials': 'there are no reviews or testimonials shown, which makes it harder for new visitors to trust you',
-  'No Portfolio': "there's no portfolio or past work shown, so visitors have nothing to judge quality by",
-  'No Google Reviews': "there's no sign of Google reviews, which is often the first thing people check",
-  'Old Branding': 'the branding feels outdated, which can undersell how good the business actually is',
-  'Confusing Layout': 'the layout is confusing, so visitors likely leave before finding what they came for',
-  'Cluttered Mobile Nav': 'the mobile menu takes up a big chunk of the screen and feels cluttered, pushing your actual content further down and making the site harder to use on a phone',
-  'Weak Logo': "the logo doesn't reflect the quality of the business, which can undersell how professional and established you actually are",
-};
-
-const AUDIT_EMAIL_SUBJECT = `A quick audit of {{business}}'s website`;
-const AUDIT_EMAIL_BODY = `Hi {{contact}},
-
-I'm ${MY_NAME}, a web developer who builds websites for local businesses. I ran {{business}}'s website through a quick audit and wanted to share what came up, in case it's useful.{{website_score_note}}
-
-{{issue_list}}
-
-None of this is a huge job to fix, and getting it sorted properly tends to make a real difference to how many visitors actually turn into enquiries — a modern, mobile-friendly website is often the first impression a potential customer gets before deciding whether to trust you, and it means you can pick up enquiries any time, not just during opening hours.{{portfolio_line}}
-
-If you'd be interested in a no-obligation chat about any of this, just reply to this email and I'd be happy to help.
-
-Thank you for your time, and I hope to hear from you.
-
-{{signature}}`;
-
-function renderAuditEmailTemplate(lead) {
-  const allIssues = lead.issuesChecklist ?? [];
-  const issueListText = allIssues.length > 0
-    ? allIssues.map((iss) => `  • ${iss}${ISSUE_DETAILS[iss] ? ` — ${ISSUE_DETAILS[iss]}` : ''}`).join('\n')
-    : "  • Nothing major stood out, but there's usually still room to sharpen things up";
-  const vars = {
-    business: lead.businessName ?? '',
-    contact: lead.contactName?.trim() ?? '',
-    issue_list: issueListText,
-    website_score_note: typeof lead.websiteScore === 'number' ? ` It scored ${lead.websiteScore}/100 on page speed.` : '',
-    portfolio_line: `\n\nYou can view my portfolio and live demos here:\n\nPortfolio: ${MY_PORTFOLIO}`,
-    signature: `Kind regards,\n\n${MY_NAME}\ndean-da-dev\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}`,
-  };
-  const fill = (text) => text
-    .replace(/\{\{(\w+)\}\}/g, (m, key) => (typeof vars[key] === 'string' && vars[key].trim() ? vars[key] : ''))
-    .replace(/ +,/g, ',').replace(/[ \t]{2,}/g, ' ');
-  return { subject: fill(AUDIT_EMAIL_SUBJECT), body: fill(AUDIT_EMAIL_BODY) };
-}
+const AUDIT_EMAIL_AI_SECRETS = ['GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY'];
 
 // A lead is only a candidate if it's still fresh (never contacted, still
-// 'New'), has somewhere to send to, and the audit actually found something
-// worth writing about — a clean audit with no issues has nothing to pitch.
+// 'New'), has somewhere to send to, hasn't already had a draft written for
+// it, and the audit actually found something worth writing about — a clean
+// audit with no issues has nothing to pitch.
 function isAuditEmailCandidate(lead) {
   return lead.email?.trim()
     && lead.status === 'New'
     && !lead.lastContactDate
+    && !lead.auditEmailDrafted
     && Array.isArray(lead.issuesChecklist)
     && lead.issuesChecklist.length > 0;
 }
@@ -564,38 +514,47 @@ async function runAutoAuditEmail() {
   const db = getFirestore();
   const snap = await db.collection('crmLeads').where('status', '==', 'New').limit(50).get();
   const due = snap.docs.filter((d) => isAuditEmailCandidate(d.data()));
-  if (!due.length) return { sent: 0, candidates: 0 };
+  if (!due.length) return { drafted: 0, candidates: 0 };
+
+  const keys = {
+    gemini: process.env.GEMINI_API_KEY,
+    groq: process.env.GROQ_API_KEY,
+    mistral: process.env.MISTRAL_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+  };
 
   const gmail = await getGmailClient();
-  let sent = 0;
+  let drafted = 0;
   for (const doc of due) {
     const lead = doc.data();
     try {
-      const { subject, body } = renderAuditEmailTemplate(lead);
-      const bodyHtml = body.replace(/\n/g, '<br>');
-      const raw = buildRawMessage({ to: lead.email, subject, bodyHtml, bodyText: body });
-      const sentDate = new Date();
-      const res = await gmail.users.messages.send({
-        userId: 'me',
-        requestBody: { raw, threadId: lead.gmailThreadId || undefined },
-      });
+      const body = await generateAuditEmail(lead, MY_NAME, keys);
+      if (!body) { console.warn(`[autoAuditEmail] AI generation failed for "${lead.businessName}" — every provider unavailable.`); continue; }
 
-      await doc.ref.update({
-        gmailThreadId: res.data.threadId,
-        ...nextFollowUpPatch(lead, sentDate),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      sent++;
-      console.log(`[autoAuditEmail] sent to "${lead.businessName}" (${lead.email}).`);
+      const subject = `A quick audit of ${lead.businessName ?? 'your'} website`;
+      const greeting = lead.contactName?.trim() ? `Hi ${lead.contactName.trim()},` : 'Hi,';
+      const signOff = `Kind regards,\n\n${MY_NAME}\ndean-da-dev\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}`;
+      const fullBody = `${greeting}\n\n${body}\n\n${signOff}`;
+      const bodyHtml = fullBody.replace(/\n/g, '<br>');
+      const raw = buildRawMessage({ to: lead.email, subject, bodyHtml, bodyText: fullBody });
+
+      await gmail.users.drafts.create({ userId: 'me', requestBody: { message: { raw } } });
+
+      // Only marks the draft as written — status/lastContactDate/follow-up
+      // ladder are untouched, since nothing has actually been sent yet.
+      // Those only advance once Dean opens the draft in Gmail and sends it.
+      await doc.ref.update({ auditEmailDrafted: true, updatedAt: FieldValue.serverTimestamp() });
+      drafted++;
+      console.log(`[autoAuditEmail] drafted for "${lead.businessName}" (${lead.email}).`);
     } catch (err) {
       console.error(`[autoAuditEmail] failed for "${lead.businessName}":`, err.message);
     }
   }
-  return { sent, candidates: due.length };
+  return { drafted, candidates: due.length };
 }
 
 const scheduledAutoAuditEmail = onSchedule(
-  { schedule: '15 9 * * *', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
+  { schedule: '15 9 * * *', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: [...CRM_GMAIL_SECRETS, ...AUDIT_EMAIL_AI_SECRETS] },
   async () => {
     const db = getFirestore();
     const configSnap = await db.collection('autoAuditEmailConfig').doc('settings').get();
@@ -604,11 +563,11 @@ const scheduledAutoAuditEmail = onSchedule(
   }
 );
 
-// Manual "Send Now" trigger for the Settings toggle — runs the exact same
+// Manual "Draft Now" trigger for the Settings toggle — runs the exact same
 // logic, ignoring the enabled flag, so Dean can verify it before turning
 // the daily schedule on.
 const sendAuditEmailsNow = onCall(
-  { cors: true, timeoutSeconds: 300, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
+  { cors: true, timeoutSeconds: 300, memory: '256MiB', secrets: [...CRM_GMAIL_SECRETS, ...AUDIT_EMAIL_AI_SECRETS] },
   async () => runAutoAuditEmail()
 );
 

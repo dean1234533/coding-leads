@@ -311,19 +311,19 @@ function CrmAutoAuditEmail() {
         </button>
       </div>
       <p className="mt-1 text-xs text-gray-500">
-        Every morning at 9:15am, automatically sends the "Website Audit Findings" email to any new lead that has an email address, is still "New", hasn't been contacted yet, and whose website audit found issues — covers leads from Auto Scan, Quick Lookup, or a manual audit alike. This sends real emails with no review step, so double-check the "Website Audit Findings" template in your Template Library reads how you want before turning this on. Turned {enabled ? 'on' : 'off'} right now.
+        Every morning at 9:15am, writes a personalized email (via AI, from the lead's real audit findings — same as the "Generate with AI" button in the composer) for any new lead that has an email address, is still "New", hasn't been contacted yet, and whose website audit found issues — covers leads from Auto Scan, Quick Lookup, or a manual audit alike. It saves each one as a Gmail draft rather than sending it — nothing goes out until you open the draft in Gmail, check it, and send it yourself. Turned {enabled ? 'on' : 'off'} right now.
       </p>
       <button
         onClick={handleSendNow}
         disabled={testing}
         className="mt-3 rounded-lg border border-gray-700 px-4 py-2 text-xs font-semibold text-gray-300 transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {testing ? 'Sending…' : 'Send Now'}
+        {testing ? 'Writing…' : 'Draft Now'}
       </button>
       {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
       {testResult && (
         <p className="mt-3 text-xs text-gray-400">
-          Sent {testResult.sent} of {testResult.candidates} candidate{testResult.candidates === 1 ? '' : 's'} found.
+          Drafted {testResult.drafted} of {testResult.candidates} candidate{testResult.candidates === 1 ? '' : 's'} found — check Gmail Drafts to review and send.
         </p>
       )}
     </section>
