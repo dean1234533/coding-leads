@@ -555,6 +555,36 @@ async function findContactEmail(website, ownerName, businessName) {
     }
   }
 
+  // ── 3a5. Lusha contact search + enrich — two-step like Snov: search by
+  // name+domain to get a contact id (free, no credits charged unless a
+  // match is found), then a separate enrich call actually reveals the email
+  // and spends a credit. Verified live against the real key: search returns
+  // `results[].id` + `canReveal`, enrich needs `{ ids, reveal }` (not
+  // `contactIds` — confirmed by trial against the real API, docs were
+  // ambiguous on the exact field name).
+  const lushaKey = process.env.LUSHA_KEY;
+  if (lushaKey && ownerName && domain) {
+    const parts = ownerName.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      try {
+        const searchRes = await axios.post('https://api.lusha.com/v3/contacts/search', {
+          contacts: [{ firstName: parts[0], lastName: parts.slice(1).join(' '), companyDomain: domain }],
+        }, { headers: { api_key: lushaKey, 'Content-Type': 'application/json' }, timeout: 8_000 });
+
+        const contactId = searchRes.data?.results?.[0]?.id;
+        if (contactId) {
+          const enrichRes = await axios.post('https://api.lusha.com/v3/contacts/enrich', {
+            ids: [contactId], reveal: ['emails'],
+          }, { headers: { api_key: lushaKey, 'Content-Type': 'application/json' }, timeout: 8_000 });
+          const email = enrichRes.data?.results?.[0]?.emails?.[0]?.email;
+          if (email) return email.toLowerCase();
+        }
+      } catch (err) {
+        console.warn('[findContactEmail] Lusha failed:', err.response?.data?.message ?? err.message);
+      }
+    }
+  }
+
   // ── 3b. Snov.io domain search — fallback for once Hunter's free tier
   // (25/month) runs dry. Same idea as the AI vision-provider chain: another
   // provider's own free tier (50/month, recurring) picks up where the first
@@ -895,7 +925,7 @@ exports.scanBusinessLeads = onCall(
     cors:           true,
     timeoutSeconds: 90,
     memory:         '512MiB',
-    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY'],
+    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY'],
   },
   async (request) => {
     try {
@@ -907,7 +937,7 @@ exports.scanBusinessLeads = onCall(
   }
 );
 
-const QUICK_LOOKUP_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY'];
+const QUICK_LOOKUP_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY'];
 
 /**
  * "Walk-by" lookup: search for a business by name (optionally biased toward
@@ -1441,7 +1471,7 @@ async function runAutoBusinessScan({ bypassHourCheck = false, overrides = null }
   return { ran: true, added, candidatesFound: leads.length };
 }
 
-const AUTO_SCAN_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', ...AUDIT_SECRETS];
+const AUTO_SCAN_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', ...AUDIT_SECRETS];
 
 exports.scheduledAutoBusinessScan = onSchedule(
   { schedule: 'every hour', timeZone: 'Europe/London', timeoutSeconds: 540, memory: '512MiB', secrets: AUTO_SCAN_SECRETS },
