@@ -150,8 +150,22 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
             )}
             {findEmailError && <p className="mt-1 text-xs text-red-400">{findEmailError}</p>}
           </div>
-          <EditableField label="Phone" value={lead.phone} onSave={(v) => onUpdate({ phone: v })} />
-          <EditableField label="Website" value={lead.website} onSave={(v) => onUpdate({ website: v })} />
+          <div>
+            <EditableField label="Phone" value={lead.phone} onSave={(v) => onUpdate({ phone: v })} />
+            {lead.phone && (
+              <a href={`tel:${lead.phone.replace(/[^\d+]/g, '')}`} className="mt-1 inline-block text-xs text-blue-400 hover:text-blue-300">
+                Call →
+              </a>
+            )}
+          </div>
+          <div>
+            <EditableField label="Website" value={lead.website} onSave={(v) => onUpdate({ website: v })} />
+            {lead.website && (
+              <a href={/^https?:\/\//i.test(lead.website) ? lead.website : `https://${lead.website}`} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs text-blue-400 hover:text-blue-300">
+                Open site →
+              </a>
+            )}
+          </div>
           <EditableField label="Address" value={lead.address} onSave={(v) => onUpdate({ address: v })} />
           <EditableSelect label="Industry" value={lead.industry} options={INDUSTRIES} onSave={(v) => onUpdate({ industry: v })} />
           <EditableField label="Lead Score" type="number" value={lead.leadScore} onSave={(v) => onUpdate({ leadScore: v ? Number(v) : null })} />
