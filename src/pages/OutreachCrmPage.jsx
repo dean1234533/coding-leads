@@ -6,6 +6,7 @@ import { db, app } from '../firebase';
 import CrmGmailConnect, { useGmailConnection } from '../components/crm/CrmGmailConnect';
 import CrmDashboard from '../components/crm/CrmDashboard';
 import CrmLeadsPage from '../components/crm/CrmLeadsPage';
+import CrmCharityScan from '../components/crm/CrmCharityScan';
 import CrmGmailInbox from '../components/crm/CrmGmailInbox';
 import CrmTemplateLibrary from '../components/crm/CrmTemplateLibrary';
 import CrmPortfolioSelector from '../components/crm/CrmPortfolioSelector';
@@ -20,6 +21,7 @@ const SUB_TABS = [
   { key: 'dashboard',  label: 'Dashboard'  },
   { key: 'leads',      label: 'Leads'      },
   { key: 'backlinks',  label: 'Backlinks'  },
+  { key: 'charity',    label: 'Charity'    },
   { key: 'inbox',      label: 'Inbox'      },
   { key: 'scanner',    label: 'Scanner'    },
   { key: 'templates',  label: 'Templates'  },
@@ -788,8 +790,12 @@ export default function OutreachCrmPage() {
   // aren't real sales leads — mixing them into the main Leads list and
   // dashboard KPIs just buries actual business leads under a wall of
   // directory/guest-post targets. Kept in their own tab instead.
-  const businessLeads = useMemo(() => (leads ? leads.filter((l) => l.category !== 'Backlink') : leads), [leads]);
+  // Charity/non-profit leads get the same treatment as backlinks — they're
+  // free-work outreach, not paying sales leads, so they're tracked
+  // separately rather than muddying the main Leads list/KPIs.
+  const businessLeads = useMemo(() => (leads ? leads.filter((l) => l.category !== 'Backlink' && l.category !== 'Charity') : leads), [leads]);
   const backlinkLeads = useMemo(() => (leads ? leads.filter((l) => l.category === 'Backlink') : leads), [leads]);
+  const charityLeads  = useMemo(() => (leads ? leads.filter((l) => l.category === 'Charity') : leads), [leads]);
 
   return (
     <div className="min-h-screen bg-gray-950 font-sans text-gray-100 antialiased">
@@ -850,6 +856,12 @@ export default function OutreachCrmPage() {
         )}
         {subTab === 'backlinks' && (
           <CrmLeadsPage leads={backlinkLeads} openLeadId={openLeadId} onOpenLeadHandled={() => setOpenLeadId(null)} />
+        )}
+        {subTab === 'charity' && (
+          <div className="space-y-6">
+            <CrmCharityScan />
+            <CrmLeadsPage leads={charityLeads} openLeadId={openLeadId} onOpenLeadHandled={() => setOpenLeadId(null)} />
+          </div>
         )}
         {subTab === 'inbox' && <CrmGmailInbox connected={!!gmailStatus?.connected} />}
         {subTab === 'scanner' && (

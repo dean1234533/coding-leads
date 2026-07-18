@@ -570,6 +570,20 @@ Let me know if that's of interest and I'll send over a draft outline first, so y
 
 {{signature}}`,
   },
+  {
+    name: 'Charity / Non-Profit Offer',
+    category: 'Charity',
+    subject: 'Free website help for {{business}}',
+    body: `Hi {{contact}},
+
+I'm {{myname}}, a web developer, and each year I set aside some free work for local charities and community organisations — I wanted to reach out to {{business}} directly rather than wait to be asked.
+
+To be upfront about exactly what's on offer: I'd build or improve your website for free, no strings attached. The only thing I'd ask in return is that, if you're happy with the result, you'd be willing to recommend me to anyone else you know who might need a website built — that's the whole ask, nothing more, and no hidden costs later.{{portfolio_line}}
+
+If that's of interest, just reply and let me know a bit about what you're looking for and I'll take it from there.
+
+{{signature}}`,
+  },
 ];
 
 // ─── Free tools on dean-da-dev.co.uk (for backlink outreach) ──────────────

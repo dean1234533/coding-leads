@@ -725,6 +725,13 @@ async function runBusinessScan({
     // selecting several categories in one scan possible.
     const selectedTypes = scanMode === 'agency'
       ? [{ value: 'agency', keyword: 'digital agency' }]
+      : scanMode === 'charity'
+      ? [
+          { value: 'charity', label: 'Charity / Non-Profit', keyword: 'charity' },
+          { value: 'charity_shop', label: 'Charity Shop', keyword: 'charity shop' },
+          { value: 'community_org', label: 'Community Organisation', keyword: 'community organisation' },
+          { value: 'voluntary_org', label: 'Voluntary Organisation', keyword: 'voluntary organisation' },
+        ]
       : (Array.isArray(types) && types.length > 0 ? types : [type ?? 'restaurant']).map((v) =>
           BUSINESS_TYPES.find((t) => t.value === v) ?? { value: v, keyword: String(v).replace(/_/g, ' ') }
         );
