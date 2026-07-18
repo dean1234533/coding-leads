@@ -52,7 +52,7 @@ export function followUpPatchForSend(lead, sentDate = new Date()) {
   const stage = (lead.followUpStage ?? -1) + 1;
   const nextDate = computeNextFollowUp(stage, sentDate);
   return {
-    status: nextDate ? (stage === 0 ? 'Email Sent' : 'Follow Up Due') : 'Archive',
+    status: nextDate ? 'Follow Up Scheduled' : 'Archive',
     followUpStage: stage,
     followUpDate: nextDate,
     lastContactDate: sentDate,

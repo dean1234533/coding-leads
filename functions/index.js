@@ -15,9 +15,11 @@ const {
 const {
   gmailListMessages, gmailGetThread, gmailSendEmail, gmailSaveDraft,
   gmailListLabels, getGmailSentStats, checkRepliesNow, syncGmailReplies,
-  sendScheduledEmails,
+  sendScheduledEmails, scheduledAutoFollowUp,
 } = require('./crmGmailService');
-const { findLeadEmail, migrateLegacyLeads } = require('./crmMigration');
+const { findLeadEmail, migrateLegacyLeads, recoverBacklinkPageTitles } = require('./crmMigration');
+const { ensureBacklinkConfig, runBacklinkScan } = require('./backlinkScanner');
+const { auditWebsite } = require('./websiteAudit');
 const { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow } = require('./pushNotifications');
 
 initializeApp();
@@ -36,8 +38,10 @@ exports.getGmailSentStats  = getGmailSentStats;
 exports.checkRepliesNow    = checkRepliesNow;
 exports.syncGmailReplies   = syncGmailReplies;
 exports.sendScheduledEmails = sendScheduledEmails;
+exports.scheduledAutoFollowUp = scheduledAutoFollowUp;
 exports.findLeadEmail      = findLeadEmail;
 exports.migrateLegacyLeads = migrateLegacyLeads;
+exports.recoverBacklinkPageTitles = recoverBacklinkPageTitles;
 exports.savePushToken      = savePushToken;
 exports.sendFollowUpDigest = sendFollowUpDigest;
 exports.sendFollowUpDigestNow = sendFollowUpDigestNow;
@@ -55,19 +59,59 @@ exports.sendFollowUpDigestNow = sendFollowUpDigestNow;
 // out to about building/improving their app or website.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Business types that are strong candidates for app/website development work
+// Business types that are strong candidates for app/website development work.
+// Each has a `keyword` used with Google Places Text Search ("<keyword> near
+// <location>") instead of Nearby Search's fixed `type` enum — Text Search
+// covers categories with no matching Places type at all (personal trainers,
+// wedding photographers, tutors, etc.) and lets every category be searched
+// the same way, which is what makes selecting several at once possible.
 const BUSINESS_TYPES = [
-  { value: 'restaurant',        label: 'Restaurants & Cafés'   },
-  { value: 'beauty_salon',      label: 'Beauty & Hair Salons'  },
-  { value: 'gym',               label: 'Gyms & Fitness'        },
-  { value: 'lawyer',            label: 'Law Firms'             },
-  { value: 'real_estate_agency',label: 'Estate Agents'         },
-  { value: 'accounting',        label: 'Accountants'           },
-  { value: 'plumber',           label: 'Tradespeople'          },
-  { value: 'clothing_store',    label: 'Retail / Clothing'     },
-  { value: 'car_repair',        label: 'Auto Services'         },
-  { value: 'dentist',           label: 'Dentists & Medical'    },
-  { value: 'store',             label: 'General Retail'        },
+  { value: 'restaurant',        label: 'Restaurants & Cafés',       keyword: 'restaurant' },
+  { value: 'bakery',            label: 'Bakeries',                  keyword: 'bakery' },
+  { value: 'bar',               label: 'Bars & Pubs',                keyword: 'bar' },
+  { value: 'beauty_salon',      label: 'Beauty & Hair Salons',      keyword: 'beauty salon' },
+  { value: 'barber',            label: 'Barbers',                   keyword: 'barber shop' },
+  { value: 'nail_salon',        label: 'Nail Salons',               keyword: 'nail salon' },
+  { value: 'spa',               label: 'Spas & Massage',            keyword: 'spa' },
+  { value: 'gym',               label: 'Gyms & Fitness',            keyword: 'gym' },
+  { value: 'personal_trainer',  label: 'Personal Trainers',         keyword: 'personal trainer' },
+  { value: 'yoga_studio',       label: 'Yoga Studios',              keyword: 'yoga studio' },
+  { value: 'physiotherapist',   label: 'Physiotherapists',          keyword: 'physiotherapist' },
+  { value: 'chiropractor',      label: 'Chiropractors',             keyword: 'chiropractor' },
+  { value: 'dentist',           label: 'Dentists & Medical',        keyword: 'dentist' },
+  { value: 'optician',          label: 'Opticians',                 keyword: 'optician' },
+  { value: 'veterinary_care',   label: 'Veterinary Clinics',        keyword: 'vet clinic' },
+  { value: 'lawyer',            label: 'Law Firms',                 keyword: 'law firm' },
+  { value: 'accounting',        label: 'Accountants',               keyword: 'accountant' },
+  { value: 'real_estate_agency',label: 'Estate Agents',             keyword: 'estate agent' },
+  { value: 'insurance_agency',  label: 'Insurance Agents',          keyword: 'insurance agency' },
+  { value: 'financial_advisor', label: 'Financial Advisors',        keyword: 'financial advisor' },
+  { value: 'plumber',           label: 'Plumbers',                  keyword: 'plumber' },
+  { value: 'electrician',       label: 'Electricians',              keyword: 'electrician' },
+  { value: 'builder',           label: 'Builders',                  keyword: 'builder' },
+  { value: 'roofer',            label: 'Roofers',                   keyword: 'roofing contractor' },
+  { value: 'painter_decorator', label: 'Painters & Decorators',     keyword: 'painter and decorator' },
+  { value: 'locksmith',         label: 'Locksmiths',                keyword: 'locksmith' },
+  { value: 'cleaner',           label: 'Cleaning Services',         keyword: 'cleaning service' },
+  { value: 'gardener',          label: 'Gardeners & Landscapers',   keyword: 'gardener landscaping' },
+  { value: 'clothing_store',    label: 'Retail / Clothing',         keyword: 'clothing store' },
+  { value: 'jewelry_store',     label: 'Jewellers',                 keyword: 'jeweller' },
+  { value: 'florist',           label: 'Florists',                  keyword: 'florist' },
+  { value: 'furniture_store',   label: 'Furniture Stores',          keyword: 'furniture store' },
+  { value: 'pet_store',         label: 'Pet Stores',                keyword: 'pet shop' },
+  { value: 'store',             label: 'General Retail',            keyword: 'shop' },
+  { value: 'car_repair',        label: 'Auto Repair Garages',       keyword: 'car repair garage' },
+  { value: 'car_dealer',        label: 'Car Dealers',               keyword: 'car dealership' },
+  { value: 'car_wash',          label: 'Car Washes & Valeting',     keyword: 'car wash' },
+  { value: 'photographer',      label: 'Wedding Photographers',     keyword: 'wedding photographer' },
+  { value: 'event_planner',     label: 'Event Planners',            keyword: 'event planner' },
+  { value: 'dj',                label: 'DJs & Entertainers',        keyword: 'wedding dj' },
+  { value: 'tutor',             label: 'Tutors',                    keyword: 'private tutor' },
+  { value: 'driving_school',    label: 'Driving Instructors',       keyword: 'driving instructor' },
+  { value: 'nursery',           label: 'Nurseries & Childcare',     keyword: 'nursery childcare' },
+  { value: 'moving_company',    label: 'Removal Companies',         keyword: 'removal company' },
+  { value: 'travel_agency',     label: 'Travel Agents',             keyword: 'travel agent' },
+  { value: 'funeral_home',      label: 'Funeral Directors',         keyword: 'funeral director' },
 ];
 
 // Free/amateur website builders and hosting platforms
@@ -296,16 +340,36 @@ function pickBestEmail(emails, domain) {
   return onDomain[0] ?? anyGood[0] ?? emails[0];
 }
 
+// Many sites embed a contact email directly in schema.org JSON-LD structured
+// data (LocalBusiness/Organization markup, added for SEO/Google rich
+// results) — a highly reliable, zero-cost source when present. It lives
+// inside <script type="application/ld+json"> though, which the plain-text
+// scan below deliberately strips out, so it has to be pulled separately
+// before that stripping happens.
+function extractEmailsFromJsonLd(html) {
+  const blocks = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+  const emails = [];
+  for (const [, raw] of blocks) {
+    try {
+      const json = JSON.parse(raw.trim());
+      emails.push(...[...JSON.stringify(json).matchAll(EMAIL_REGEX)].map(m => m[1].toLowerCase()));
+    } catch { /* malformed JSON-LD — skip */ }
+  }
+  return emails;
+}
+
 function extractEmailsFromHtml(html, domain) {
   const stripped = html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]+>/g, ' ');
 
-  // mailto: links first (most explicit), then plain-text emails in content
+  // JSON-LD structured data first (most reliable when present), then
+  // mailto: links (most explicit), then plain-text emails in content
+  const jsonLd = extractEmailsFromJsonLd(html);
   const mailto = [...html.matchAll(/mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/gi)].map(m => m[1].toLowerCase());
   const plain  = [...stripped.matchAll(EMAIL_REGEX)].map(m => m[1].toLowerCase());
-  const all    = [...new Set([...mailto, ...plain])];
+  const all    = [...new Set([...jsonLd, ...mailto, ...plain])];
   return pickBestEmail(all, domain);
 }
 
@@ -427,17 +491,169 @@ async function findContactEmail(website, ownerName, businessName) {
     }
   }
 
-  // ── 4. Scrape website pages (7 common contact locations) ─────────────────
+  // ── 3a2. Prospeo enrich-person — another genuinely recurring free tier
+  // (100/month, confirmed live via account-information, not just a
+  // marketing claim). Needs a name like Hunter's Email Finder does (it's
+  // person-enrichment, not a domain-wide scan like Hunter/Snov's domain
+  // search), so it only fires when ownerName is already known.
+  const prospeoKey = process.env.PROSPEO_KEY;
+  if (prospeoKey && ownerName) {
+    const parts = ownerName.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      try {
+        const { data } = await axios.post('https://api.prospeo.io/enrich-person', {
+          data: { first_name: parts[0], last_name: parts.slice(1).join(' '), company_website: domain },
+        }, { headers: { 'X-KEY': prospeoKey }, timeout: 8_000 });
+        // Exact success field name isn't confirmed (docs didn't show a real
+        // match to inspect) — check the likely path, but also fall back to
+        // scanning the whole payload defensively, same as the Snov/Serper
+        // steps, so this doesn't silently do nothing if the field differs.
+        const email = data?.response?.email?.toLowerCase() ?? extractEmailsFromHtml(JSON.stringify(data ?? {}), domain);
+        if (email) return email;
+      } catch (err) {
+        console.warn('[findContactEmail] Prospeo failed:', err.response?.data?.error_code ?? err.message);
+      }
+    }
+  }
+
+  // ── 3a3. GetProspect email-finder — confirmed live, 50/month recurring
+  // (verified via the response's own metadata.credits.reset_at, not a
+  // marketing claim). Same name+domain shape as Hunter/Prospeo, so it only
+  // fires when ownerName is already known. Plain synchronous GET, no
+  // separate auth/polling step needed.
+  const getProspectKey = process.env.GETPROSPECT_KEY;
+  if (getProspectKey && ownerName) {
+    try {
+      const { data } = await axios.get('https://api.getprospect.com/v2/email-finder', {
+        params: { full_name: ownerName.trim(), domain, api_key: getProspectKey },
+        timeout: 8_000,
+      });
+      if (data?.success && data?.data?.email) return data.data.email.toLowerCase();
+    } catch (err) {
+      console.warn('[findContactEmail] GetProspect failed:', err.response?.data?.errors?.[0]?.message ?? err.message);
+    }
+  }
+
+  // ── 3a4. RocketReach person lookup — only 5 standard lookups/month on the
+  // free tier (confirmed live via /account), a small addition on top of the
+  // other providers but free to include. Same name-based shape, current
+  // employer works better than a bare domain for matching.
+  const rocketReachKey = process.env.ROCKETREACH_KEY;
+  if (rocketReachKey && ownerName) {
+    try {
+      const { data } = await axios.get('https://api.rocketreach.co/api/v2/person/lookup', {
+        params: { name: ownerName.trim(), current_employer: businessName || domain },
+        headers: { 'Api-Key': rocketReachKey },
+        timeout: 8_000,
+      });
+      const email = data?.current_work_email ?? data?.emails?.[0]?.email ?? extractEmailsFromHtml(JSON.stringify(data ?? {}), domain);
+      if (email) return email.toLowerCase();
+    } catch (err) {
+      console.warn('[findContactEmail] RocketReach failed:', err.response?.data?.detail ?? err.message);
+    }
+  }
+
+  // ── 3b. Snov.io domain search — fallback for once Hunter's free tier
+  // (25/month) runs dry. Same idea as the AI vision-provider chain: another
+  // provider's own free tier (50/month, recurring) picks up where the first
+  // one stops, instead of the whole email pipeline degrading to scraping
+  // alone. Snov's domain search is a nested async job: start a search, poll
+  // for the result (company info + emails/contacts *counts* only), then
+  // start + poll a SECOND job against whichever of domain_emails /
+  // generic_contacts actually has a non-zero count to get the real
+  // addresses. Emails are pulled by scanning each response for the email
+  // pattern rather than trusting exact field names, since the shape isn't
+  // fully documented — same defensive approach already used on Serper
+  // snippets.
+  const snovClientId = process.env.SNOV_CLIENT_ID;
+  const snovClientSecret = process.env.SNOV_CLIENT_SECRET;
+  if (snovClientId && snovClientSecret) {
+    try {
+      const tokenRes = await axios.post('https://api.snov.io/v1/oauth/access_token', {
+        grant_type: 'client_credentials', client_id: snovClientId, client_secret: snovClientSecret,
+      }, { timeout: 8_000 });
+      const token = tokenRes.data?.access_token;
+
+      const pollSnov = async (url, maxAttempts) => {
+        for (let i = 0; i < maxAttempts; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 1_500));
+          const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` }, timeout: 8_000 });
+          if (res.data?.status === 'completed') return res.data;
+        }
+        return null;
+      };
+
+      if (token) {
+        const startRes = await axios.post('https://api.snov.io/v2/domain-search/start',
+          { domain },
+          { headers: { Authorization: `Bearer ${token}` }, timeout: 8_000 }
+        );
+        const domainResult = startRes.data?.links?.result ? await pollSnov(startRes.data.links.result, 5) : null;
+
+        if (domainResult) {
+          const meta = domainResult.meta ?? {};
+          const links = domainResult.links ?? {};
+          const followUpStartUrls = [
+            meta.emails_count > 0 ? links.domain_emails : null,
+            meta.generic_contacts_count > 0 ? links.generic_contacts : null,
+          ].filter(Boolean);
+
+          for (const startUrl of followUpStartUrls) {
+            const subStart = await axios.post(startUrl, { domain }, { headers: { Authorization: `Bearer ${token}` }, timeout: 8_000 }).catch(() => null);
+            const subResultUrl = subStart?.data?.links?.result;
+            const subResult = subResultUrl ? await pollSnov(subResultUrl, 3) : null;
+            const email = subResult ? extractEmailsFromHtml(JSON.stringify(subResult), domain) : null;
+            if (email) return email;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[findContactEmail] Snov.io failed:', err.response?.data?.message ?? err.message);
+    }
+  }
+
+  // ── 4. Scrape website pages — genuinely free and unlimited (no API key,
+  // no quota) since these are plain requests to the business's own public
+  // site. Widened well past the original 7 paths to cover more CMS/platform
+  // conventions (Shopify's /pages/*, legal-notice pages that are required
+  // by law to list a contact email, booking/quote flows, etc.) — a much
+  // bigger net now that this is the layer everything else ultimately falls
+  // back to once Hunter/Snov are both exhausted.
   try {
     const base  = new URL(website).origin;
     const pages = [
       website,
       `${base}/contact`,
       `${base}/contact-us`,
+      `${base}/contact.html`,
+      `${base}/pages/contact`,
+      `${base}/pages/contact-us`,
       `${base}/get-in-touch`,
+      `${base}/enquire`,
+      `${base}/enquiry`,
+      `${base}/enquiries`,
+      `${base}/get-a-quote`,
+      `${base}/quote`,
+      `${base}/booking`,
+      `${base}/bookings`,
+      `${base}/reservations`,
       `${base}/about`,
       `${base}/about-us`,
+      `${base}/pages/about`,
+      `${base}/pages/about-us`,
       `${base}/team`,
+      `${base}/our-team`,
+      `${base}/support`,
+      `${base}/help`,
+      `${base}/faq`,
+      `${base}/faqs`,
+      `${base}/privacy`,
+      `${base}/privacy-policy`,
+      `${base}/terms`,
+      `${base}/terms-and-conditions`,
+      `${base}/legal`,
+      `${base}/imprint`,
+      `${base}/impressum`,
     ];
     const opts = { timeout: 4_000, headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 3 };
     const results = await Promise.allSettled(pages.map(url => axios.get(url, opts)));
@@ -468,24 +684,21 @@ async function findOwnerName(businessName) {
   return null;
 }
 
-exports.scanBusinessLeads = onCall(
-  {
-    cors:           true,
-    timeoutSeconds: 60,
-    memory:         '512MiB',
-    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY'],
-  },
-  async (request) => {
-    const {
-      location   = 'London, UK',
-      radius     = 2000,
-      type       = 'restaurant',
-      scanMode   = 'business',    // 'business' | 'agency'
-      maxResults = 20,
-    } = request.data ?? {};
-
-    const apiKey = process.env.GOOGLE_PLACES_KEY;
-    if (!apiKey) throw new HttpsError('internal', 'GOOGLE_PLACES_KEY secret not set.');
+/**
+ * Core business-discovery logic, factored out of the scanBusinessLeads
+ * onCall so the scheduled auto-scan can reuse it too — the manual scan and
+ * the overnight auto-scan should find leads exactly the same way.
+ */
+async function runBusinessScan({
+  location   = 'London, UK',
+  radius     = 2000,
+  type,                        // legacy single-type param — still accepted
+  types,                       // preferred: array of BUSINESS_TYPES values, searched and merged together
+  scanMode   = 'business',    // 'business' | 'agency'
+  maxResults = 20,
+} = {}) {
+  const apiKey = process.env.GOOGLE_PLACES_KEY;
+  if (!apiKey) throw new HttpsError('internal', 'GOOGLE_PLACES_KEY secret not set.');
 
     // ── Step 1: Geocode the location string to lat/lng ──────────────────────
     let lat, lng;
@@ -503,39 +716,56 @@ exports.scanBusinessLeads = onCall(
       throw new HttpsError('internal', `Geocoding failed: ${err.message}`);
     }
 
-    // ── Step 2: Search for places ────────────────────────────────────────────
+    // ── Step 2: Search for places, one Text Search per selected type ────────
+    // Text Search (keyword-based) covers every category uniformly, including
+    // ones with no matching Places `type` enum value at all (personal
+    // trainers, wedding photographers, tutors...) — that's what makes
+    // selecting several categories in one scan possible.
+    const selectedTypes = scanMode === 'agency'
+      ? [{ value: 'agency', keyword: 'digital agency' }]
+      : (Array.isArray(types) && types.length > 0 ? types : [type ?? 'restaurant']).map((v) =>
+          BUSINESS_TYPES.find((t) => t.value === v) ?? { value: v, keyword: String(v).replace(/_/g, ' ') }
+        );
+
+    const searchResults = await Promise.allSettled(
+      selectedTypes.map((t) =>
+        axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', {
+          params: { query: `${t.keyword} near ${location}`, location: `${lat},${lng}`, radius, key: apiKey },
+          timeout: 15_000,
+        })
+      )
+    );
+
+    const seenPlaceIds = new Set();
     let places = [];
-    try {
-      if (scanMode === 'agency') {
-        // Text Search finds agencies by keyword — no Places type exists for them
-        const searchRes = await axios.get(
-          'https://maps.googleapis.com/maps/api/place/textsearch/json',
-          {
-            params: {
-              query:    `digital agency ${location}`,
-              location: `${lat},${lng}`,
-              radius,
-              key:      apiKey,
-            },
-            timeout: 15_000,
-          }
-        );
-        places = (searchRes.data.results ?? []).slice(0, maxResults);
-      } else {
-        const searchRes = await axios.get(
-          'https://maps.googleapis.com/maps/api/place/nearbysearch/json',
-          {
-            params: { location: `${lat},${lng}`, radius, type, key: apiKey },
-            timeout: 15_000,
-          }
-        );
-        places = (searchRes.data.results ?? []).slice(0, maxResults);
+    searchResults.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        console.warn(`[scanBusinessLeads] search failed for "${selectedTypes[i].keyword}":`, r.reason.message);
+        return;
       }
-    } catch (err) {
-      throw new HttpsError('internal', `Places search failed: ${err.message}`);
+      for (const p of (r.value.data.results ?? []).slice(0, maxResults)) {
+        if (seenPlaceIds.has(p.place_id)) continue;
+        seenPlaceIds.add(p.place_id);
+        // Which selected category's search actually found this place —
+        // used below so each lead's industry reflects its own category
+        // instead of one label being forced onto every result.
+        p.__industryLabel = selectedTypes[i].label ?? null;
+        places.push(p);
+      }
+    });
+
+    if (!places.length) {
+      return { leads: [], meta: { location, radius, types: selectedTypes.map((t) => t.value) } };
     }
 
-    if (!places.length) return { leads: [], meta: { location, type, radius } };
+    // Selecting several types can merge into 100+ unique places (each type
+    // contributes up to `maxResults` on its own) — firing a details request
+    // for every single one risked Places rate-limiting or blowing the 60s
+    // function timeout, which surfaced as scans just failing outright. Cap
+    // the combined total so a multi-type scan is reliably faster than it is
+    // exhaustive.
+    const MAX_TOTAL_PLACES = 60;
+    if (places.length > MAX_TOTAL_PLACES) places = places.slice(0, MAX_TOTAL_PLACES);
 
     // ── Step 3: Fetch details (website, phone) for each place in parallel ───
     const detailResults = await Promise.allSettled(
@@ -570,6 +800,7 @@ exports.scanBusinessLeads = onCall(
           opportunityScore: 5,
           opportunityLabel: 'No Website — Prime Lead',
           ownerName:        null,
+          industryLabel:    p.__industryLabel ?? null,
         };
       }
       const d = r.value.data.result ?? {};
@@ -589,19 +820,49 @@ exports.scanBusinessLeads = onCall(
         opportunityLabel: opportunityLabel(d),
         ownerName:        null,
         contactEmail:     null,
+        industryLabel:    places[i].__industryLabel ?? null,
       };
     });
 
-    // ── Step 5: Resolve owner names + contact emails in parallel ───────────
-    console.log('[owner] business names:', rawLeads.slice(0, 15).map(l => l.name));
+    // ── Step 5: Resolve owner names + contact emails, skipping anything
+    // already looked up in a previous scan ──────────────────────────────────
+    // Hunter/Serper quota is limited and shared across every scan (manual +
+    // overnight auto-scan) — without this, re-scanning the same area burns
+    // fresh quota re-looking-up businesses already checked, even ones never
+    // added to the CRM. Cached by Google's place_id, which is stable across
+    // scans, forever (a business's owner/email doesn't change day to day).
+    const toResolve = rawLeads.slice(0, 15);
+    const cacheRefs = toResolve.map((lead) => db.collection('emailLookupCache').doc(lead.id));
+    const cacheSnaps = cacheRefs.length ? await db.getAll(...cacheRefs) : [];
+
+    console.log('[owner] business names:', toResolve.map(l => l.name));
     await Promise.allSettled(
-      rawLeads.slice(0, 15).map(async (lead) => {
+      toResolve.map(async (lead, i) => {
+        const cached = cacheSnaps[i]?.exists ? cacheSnaps[i].data() : null;
+        if (cached) {
+          lead.ownerName       = cached.ownerName ?? null;
+          lead.ownerNameSource = cached.ownerNameSource ?? null;
+          lead.contactEmail    = cached.email ?? null;
+          console.log(`[owner] "${lead.name}" → cached: ${cached.ownerName ?? 'null'} | email: ${cached.email ?? 'none'}`);
+          return;
+        }
+
         const ownerResult = await findOwnerName(lead.name);
         lead.ownerName       = ownerResult?.name   ?? null;
         lead.ownerNameSource = ownerResult?.source ?? null;
         const email = await findContactEmail(lead.website, lead.ownerName, lead.name);
         console.log(`[owner] "${lead.name}" → ${ownerResult ? `${ownerResult.name} (${ownerResult.source})` : 'null'} | email: ${email ?? 'none'}`);
         lead.contactEmail    = email ?? null;
+
+        // Cache the result either way — a confirmed "no email found" is just
+        // as worth remembering as a hit, so a dead end isn't re-queried
+        // forever.
+        await cacheRefs[i].set({
+          email: lead.contactEmail,
+          ownerName: lead.ownerName,
+          ownerNameSource: lead.ownerNameSource,
+          checkedAt: FieldValue.serverTimestamp(),
+        }).catch((err) => console.warn(`[owner] cache write failed for ${lead.id}:`, err.message));
       })
     );
 
@@ -612,10 +873,26 @@ exports.scanBusinessLeads = onCall(
         : (a.reviewCount ?? 999) - (b.reviewCount ?? 999)
     );
 
-    return {
-      leads,
-      meta: { location, type, radius, scanMode, found: leads.length },
-    };
+  return {
+    leads,
+    meta: { location, radius, scanMode, types: selectedTypes.map((t) => t.value), found: leads.length },
+  };
+}
+
+exports.scanBusinessLeads = onCall(
+  {
+    cors:           true,
+    timeoutSeconds: 90,
+    memory:         '512MiB',
+    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY'],
+  },
+  async (request) => {
+    try {
+      return await runBusinessScan(request.data ?? {});
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError('internal', err.message);
+    }
   }
 );
 
@@ -833,3 +1110,228 @@ exports.scheduledCodingLeadsScan = onSchedule(
   }
 );
 
+const BACKLINK_SECRETS = ['SERPAPI_KEY'];
+
+/**
+ * Function 10: scanBacklinkProspectsNow (authenticated, manual trigger)
+ * Runs a set of configured Google searches (via SerpAPI) for pages that
+ * already list similar free tools (resource pages, "best free tools"
+ * roundups) and saves new matches into crmLeads (category: 'Backlink') for
+ * outreach. Safe to call repeatedly — already-seen domains are skipped.
+ */
+exports.scanBacklinkProspectsNow = onCall(
+  { cors: true, timeoutSeconds: 180, memory: '256MiB', secrets: BACKLINK_SECRETS },
+  async () => {
+    await ensureBacklinkConfig(db);
+    return runBacklinkScan(db, FieldValue, { apiKey: process.env.SERPAPI_KEY });
+  }
+);
+
+/**
+ * Function 11: scheduledBacklinkScan
+ * Search results don't change nearly as often as Reddit posts, and SerpAPI's
+ * free tier is capped at 100 searches/month — weekly is plenty and keeps
+ * well under quota alongside manual "Scan Now" runs.
+ */
+exports.scheduledBacklinkScan = onSchedule(
+  { schedule: 'every monday 08:00', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: BACKLINK_SECRETS },
+  async () => {
+    await ensureBacklinkConfig(db);
+    await runBacklinkScan(db, FieldValue, { apiKey: process.env.SERPAPI_KEY });
+  }
+);
+
+/**
+ * Function 12: auditWebsitesNow (authenticated)
+ * Runs a real PageSpeed Insights audit against each given URL and maps the
+ * results onto the same fields the manual Website Review tab uses. Called
+ * from RssScout.jsx right before a scanned business lead is saved into the
+ * CRM, so leads arrive pre-audited instead of needing a manual review pass.
+ * Runs audits in small parallel batches — PageSpeed takes 10-20s per site,
+ * so auditing many leads sequentially would be far too slow.
+ */
+const PAGESPEED_CONCURRENCY = 4;
+
+const AUDIT_SECRETS = ['GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY'];
+
+exports.auditWebsitesNow = onCall(
+  { cors: true, timeoutSeconds: 540, memory: '256MiB', secrets: AUDIT_SECRETS },
+  async (request) => {
+    const { urls } = request.data ?? {};
+    if (!Array.isArray(urls) || urls.length === 0) {
+      throw new HttpsError('invalid-argument', 'urls (array) is required.');
+    }
+
+    const apiKey = process.env.GOOGLE_PAGESPEED_KEY;
+    // Vision providers are tried in this order — Gemini first, falling
+    // through to the next whenever one's free-tier quota runs dry.
+    const visionKeys = {
+      gemini: process.env.GEMINI_API_KEY,
+      groq: process.env.GROQ_API_KEY,
+      mistral: process.env.MISTRAL_API_KEY,
+      openrouter: process.env.OPENROUTER_API_KEY,
+    };
+    const results = {};
+    const queue = [...urls];
+
+    async function worker() {
+      while (queue.length > 0) {
+        const url = queue.shift();
+        results[url] = await auditWebsite(url, apiKey, visionKeys);
+      }
+    }
+    await Promise.all(Array.from({ length: PAGESPEED_CONCURRENCY }, worker));
+
+    return { results };
+  }
+);
+
+/**
+ * Saves one scanned business lead into crmLeads, pre-audited — the
+ * server-side equivalent of RssScout.jsx's addLeadToCrm, needed because the
+ * overnight auto-scan runs with nobody at the keyboard to click "Add to CRM".
+ * Returns 'added' | 'duplicate' so the caller can count real additions
+ * toward the daily quota (a re-found duplicate shouldn't use up quota).
+ */
+async function addBusinessLeadToCrm(lead, fallbackIndustryLabel, pagespeedKey, visionKeys) {
+  if (lead.googleMapsUrl) {
+    const dupeSnap = await db.collection('crmLeads').where('googleMapsUrl', '==', lead.googleMapsUrl).limit(1).get();
+    if (!dupeSnap.empty) return 'duplicate';
+  }
+
+  const audit = lead.website ? await auditWebsite(lead.website, pagespeedKey, visionKeys) : null;
+
+  await db.collection('crmLeads').add({
+    businessName: lead.name ?? null,
+    website: lead.website ?? null,
+    email: lead.contactEmail ?? null,
+    phone: lead.phone ?? null,
+    contactName: lead.ownerName ?? null,
+    // Each lead carries which of the (possibly several) selected categories
+    // actually found it, so a multi-type scan doesn't lump every result
+    // under whichever type happened to be first.
+    industry: lead.industryLabel ?? fallbackIndustryLabel ?? null,
+    address: lead.address ?? null,
+    googleMapsUrl: lead.googleMapsUrl ?? null,
+    overallImpression: audit?.auditFailed
+      ? `Auto-audit failed (${audit.error}) — ${lead.opportunityLabel ?? 'try a manual Website Review instead.'}`
+      : audit?.overallImpression ?? lead.opportunityLabel ?? null,
+    websiteScore: audit?.websiteScore ?? null,
+    issuesChecklist: audit?.issuesChecklist ?? [],
+    speedNotes: audit?.speedNotes ?? null,
+    mobileNotes: audit?.mobileNotes ?? null,
+    seoNotes: audit?.seoNotes ?? null,
+    aiDesignNote: audit?.aiDesignNote ?? null,
+    status: 'New',
+    priority: 'Medium',
+    source: 'Google Maps (Auto)',
+    leadScore: typeof lead.opportunityScore === 'number' ? lead.opportunityScore * 20 : null,
+    tags: ['Auto-Scanned'],
+    dateAdded: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  return 'added';
+}
+
+/**
+ * Function 13: scheduledAutoBusinessScan
+ * Overnight version of the Scanner tab's business search — reads Dean's
+ * saved preferences (business type, radius, location, daily quota) from
+ * autoScanConfig/settings and, if enabled, finds and pre-audits that many
+ * new leads while he's asleep. A single Places search page returns at most
+ * ~20 candidates and some will already be in the CRM (skipped as
+ * duplicates, not counted toward the quota), so the daily limit is a
+ * best-effort target, not a guarantee, within one run.
+ */
+// Cloud Scheduler's cron is fixed at deploy time, so a user-configurable
+// "scan at whatever hour I want" setting can't just change the trigger
+// itself without a redeploy every time. Instead this runs every hour and
+// only actually scans once the current hour in London matches Dean's
+// chosen scanHour, so changing it in Settings takes effect on the very
+// next hourly tick — no redeploy needed.
+function currentHourInLondon() {
+  return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hour12: false }).format(new Date()));
+}
+
+async function runAutoBusinessScan({ bypassHourCheck = false } = {}) {
+  const configSnap = await db.collection('autoScanConfig').doc('settings').get();
+  const config = configSnap.exists ? configSnap.data() : null;
+  if (!config?.enabled) {
+    console.log('[autoBusinessScan] skipped: auto scan is disabled in Settings.');
+    return { ran: false, reason: 'disabled' };
+  }
+
+  const scanHour = typeof config.scanHour === 'number' ? config.scanHour : 2;
+  const nowHour = currentHourInLondon();
+  if (!bypassHourCheck && nowHour !== scanHour) {
+    console.log(`[autoBusinessScan] skipped: current London hour is ${nowHour}, configured scanHour is ${scanHour}.`);
+    return { ran: false, reason: 'not-scan-hour', nowHour, scanHour };
+  }
+
+  const {
+    location = 'London, UK',
+    radius = 2000,
+    businessTypes = ['restaurant'],
+    dailyLimit = 10,
+    scanMode = 'business',
+  } = config;
+
+  let leads;
+  try {
+    ({ leads } = await runBusinessScan({ location, radius, types: businessTypes, scanMode, maxResults: 20 }));
+  } catch (err) {
+    console.error('[autoBusinessScan] scan failed:', err.message);
+    return { ran: true, error: err.message };
+  }
+
+  // Nobody's reviewing these overnight — a lead with no email found is
+  // just dead weight in the CRM with no way to actually contact it, so
+  // it's skipped here rather than added anyway (unlike the manual Scanner
+  // tab, where "Has Email" is just a display filter Dean can toggle).
+  const totalFound = leads.length;
+  leads = leads.filter((l) => l.contactEmail);
+  console.log(`[autoBusinessScan] ${leads.length}/${totalFound} candidates have an email; skipping the rest.`);
+
+  const fallbackIndustryLabel = BUSINESS_TYPES.find((t) => t.value === businessTypes[0])?.label ?? null;
+  const pagespeedKey = process.env.GOOGLE_PAGESPEED_KEY;
+  const visionKeys = {
+    gemini: process.env.GEMINI_API_KEY,
+    groq: process.env.GROQ_API_KEY,
+    mistral: process.env.MISTRAL_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+  };
+
+  let added = 0;
+  for (const lead of leads) {
+    if (added >= dailyLimit) break;
+    try {
+      const result = await addBusinessLeadToCrm(lead, fallbackIndustryLabel, pagespeedKey, visionKeys);
+      if (result === 'added') added++;
+    } catch (err) {
+      console.warn(`[autoBusinessScan] failed to add "${lead.name}":`, err.message);
+    }
+  }
+
+  console.log(`[autoBusinessScan] added ${added}/${dailyLimit} new leads (${leads.length} candidates found).`);
+  return { ran: true, added, candidatesFound: leads.length };
+}
+
+const AUTO_SCAN_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', ...AUDIT_SECRETS];
+
+exports.scheduledAutoBusinessScan = onSchedule(
+  { schedule: 'every hour', timeZone: 'Europe/London', timeoutSeconds: 540, memory: '512MiB', secrets: AUTO_SCAN_SECRETS },
+  async () => {
+    await runAutoBusinessScan({ bypassHourCheck: false });
+  }
+);
+
+// Manual "Test Now" trigger for the Settings tab — runs the exact same auto
+// scan logic but skips the scanHour check, so Dean can verify a new config
+// (time, business types, quota) actually works without waiting for the next
+// real hourly tick.
+exports.triggerAutoBusinessScanNow = onCall(
+  { timeoutSeconds: 540, memory: '512MiB', secrets: AUTO_SCAN_SECRETS },
+  async () => {
+    return await runAutoBusinessScan({ bypassHourCheck: true });
+  }
+);

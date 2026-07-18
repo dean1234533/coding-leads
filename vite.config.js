@@ -7,6 +7,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Registration happens explicitly via PwaUpdatePrompt.jsx (virtual:pwa-register)
+      // instead of the auto-injected script, so it can poll for updates and
+      // prompt to reload rather than silently waiting for the next full app close.
+      injectRegister: null,
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'Outreach CRM',

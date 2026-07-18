@@ -378,6 +378,112 @@ const sendScheduledEmails = onSchedule(
   }
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// scheduledAutoFollowUp — sends the "Follow Up" email itself to any lead
+// whose followUpDate is due, then advances the ladder exactly like a manual
+// send does. Off by default (gated on autoFollowUpConfig/settings.enabled)
+// since this contacts real businesses with no human review — a lead that's
+// already replied is always excluded regardless of the setting, so a reply
+// never gets a canned "just following up" email on top of it.
+// ─────────────────────────────────────────────────────────────────────────────
+const MY_NAME = 'Dean Burt';
+const MY_WEBSITE = 'https://www.dean-da-dev.co.uk';
+const MY_PORTFOLIO = 'https://www.dean-da-dev.co.uk/portfolio';
+const MY_EMAIL = 'dean@dean-da-dev.co.uk';
+const FOLLOW_UP_LADDER_DAYS = [7, 7, 14];
+const FOLLOW_UP_EXCLUDED_STATUSES = new Set(['Won', 'Lost', 'Archive', 'Replied']);
+
+const FOLLOW_UP_SUBJECT = 'Following up — {{business}}';
+const FOLLOW_UP_BODY = `Hi {{contact}},
+
+I hope you're doing well.
+
+I just wanted to follow up on my previous email in case you hadn't had a chance to read it.
+
+When I visited your website, I noticed a few areas where I believe it could be improved. Whether that was an outdated design, mobile usability issues, slow loading, or another issue, I'd be happy to discuss it further if it's something you're already considering.
+
+A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+
+If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+
+Thank you for your time, and I hope to hear from you.
+
+{{signature}}`;
+
+function renderFollowUpTemplate(lead) {
+  const vars = {
+    business: lead.businessName ?? '',
+    contact: lead.contactName?.trim() ?? '',
+    portfolio_line: `\n\nYou can view my portfolio and live demos here:\n\nPortfolio: ${MY_PORTFOLIO}`,
+    signature: `Kind regards,\n\n${MY_NAME}\ndean-da-dev\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}`,
+  };
+  const fill = (text) => text
+    .replace(/\{\{(\w+)\}\}/g, (m, key) => (typeof vars[key] === 'string' && vars[key].trim() ? vars[key] : ''))
+    .replace(/ +,/g, ',').replace(/[ \t]{2,}/g, ' ');
+  return { subject: fill(FOLLOW_UP_SUBJECT), body: fill(FOLLOW_UP_BODY) };
+}
+
+function nextFollowUpPatch(lead, sentDate) {
+  const stage = (lead.followUpStage ?? -1) + 1;
+  const days = FOLLOW_UP_LADDER_DAYS[stage];
+  if (days == null) return { status: 'Archive', followUpStage: stage, followUpDate: null, lastContactDate: sentDate };
+  const nextDate = new Date(sentDate);
+  nextDate.setDate(nextDate.getDate() + days);
+  return { status: 'Follow Up Scheduled', followUpStage: stage, followUpDate: nextDate, lastContactDate: sentDate };
+}
+
+const scheduledAutoFollowUp = onSchedule(
+  { schedule: '0 9 * * *', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
+  async () => {
+    const db = getFirestore();
+
+    const configSnap = await db.collection('autoFollowUpConfig').doc('settings').get();
+    if (!configSnap.exists || !configSnap.data()?.enabled) return;
+
+    const now = new Date();
+    const snap = await db.collection('crmLeads')
+      .where('followUpDate', '<=', now)
+      .limit(30)
+      .get();
+
+    const due = snap.docs.filter((d) => {
+      const lead = d.data();
+      return lead.email?.trim() && !FOLLOW_UP_EXCLUDED_STATUSES.has(lead.status);
+    });
+    if (!due.length) return;
+
+    const gmail = await getGmailClient();
+
+    for (const doc of due) {
+      const lead = doc.data();
+      try {
+        const { subject, body } = renderFollowUpTemplate(lead);
+        const bodyHtml = body.replace(/\n/g, '<br>');
+        // Threading relies on the `threadId` param on the send call below,
+        // not RFC In-Reply-To/References headers — those need the previous
+        // message's actual Message-ID, which isn't stored on the lead (only
+        // the Gmail thread ID is), and Gmail's own UI threads correctly off
+        // threadId alone.
+        const raw = buildRawMessage({ to: lead.email, subject, bodyHtml, bodyText: body });
+        const sentDate = new Date();
+        const res = await gmail.users.messages.send({
+          userId: 'me',
+          requestBody: { raw, threadId: lead.gmailThreadId || undefined },
+        });
+
+        await doc.ref.update({
+          gmailThreadId: res.data.threadId,
+          ...nextFollowUpPatch(lead, sentDate),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        console.log(`[scheduledAutoFollowUp] sent to "${lead.businessName}" (${lead.email}).`);
+      } catch (err) {
+        console.error(`[scheduledAutoFollowUp] failed for "${lead.businessName}":`, err.message);
+      }
+    }
+  }
+);
+
 module.exports = {
   gmailListMessages,
   gmailGetThread,
@@ -388,4 +494,5 @@ module.exports = {
   checkRepliesNow,
   syncGmailReplies,
   sendScheduledEmails,
+  scheduledAutoFollowUp,
 };

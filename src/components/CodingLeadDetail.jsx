@@ -98,7 +98,7 @@ export default function CodingLeadDetail({ lead, onUpdate, onDelete, onClose }) 
 
         {lead.snippet && (
           <Section label="Snippet / Content">
-            <p className="whitespace-pre-wrap rounded-lg border border-gray-800 bg-gray-950/60 p-3 text-sm text-gray-300">{lead.snippet}</p>
+            <p className="whitespace-pre-wrap break-words rounded-lg border border-gray-800 bg-gray-950/60 p-3 text-sm text-gray-300">{lead.snippet}</p>
           </Section>
         )}
 

@@ -89,7 +89,7 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
     await onUpdate({
       followUpStage: stage,
       followUpDate: next,
-      status: next ? 'Follow Up Due' : 'Archive',
+      status: next ? 'Follow Up Scheduled' : 'Archive',
       lastContactDate: new Date(),
     });
   }
@@ -142,7 +142,7 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
           <EditableField label="Contact Name" value={lead.contactName} onSave={(v) => onUpdate({ contactName: v })} />
           <div>
             <EditableField label="Email" type="email" value={lead.email} onSave={(v) => onUpdate({ email: v })} />
-            {!lead.email && lead.website && lead.contactName && (
+            {!lead.email && lead.website && (
               <button onClick={handleFindEmail} disabled={findingEmail}
                 className="mt-1 text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50">
                 {findingEmail ? 'Searching…' : 'Find Email'}

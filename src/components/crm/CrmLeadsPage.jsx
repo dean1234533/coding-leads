@@ -8,7 +8,8 @@ import CrmLeadAddForm from './CrmLeadAddForm';
 import CrmLeadDetail from './CrmLeadDetail';
 import CrmBulkSendModal from './CrmBulkSendModal';
 
-const EMPTY_FILTERS = { status: 'all', industry: 'all', priority: 'all', followUpDue: 'all' };
+const EMPTY_FILTERS = { status: 'all', industry: 'all', priority: 'all', followUpDue: 'all', source: 'all', tag: 'all' };
+const PAGE_SIZE = 50;
 
 export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -17,6 +18,7 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showBulkSend, setShowBulkSend] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   useEffect(() => {
     if (openLeadId) {
@@ -25,7 +27,23 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
     }
   }, [openLeadId]);
 
+  // Reset pagination whenever the result set actually changes shape —
+  // otherwise "Load more" position feels random after a new search/filter.
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [search, filters]);
+
   const selectedLead = useMemo(() => (leads ?? []).find((l) => l.id === selectedId) ?? null, [leads, selectedId]);
+
+  // Auto Scan and Backlink leads flood in with no human picking each one —
+  // a source/tag filter is the difference between "findable" and "a wall
+  // of thousands of rows" once those run for a while.
+  const sourceOptions = useMemo(
+    () => [...new Set((leads ?? []).map((l) => l.source).filter(Boolean))].sort(),
+    [leads]
+  );
+  const tagOptions = useMemo(
+    () => [...new Set((leads ?? []).flatMap((l) => l.tags ?? []))].sort(),
+    [leads]
+  );
 
   const filteredLeads = useMemo(() => {
     if (!leads) return [];
@@ -36,6 +54,8 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
       if (filters.priority !== 'all' && l.priority !== filters.priority) return false;
       if (filters.followUpDue === 'due' && !isOverdue(l.followUpDate) && !l.followUpDate) return false;
       if (filters.followUpDue === 'overdue' && !isOverdue(l.followUpDate)) return false;
+      if (filters.source !== 'all' && l.source !== filters.source) return false;
+      if (filters.tag !== 'all' && !(l.tags ?? []).includes(filters.tag)) return false;
       if (term) {
         const haystack = [
           l.businessName, l.email, l.industry, l.website, l.address,
@@ -134,7 +154,7 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
           placeholder="Search business, email, industry, website, tag, issue…"
           className="w-full rounded-lg border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
             className="rounded-lg border border-gray-700 bg-gray-800/50 px-2.5 py-2 text-xs text-gray-200 focus:border-blue-500 focus:outline-none">
             <option value="all">All Statuses</option>
@@ -158,8 +178,18 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
             <option value="due">Has Follow Up Date</option>
             <option value="overdue">Overdue</option>
           </select>
+          <select value={filters.source} onChange={(e) => setFilters((f) => ({ ...f, source: e.target.value }))}
+            className="rounded-lg border border-gray-700 bg-gray-800/50 px-2.5 py-2 text-xs text-gray-200 focus:border-blue-500 focus:outline-none">
+            <option value="all">All Sources</option>
+            {sourceOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={filters.tag} onChange={(e) => setFilters((f) => ({ ...f, tag: e.target.value }))}
+            className="rounded-lg border border-gray-700 bg-gray-800/50 px-2.5 py-2 text-xs text-gray-200 focus:border-blue-500 focus:outline-none">
+            <option value="all">All Tags</option>
+            {tagOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
         </div>
-        {(filters.status !== 'all' || filters.industry !== 'all' || filters.priority !== 'all' || filters.followUpDue !== 'all' || search) && (
+        {(filters.status !== 'all' || filters.industry !== 'all' || filters.priority !== 'all' || filters.followUpDue !== 'all' || filters.source !== 'all' || filters.tag !== 'all' || search) && (
           <button onClick={() => { setFilters(EMPTY_FILTERS); setSearch(''); }} className="text-xs text-gray-500 hover:text-gray-300">
             Clear filters
           </button>
@@ -203,14 +233,26 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
             {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-gray-800/40" />)}
           </div>
         ) : (
-          <CrmLeadsTable
-            leads={filteredLeads}
-            onSelect={(l) => setSelectedId(l.id)}
-            onDelete={handleDeleteLead}
-            selectedIds={selectedIds}
-            onToggleOne={toggleOne}
-            onToggleAll={toggleAll}
-          />
+          <>
+            <CrmLeadsTable
+              leads={filteredLeads.slice(0, visibleCount)}
+              onSelect={(l) => setSelectedId(l.id)}
+              onDelete={handleDeleteLead}
+              selectedIds={selectedIds}
+              onToggleOne={toggleOne}
+              onToggleAll={toggleAll}
+            />
+            {filteredLeads.length > visibleCount && (
+              <div className="flex justify-center border-t border-gray-800 p-3">
+                <button
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                  className="rounded-lg bg-gray-800 px-4 py-2 text-xs font-semibold text-gray-200 transition hover:bg-gray-700"
+                >
+                  Load {Math.min(PAGE_SIZE, filteredLeads.length - visibleCount)} more ({filteredLeads.length - visibleCount} left)
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
 

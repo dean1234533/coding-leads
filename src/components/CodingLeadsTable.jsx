@@ -73,10 +73,10 @@ export default function CodingLeadsTable({ leads, totalCount, onSelect, onDelete
           <button
             key={lead.id}
             onClick={() => onSelect(lead)}
-            className="flex w-full flex-col gap-2 px-4 py-4 text-left transition hover:bg-gray-800/20"
+            className="flex w-full min-w-0 flex-col gap-2 px-4 py-4 text-left transition hover:bg-gray-800/20"
           >
-            <div className="flex items-start justify-between gap-2">
-              <p className="min-w-0 flex-1 truncate font-medium text-gray-100">{lead.title}</p>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+              <p className="min-w-0 truncate font-medium text-gray-100">{lead.title}</p>
               <ScoreBadge score={lead.intentScore} />
             </div>
             <p className="line-clamp-2 text-xs text-gray-500">{lead.snippet}</p>

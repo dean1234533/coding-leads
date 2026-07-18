@@ -2,19 +2,22 @@
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
-const { findOwnerEmail } = require('./leadService');
+const { findOwnerEmail, findGenericEmail } = require('./leadService');
+const axios = require('axios');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // findLeadEmail — Hunter.io lookup for a CRM lead, ported from the old
 // createOutreachDraft flow so the CRM can find an email without the legacy
-// manual-draft form.
+// manual-draft form. Falls back to a generic domain-level email (hello@,
+// contact@, etc.) when there's no known contact name to search against —
+// e.g. a backlink prospect found via search, not a named business owner.
 // ─────────────────────────────────────────────────────────────────────────────
 const findLeadEmail = onCall(
   { cors: true, timeoutSeconds: 20, memory: '256MiB', secrets: ['HUNTER_KEY'] },
   async (request) => {
     const { website, contactName } = request.data ?? {};
-    if (!website?.trim() || !contactName?.trim()) {
-      throw new HttpsError('invalid-argument', 'website and contactName are required.');
+    if (!website?.trim()) {
+      throw new HttpsError('invalid-argument', 'website is required.');
     }
 
     let domain;
@@ -25,8 +28,9 @@ const findLeadEmail = onCall(
       throw new HttpsError('invalid-argument', 'Could not parse a domain from that website.');
     }
 
-    const firstName = contactName.trim().split(/\s+/)[0];
-    const email = await findOwnerEmail(domain, firstName);
+    const email = contactName?.trim()
+      ? await findOwnerEmail(domain, contactName.trim().split(/\s+/)[0])
+      : await findGenericEmail(domain);
     return { email };
   }
 );
@@ -97,4 +101,47 @@ const migrateLegacyLeads = onCall(
   }
 );
 
-module.exports = { findLeadEmail, migrateLegacyLeads };
+// ─────────────────────────────────────────────────────────────────────────────
+// recoverBacklinkPageTitles — the businessName fix above overwrote the only
+// place the article title was stored on already-scanned leads (new scans
+// save it into notes too, but these existing ones predate that). Since the
+// source pages are still live, re-fetch each one's real <title> tag and
+// restore it into notes instead of leaving it lost. Processes up to 40 per
+// call to stay well under the timeout — safe/cheap to run more than once,
+// since already-recovered leads (notes already has "Page:") are skipped.
+// ─────────────────────────────────────────────────────────────────────────────
+const recoverBacklinkPageTitles = onCall(
+  { cors: true, timeoutSeconds: 300, memory: '256MiB' },
+  async () => {
+    const db = getFirestore();
+    const snap = await db.collection('crmLeads').where('category', '==', 'Backlink').get();
+
+    const allPending = snap.docs.filter((d) => !d.data().notes?.includes('Page:'));
+    const pending = allPending.slice(0, 40);
+
+    let updated = 0;
+    let failed = 0;
+
+    for (const doc of pending) {
+      const { website, notes } = doc.data();
+      if (!website) { failed++; continue; }
+      try {
+        const { data: html } = await axios.get(website, {
+          timeout: 8000,
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; coding-leads-tracker/1.0)' },
+        });
+        const match = String(html).match(/<title[^>]*>([^<]*)<\/title>/i);
+        const title = match?.[1]?.trim().replace(/\s+/g, ' ').slice(0, 200);
+        if (!title) { failed++; continue; }
+        await doc.ref.update({ notes: `Page: ${title}\n\n${notes ?? ''}`.trim() });
+        updated++;
+      } catch {
+        failed++;
+      }
+    }
+
+    return { updated, failed, remaining: allPending.length - updated - failed };
+  }
+);
+
+module.exports = { findLeadEmail, migrateLegacyLeads, recoverBacklinkPageTitles };

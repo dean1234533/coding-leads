@@ -21,17 +21,52 @@ const SCAN_MODES = [
 
 // ─── Business type options (mirrors the backend BUSINESS_TYPES list) ──────────
 const BUSINESS_TYPES = [
-  { value: 'restaurant',         label: 'Restaurants & Cafés'  },
-  { value: 'beauty_salon',       label: 'Beauty & Hair Salons' },
-  { value: 'gym',                label: 'Gyms & Fitness'       },
-  { value: 'lawyer',             label: 'Law Firms'            },
-  { value: 'real_estate_agency', label: 'Estate Agents'        },
-  { value: 'accounting',         label: 'Accountants'          },
-  { value: 'plumber',            label: 'Tradespeople'         },
-  { value: 'clothing_store',     label: 'Retail / Clothing'    },
-  { value: 'car_repair',         label: 'Auto Services'        },
-  { value: 'dentist',            label: 'Dentists & Medical'   },
-  { value: 'store',              label: 'General Retail'       },
+  { value: 'restaurant',         label: 'Restaurants & Cafés'      },
+  { value: 'bakery',             label: 'Bakeries'                 },
+  { value: 'bar',                label: 'Bars & Pubs'              },
+  { value: 'beauty_salon',       label: 'Beauty & Hair Salons'     },
+  { value: 'barber',             label: 'Barbers'                  },
+  { value: 'nail_salon',         label: 'Nail Salons'              },
+  { value: 'spa',                label: 'Spas & Massage'           },
+  { value: 'gym',                label: 'Gyms & Fitness'           },
+  { value: 'personal_trainer',   label: 'Personal Trainers'        },
+  { value: 'yoga_studio',        label: 'Yoga Studios'             },
+  { value: 'physiotherapist',    label: 'Physiotherapists'         },
+  { value: 'chiropractor',       label: 'Chiropractors'            },
+  { value: 'dentist',            label: 'Dentists & Medical'       },
+  { value: 'optician',           label: 'Opticians'                },
+  { value: 'veterinary_care',    label: 'Veterinary Clinics'       },
+  { value: 'lawyer',             label: 'Law Firms'                },
+  { value: 'accounting',         label: 'Accountants'              },
+  { value: 'real_estate_agency', label: 'Estate Agents'            },
+  { value: 'insurance_agency',   label: 'Insurance Agents'         },
+  { value: 'financial_advisor',  label: 'Financial Advisors'       },
+  { value: 'plumber',            label: 'Plumbers'                 },
+  { value: 'electrician',        label: 'Electricians'             },
+  { value: 'builder',            label: 'Builders'                 },
+  { value: 'roofer',             label: 'Roofers'                  },
+  { value: 'painter_decorator',  label: 'Painters & Decorators'    },
+  { value: 'locksmith',          label: 'Locksmiths'               },
+  { value: 'cleaner',            label: 'Cleaning Services'        },
+  { value: 'gardener',           label: 'Gardeners & Landscapers'  },
+  { value: 'clothing_store',     label: 'Retail / Clothing'        },
+  { value: 'jewelry_store',      label: 'Jewellers'                },
+  { value: 'florist',            label: 'Florists'                 },
+  { value: 'furniture_store',    label: 'Furniture Stores'         },
+  { value: 'pet_store',          label: 'Pet Stores'               },
+  { value: 'store',              label: 'General Retail'           },
+  { value: 'car_repair',         label: 'Auto Repair Garages'      },
+  { value: 'car_dealer',         label: 'Car Dealers'              },
+  { value: 'car_wash',           label: 'Car Washes & Valeting'    },
+  { value: 'photographer',       label: 'Wedding Photographers'    },
+  { value: 'event_planner',      label: 'Event Planners'           },
+  { value: 'dj',                 label: 'DJs & Entertainers'       },
+  { value: 'tutor',              label: 'Tutors'                   },
+  { value: 'driving_school',     label: 'Driving Instructors'      },
+  { value: 'nursery',            label: 'Nurseries & Childcare'    },
+  { value: 'moving_company',     label: 'Removal Companies'        },
+  { value: 'travel_agency',      label: 'Travel Agents'            },
+  { value: 'funeral_home',       label: 'Funeral Directors'        },
 ];
 
 const RADII = [
@@ -298,7 +333,7 @@ function LeadCard({ lead, onFigmaCopy, isFigmaCopied, businessType, onAddToCrm, 
           }`}
         >
           {crmStatus === 'adding' ? (
-            'Adding…'
+            'Auditing site…'
           ) : crmStatus === 'added' ? (
             <>
               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -371,7 +406,7 @@ function SkeletonCard() {
 export default function RssScout() {
   const [scanMode, setScanMode]   = useState('business');
   const [location, setLocation]   = useState('London, UK');
-  const [type,     setType]       = useState('restaurant');
+  const [types,    setTypes]      = useState(['restaurant']);
   const [radius,   setRadius]     = useState(2000);
   const [leads,    setLeads]      = useState([]);
   const [loading,  setLoading]    = useState(false);
@@ -390,15 +425,20 @@ export default function RssScout() {
     setError(null);
   }
 
+  function toggleType(value) {
+    setTypes((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
+  }
+
   const scan = useCallback(async () => {
     if (!location.trim()) return;
+    if (scanMode === 'business' && types.length === 0) { setError('Pick at least one business type.'); return; }
     setLoading(true);
     setError(null);
     setLeads([]);
     setMeta(null);
     try {
       const fns = getFunctions(app);
-      const res = await httpsCallable(fns, 'scanBusinessLeads')({ location, type, radius, scanMode });
+      const res = await httpsCallable(fns, 'scanBusinessLeads', { timeout: 100000 })({ location, types, radius, scanMode });
       setLeads(res.data.leads ?? []);
       setMeta(res.data.meta);
     } catch (err) {
@@ -407,14 +447,34 @@ export default function RssScout() {
     } finally {
       setLoading(false);
     }
-  }, [location, type, radius, scanMode]);
+  }, [location, types, radius, scanMode]);
 
   function handleFigmaCopy(lead) {
-    const figmaPrompt = generateFigmaPrompt(lead, type);
-    const prompt = figmaPrompt ?? generateBase44Prompt(lead, type);
+    // A multi-type scan mixes leads from several categories — use the
+    // specific one that actually matched this lead, not just whichever was
+    // selected first, so the mockup prompt fits the right kind of business.
+    const leadType = BUSINESS_TYPES.find((t) => t.label === lead.industryLabel)?.value ?? types[0] ?? 'restaurant';
+    const figmaPrompt = generateFigmaPrompt(lead, leadType);
+    const prompt = figmaPrompt ?? generateBase44Prompt(lead, leadType);
     navigator.clipboard.writeText(prompt).catch(() => {});
     setFigmaCopiedId(lead.id);
     setTimeout(() => setFigmaCopiedId(null), 2000);
+  }
+
+  // Runs a real PageSpeed audit against the lead's website before it's saved,
+  // so it arrives in the CRM with issuesChecklist/websiteScore/notes already
+  // filled in instead of needing a manual Website Review pass. Best-effort —
+  // a failed/slow audit shouldn't block adding the lead at all.
+  async function auditLeadWebsite(website) {
+    if (!website) return null;
+    try {
+      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 60000 });
+      const { data } = await fn({ urls: [website] });
+      return data.results?.[website] ?? null;
+    } catch (err) {
+      console.warn('[BusinessScout] Website audit failed:', err);
+      return null;
+    }
   }
 
   // ── Add to Outreach CRM ─────────────────────────────────────────────────
@@ -432,16 +492,25 @@ export default function RssScout() {
           return 'duplicate';
         }
       }
+      const audit = await auditLeadWebsite(lead.website);
       await addDoc(collection(db, 'crmLeads'), {
         businessName: lead.name ?? null,
         website: lead.website ?? null,
         email: lead.contactEmail ?? null,
         phone: lead.phone ?? null,
         contactName: lead.ownerName ?? null,
-        industry: BUSINESS_TYPES.find((t) => t.value === type)?.label ?? null,
+        industry: lead.industryLabel ?? BUSINESS_TYPES.find((t) => types.includes(t.value))?.label ?? null,
         address: lead.address ?? null,
         googleMapsUrl: lead.googleMapsUrl ?? null,
-        overallImpression: lead.opportunityLabel ?? null,
+        overallImpression: audit?.auditFailed
+          ? `Auto-audit failed (${audit.error}) — ${lead.opportunityLabel ?? 'try a manual Website Review instead.'}`
+          : audit?.overallImpression ?? lead.opportunityLabel ?? null,
+        websiteScore: audit?.websiteScore ?? null,
+        issuesChecklist: audit?.issuesChecklist ?? [],
+        speedNotes: audit?.speedNotes ?? null,
+        mobileNotes: audit?.mobileNotes ?? null,
+        seoNotes: audit?.seoNotes ?? null,
+        aiDesignNote: audit?.aiDesignNote ?? null,
         status: 'New',
         priority: 'Medium',
         source: 'Google Maps',
@@ -475,9 +544,12 @@ export default function RssScout() {
     setAddAllSummary({ added, skipped });
   }
 
-  const primeCount = leads.filter(l => l.opportunityScore >= 5).length;
-  const visible    = filter === 'prime'
+  const primeCount    = leads.filter(l => l.opportunityScore >= 5).length;
+  const hasEmailCount = leads.filter(l => l.contactEmail).length;
+  const visible       = filter === 'prime'
     ? leads.filter(l => l.opportunityScore >= 5)
+    : filter === 'hasEmail'
+    ? leads.filter(l => l.contactEmail)
     : leads;
 
   return (
@@ -535,18 +607,28 @@ export default function RssScout() {
 
         {/* Type + Radius row — business mode only */}
         {scanMode === 'business' && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-400">Business Type</label>
-            <select
-              value={type}
-              onChange={e => setType(e.target.value)}
-              className="w-full rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-sm text-gray-100 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            >
-              {BUSINESS_TYPES.map(t => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-xs font-medium text-gray-400">
+                Business Types {types.length > 0 && <span className="text-gray-600">({types.length} selected — searched together)</span>}
+              </label>
+              {types.length > 0 && (
+                <button onClick={() => setTypes([])} className="text-xs text-gray-500 hover:text-gray-300">Clear</button>
+              )}
+            </div>
+            <div className="max-h-40 overflow-y-auto rounded-xl border border-gray-700 bg-gray-950 p-2">
+              <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+                {BUSINESS_TYPES.map(t => (
+                  <label key={t.value} className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs transition ${
+                    types.includes(t.value) ? 'bg-teal-500/15 text-teal-300' : 'text-gray-400 hover:bg-gray-800'
+                  }`}>
+                    <input type="checkbox" checked={types.includes(t.value)} onChange={() => toggleType(t.value)} className="accent-teal-500" />
+                    {t.label}
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-400">Radius</label>
@@ -624,8 +706,9 @@ export default function RssScout() {
               </button>
               <div className="flex gap-1 rounded-xl border border-gray-800 bg-gray-900 p-1">
                 {[
-                  { key: 'all',   label: `All (${leads.length})`   },
-                  { key: 'prime', label: `No Website (${primeCount})` },
+                  { key: 'all',      label: `All (${leads.length})`   },
+                  { key: 'prime',    label: `No Website (${primeCount})` },
+                  { key: 'hasEmail', label: `Has Email (${hasEmailCount})` },
                 ].map(({ key, label }) => (
                   <button
                     key={key}
@@ -654,7 +737,7 @@ export default function RssScout() {
                 lead={lead}
                 onFigmaCopy={handleFigmaCopy}
                 isFigmaCopied={figmaCopiedId === lead.id}
-                businessType={type}
+                businessType={types[0]}
                 onAddToCrm={addLeadToCrm}
                 crmStatus={crmStatusById[lead.id]}
               />

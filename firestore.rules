@@ -28,6 +28,15 @@ service cloud.firestore {
     match /crmPortfolio/{demoId} {
       allow read, write, delete: if request.auth != null;
     }
+    match /backlinkConfig/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /autoScanConfig/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /autoFollowUpConfig/{docId} {
+      allow read, write: if request.auth != null;
+    }
     match /scheduledEmails/{emailId} {
       allow read, write, delete: if request.auth != null;
     }
@@ -43,6 +52,12 @@ service cloud.firestore {
     // Written only by the savePushToken Cloud Function (Admin SDK bypasses
     // rules) and cleaned up server-side when FCM reports a token as dead.
     match /pushTokens/{token} {
+      allow read, write: if false;
+    }
+    // Caches email-lookup results (keyed by Google place_id) so re-scanning
+    // the same area doesn't re-spend Hunter/Serper quota on businesses
+    // already checked — written only by runBusinessScan (Admin SDK).
+    match /emailLookupCache/{placeId} {
       allow read, write: if false;
     }
   }

@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import LeadDashboard from './pages/LeadDashboard';
 import BookingPage   from './pages/BookingPage';
 import OutreachCrmPage from './pages/OutreachCrmPage';
+import PwaUpdatePrompt from './components/PwaUpdatePrompt';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -15,6 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/tools"         element={<LeadDashboard />} />
         <Route path="/book" element={<BookingPage />} />
       </Routes>
+      <PwaUpdatePrompt />
     </BrowserRouter>
   </React.StrictMode>
 );
