@@ -37,6 +37,8 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
   const [preview, setPreview] = useState(false);
   const [status, setStatus] = useState(null);
   const [sending, setSending] = useState(false);
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [aiError, setAiError] = useState(null);
   const editorRef = useRef(null);
 
   useEffect(() => {
@@ -54,6 +56,32 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
       document.execCommand('insertHTML', false, html);
     } else {
       setPlainText((t) => `${t}\n${html.replace(/<[^>]+>/g, '')}`);
+    }
+  }
+
+  // Writes a personalized email from the lead's real audit findings
+  // (page speed, issuesChecklist, AI design note) via the same AI providers
+  // used for the design audit — always lands in the editor for review, never
+  // sent automatically. Subject stays the standard audit-email subject;
+  // only the body is generated.
+  async function generateWithAi() {
+    setGeneratingAi(true);
+    setAiError(null);
+    try {
+      const fn = httpsCallable(getFunctions(app), 'generateAuditEmailNow', { timeout: 30000 });
+      const { data } = await fn({ lead, myName: MY_NAME });
+      if (!subject.trim()) setSubject(applyTemplateVars(`A quick audit of {{business}}'s website`, vars));
+      const html = data.body.replace(/\n/g, '<br>');
+      if (richMode && editorRef.current) {
+        editorRef.current.innerHTML = html;
+      } else {
+        setPlainText(data.body);
+      }
+    } catch (err) {
+      console.error('[CrmComposer] AI generation failed:', err);
+      setAiError(err?.message ?? 'AI generation failed.');
+    } finally {
+      setGeneratingAi(false);
     }
   }
 
@@ -188,6 +216,15 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
           <option value="">Insert demo…</option>
           {portfolioDemos.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
+        <button
+          type="button"
+          onClick={generateWithAi}
+          disabled={generatingAi}
+          title="Writes a personalized email from this lead's real audit findings — review before sending"
+          className="rounded bg-violet-500/15 px-2 py-1 text-xs font-semibold text-violet-300 ring-1 ring-inset ring-violet-500/30 transition hover:bg-violet-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {generatingAi ? 'Writing…' : 'Generate with AI'}
+        </button>
         <button type="button" onClick={insertWebsite} className="rounded px-2 py-1 text-xs text-gray-300 hover:bg-gray-800">+ Website</button>
         <button type="button" onClick={insertSignature} className="rounded px-2 py-1 text-xs text-gray-300 hover:bg-gray-800">+ Signature</button>
         <span className="ml-auto flex items-center gap-2">
@@ -231,6 +268,7 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
         </span>
       </div>
 
+      {aiError && <p className="text-xs text-red-400">{aiError}</p>}
       {status && (
         <p className={`text-xs ${status.type === 'error' ? 'text-red-400' : 'text-emerald-400'}`}>{status.message}</p>
       )}

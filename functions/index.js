@@ -20,6 +20,7 @@ const {
 const { findLeadEmail, migrateLegacyLeads, recoverBacklinkPageTitles } = require('./crmMigration');
 const { ensureBacklinkConfig, runBacklinkScan } = require('./backlinkScanner');
 const { auditWebsite } = require('./websiteAudit');
+const { generateAuditEmail } = require('./aiEmailWriter');
 const { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow } = require('./pushNotifications');
 
 initializeApp();
@@ -1333,6 +1334,32 @@ exports.auditWebsitesNow = onCall(
     await Promise.all(Array.from({ length: PAGESPEED_CONCURRENCY }, worker));
 
     return { results };
+  }
+);
+
+/**
+ * generateAuditEmailNow (authenticated) — writes a personalized 3-paragraph
+ * outreach email body from a lead's real audit findings (page speed,
+ * issuesChecklist, AI design note) via the "senior conversion-focused web
+ * strategist" prompt, so cold outreach references what's actually wrong
+ * with THIS lead's site instead of a generic template. Always shown to Dean
+ * to review/edit before sending — never auto-sent.
+ */
+exports.generateAuditEmailNow = onCall(
+  { cors: true, timeoutSeconds: 30, memory: '256MiB', secrets: AUDIT_SECRETS },
+  async (request) => {
+    const { lead, myName } = request.data ?? {};
+    if (!lead?.businessName) throw new HttpsError('invalid-argument', 'lead.businessName is required.');
+
+    const keys = {
+      gemini: process.env.GEMINI_API_KEY,
+      groq: process.env.GROQ_API_KEY,
+      mistral: process.env.MISTRAL_API_KEY,
+      openrouter: process.env.OPENROUTER_API_KEY,
+    };
+    const body = await generateAuditEmail(lead, myName || 'Dean', keys);
+    if (!body) throw new HttpsError('internal', 'Every AI provider failed — try again in a moment.');
+    return { body };
   }
 );
 
