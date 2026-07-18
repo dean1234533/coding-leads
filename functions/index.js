@@ -715,25 +715,53 @@ const INSTAGRAM_NON_PROFILE_PATHS = new Set(['p', 'reel', 'reels', 'explore', 's
  * API allows for cold outreach, so this just surfaces the profile link for
  * Dean to reach out manually.
  */
-async function findInstagramHandle(businessName, location) {
-  const serperKey = process.env.SERPER_KEY;
-  if (!serperKey || !businessName) return null;
-
-  try {
-    const { data } = await axios.post(
-      'https://google.serper.dev/search',
-      { q: `"${businessName}" ${location ?? ''} instagram`.trim(), num: 5 },
-      { headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' }, timeout: 5_000 }
-    );
-    for (const row of data.organic ?? []) {
-      const match = row.link?.match(INSTAGRAM_PROFILE_RE);
-      if (match && !INSTAGRAM_NON_PROFILE_PATHS.has(match[1].toLowerCase())) {
-        return { url: `https://www.instagram.com/${match[1]}/`, handle: match[1] };
-      }
+function extractInstagramProfile(rows) {
+  for (const row of rows ?? []) {
+    const match = row.link?.match(INSTAGRAM_PROFILE_RE);
+    if (match && !INSTAGRAM_NON_PROFILE_PATHS.has(match[1].toLowerCase())) {
+      return { url: `https://www.instagram.com/${match[1]}/`, handle: match[1] };
     }
-  } catch (err) {
-    console.warn('[findInstagramHandle] search failed:', err.response?.data?.message ?? err.message);
   }
+  return null;
+}
+
+async function findInstagramHandle(businessName, location) {
+  if (!businessName) return null;
+  const query = `"${businessName}" ${location ?? ''} instagram`.trim();
+
+  // Serper first (faster, already the primary search provider elsewhere),
+  // falling back to SerpApi — the same key already used for the weekly
+  // Backlink Scanner — whenever Serper's own credits run dry, same
+  // provider-chain pattern as everything else in this pipeline.
+  const serperKey = process.env.SERPER_KEY;
+  if (serperKey) {
+    try {
+      const { data } = await axios.post(
+        'https://google.serper.dev/search',
+        { q: query, num: 5 },
+        { headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' }, timeout: 5_000 }
+      );
+      const found = extractInstagramProfile(data.organic);
+      if (found) return found;
+    } catch (err) {
+      console.warn('[findInstagramHandle] Serper failed:', err.response?.data?.message ?? err.message);
+    }
+  }
+
+  const serpApiKey = process.env.SERPAPI_KEY;
+  if (serpApiKey) {
+    try {
+      const { data } = await axios.get('https://serpapi.com/search.json', {
+        params: { engine: 'google', q: query, num: 5, api_key: serpApiKey },
+        timeout: 8_000,
+      });
+      const found = extractInstagramProfile(data.organic_results);
+      if (found) return found;
+    } catch (err) {
+      console.warn('[findInstagramHandle] SerpApi failed:', err.response?.data?.error ?? err.message);
+    }
+  }
+
   return null;
 }
 
@@ -976,7 +1004,7 @@ exports.scanBusinessLeads = onCall(
     cors:           true,
     timeoutSeconds: 90,
     memory:         '512MiB',
-    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY'],
+    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SERPAPI_KEY'],
   },
   async (request) => {
     try {
@@ -988,7 +1016,7 @@ exports.scanBusinessLeads = onCall(
   }
 );
 
-const QUICK_LOOKUP_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY'];
+const QUICK_LOOKUP_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SERPAPI_KEY', 'GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY'];
 
 /**
  * "Walk-by" lookup: search for a business by name (optionally biased toward
@@ -1556,7 +1584,7 @@ async function runAutoBusinessScan({ bypassHourCheck = false, overrides = null }
   return { ran: true, added, candidatesFound: leads.length };
 }
 
-const AUTO_SCAN_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', ...AUDIT_SECRETS];
+const AUTO_SCAN_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SERPAPI_KEY', ...AUDIT_SECRETS];
 
 exports.scheduledAutoBusinessScan = onSchedule(
   { schedule: 'every hour', timeZone: 'Europe/London', timeoutSeconds: 540, memory: '512MiB', secrets: AUTO_SCAN_SECRETS },
