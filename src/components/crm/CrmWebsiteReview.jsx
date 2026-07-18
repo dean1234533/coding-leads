@@ -33,7 +33,7 @@ export default function CrmWebsiteReview({ lead, onUpdate }) {
     setAuditing(true);
     setAuditError(null);
     try {
-      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 60000 });
+      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 90000 });
       const { data } = await fn({ urls: [local.website] });
       const audit = data.results?.[local.website];
       if (!audit) {

@@ -58,7 +58,10 @@ async function auditWebsite(url, apiKey, visionKeys) {
       reqUrl.searchParams.append('category', cat);
     }
 
-    const { data } = await axios.get(reqUrl.toString(), { timeout: 30_000 });
+    // PageSpeed genuinely takes 30s+ on slow, heavy sites — exactly the
+    // kind of site this app is most likely to be auditing — so a tight
+    // timeout here was failing real audits, not just broken ones.
+    const { data } = await axios.get(reqUrl.toString(), { timeout: 55_000 });
 
     const categories = data.lighthouseResult?.categories ?? {};
     const audits = data.lighthouseResult?.audits ?? {};
