@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app } from '../../firebase';
 import { WEBSITE_ISSUES } from '../../utils/crmConstants';
 
 const FIELDS = [
@@ -15,8 +17,55 @@ const FIELDS = [
 export default function CrmWebsiteReview({ lead, onUpdate }) {
   const [local, setLocal] = useState(lead);
   const [dirty, setDirty] = useState(false);
+  const [auditing, setAuditing] = useState(false);
+  const [auditError, setAuditError] = useState(null);
 
-  useEffect(() => { setLocal(lead); setDirty(false); }, [lead.id]);
+  useEffect(() => { setLocal(lead); setDirty(false); setAuditError(null); }, [lead.id]);
+
+  // A lead can end up with a blank or failed audit for all sorts of
+  // reasons — the scan hit a rate limit, the site was down for a minute,
+  // every AI vision provider happened to be dry at once. Rather than being
+  // stuck manually filling in every field, this re-runs the exact same
+  // automated audit (PageSpeed + AI vision) used everywhere else in the app
+  // on demand, against this one lead's current website.
+  async function handleRerunAudit() {
+    if (!local.website) return;
+    setAuditing(true);
+    setAuditError(null);
+    try {
+      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 60000 });
+      const { data } = await fn({ urls: [local.website] });
+      const audit = data.results?.[local.website];
+      if (!audit) {
+        setAuditError('No result came back — try again in a moment.');
+        return;
+      }
+      if (audit.auditFailed) {
+        setAuditError(`Audit failed: ${audit.error}`);
+        // Still worth saving — a broken-link/404 finding is itself useful
+        // information, same as the automated scan pipelines treat it.
+      }
+      const patch = {
+        websiteScore: audit.websiteScore ?? null,
+        issuesChecklist: audit.issuesChecklist ?? [],
+        speedNotes: audit.speedNotes ?? null,
+        mobileNotes: audit.mobileNotes ?? null,
+        seoNotes: audit.seoNotes ?? null,
+        overallImpression: audit.auditFailed
+          ? `Auto-audit failed (${audit.error})`
+          : audit.overallImpression ?? null,
+        aiDesignNote: audit.aiDesignNote ?? null,
+      };
+      await onUpdate(patch);
+      setLocal((l) => ({ ...l, ...patch }));
+      setDirty(false);
+    } catch (err) {
+      console.error('[CrmWebsiteReview] re-run audit failed:', err);
+      setAuditError(err?.message ?? 'Audit failed.');
+    } finally {
+      setAuditing(false);
+    }
+  }
 
   function setField(key, value) {
     setLocal((l) => ({ ...l, [key]: value }));
@@ -39,6 +88,21 @@ export default function CrmWebsiteReview({ lead, onUpdate }) {
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-800 bg-gray-800/30 p-3">
+        <button
+          onClick={handleRerunAudit}
+          disabled={auditing || !local.website}
+          title={!local.website ? 'No website on this lead to audit' : 'Runs the automated PageSpeed + AI vision audit against this website again'}
+          className="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {auditing ? 'Auditing…' : 'Re-run Audit'}
+        </button>
+        <span className="text-xs text-gray-500">
+          {local.website ? 'Re-runs the same automated audit used everywhere else — useful if this lead scanned badly or never got audited.' : 'Add a website in the Overview tab to enable auditing.'}
+        </span>
+      </div>
+      {auditError && <p className="text-xs text-red-400">{auditError}</p>}
+
       {local.screenshotUrl && (
         <img src={local.screenshotUrl} alt="Website screenshot" className="w-full rounded-lg border border-gray-800 object-cover" />
       )}
