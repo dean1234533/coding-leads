@@ -896,7 +896,7 @@ exports.scanBusinessLeads = onCall(
   }
 );
 
-const QUICK_LOOKUP_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY'];
+const QUICK_LOOKUP_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY'];
 
 /**
  * "Walk-by" lookup: search for a business by name (optionally biased toward
@@ -943,11 +943,12 @@ exports.searchBusinessByName = onCall(
  * Second step of the walk-by lookup — once Dean picks the right candidate,
  * this fetches its website and runs it through the same owner-name +
  * contact-email pipeline as the Scanner/Auto Scan (Hunter/Serper/Prospeo/
- * GetProspect/RocketReach/Snov, then raw scraping) so it returns a real,
- * usable contact on the spot.
+ * GetProspect/RocketReach/Snov, then raw scraping) plus the same PageSpeed +
+ * AI-vision website audit used everywhere else in the app, so a lead found
+ * this way is just as ready to add to the CRM as one found by scanning.
  */
 exports.getBusinessContactByPlaceId = onCall(
-  { cors: true, timeoutSeconds: 60, memory: '512MiB', secrets: QUICK_LOOKUP_SECRETS },
+  { cors: true, timeoutSeconds: 120, memory: '512MiB', secrets: QUICK_LOOKUP_SECRETS },
   async (request) => {
     const { placeId } = request.data ?? {};
     if (!placeId) throw new HttpsError('invalid-argument', 'A place ID is required.');
@@ -967,7 +968,17 @@ exports.getBusinessContactByPlaceId = onCall(
 
     const ownerResult = await findOwnerName(d.name ?? '');
     const ownerName = ownerResult?.name ?? null;
-    const contactEmail = await findContactEmail(d.website ?? null, ownerName, d.name ?? '');
+    const [contactEmail, audit] = await Promise.all([
+      findContactEmail(d.website ?? null, ownerName, d.name ?? ''),
+      d.website
+        ? auditWebsite(d.website, process.env.GOOGLE_PAGESPEED_KEY, {
+            gemini: process.env.GEMINI_API_KEY,
+            groq: process.env.GROQ_API_KEY,
+            mistral: process.env.MISTRAL_API_KEY,
+            openrouter: process.env.OPENROUTER_API_KEY,
+          })
+        : Promise.resolve(null),
+    ]);
 
     return {
       name:            d.name ?? null,
@@ -978,6 +989,15 @@ exports.getBusinessContactByPlaceId = onCall(
       ownerName,
       ownerNameSource: ownerResult?.source ?? null,
       contactEmail:    contactEmail ?? null,
+      websiteScore:      audit?.websiteScore ?? null,
+      issuesChecklist:   audit?.issuesChecklist ?? [],
+      overallImpression: audit?.auditFailed
+        ? `Auto-audit failed (${audit.error})`
+        : audit?.overallImpression ?? null,
+      speedNotes:        audit?.speedNotes ?? null,
+      mobileNotes:       audit?.mobileNotes ?? null,
+      seoNotes:          audit?.seoNotes ?? null,
+      aiDesignNote:      audit?.aiDesignNote ?? null,
     };
   }
 );

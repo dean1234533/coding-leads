@@ -65,7 +65,7 @@ export default function QuickLookup() {
     setLoadingContact(true);
     setError(null);
     try {
-      const fn = httpsCallable(getFunctions(app), 'getBusinessContactByPlaceId', { timeout: 60000 });
+      const fn = httpsCallable(getFunctions(app), 'getBusinessContactByPlaceId', { timeout: 120000 });
       const { data } = await fn({ placeId: candidate.placeId });
       setContact(data);
     } catch (err) {
@@ -97,9 +97,13 @@ export default function QuickLookup() {
         industry: null,
         address: contact.address ?? null,
         googleMapsUrl: contact.googleMapsUrl ?? null,
-        overallImpression: null,
-        websiteScore: null,
-        issuesChecklist: [],
+        overallImpression: contact.overallImpression ?? null,
+        websiteScore: contact.websiteScore ?? null,
+        issuesChecklist: contact.issuesChecklist ?? [],
+        speedNotes: contact.speedNotes ?? null,
+        mobileNotes: contact.mobileNotes ?? null,
+        seoNotes: contact.seoNotes ?? null,
+        aiDesignNote: contact.aiDesignNote ?? null,
         status: 'New',
         priority: 'Medium',
         source: 'Quick Lookup',
@@ -169,7 +173,7 @@ export default function QuickLookup() {
       )}
 
       {loadingContact && (
-        <p className="mt-4 text-xs text-gray-500">Looking up {selected?.name}'s website and email…</p>
+        <p className="mt-4 text-xs text-gray-500">Looking up {selected?.name}'s website, email, and running a quick website audit…</p>
       )}
 
       {contact && (
@@ -203,6 +207,23 @@ export default function QuickLookup() {
               </div>
             )}
           </dl>
+
+          {contact.website && (
+            <div className="mt-3 border-t border-gray-800 pt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">Website Audit</p>
+              {contact.websiteScore !== null ? (
+                <>
+                  <p className="mt-1 text-xs text-gray-300">Performance score: {contact.websiteScore}/100</p>
+                  {contact.issuesChecklist?.length > 0 && (
+                    <p className="mt-1 text-xs text-gray-400">Issues: {contact.issuesChecklist.join(', ')}</p>
+                  )}
+                  {contact.aiDesignNote && <p className="mt-1 text-xs text-gray-400">{contact.aiDesignNote}</p>}
+                </>
+              ) : (
+                <p className="mt-1 text-xs text-gray-500">{contact.overallImpression ?? 'Audit could not run for this site.'}</p>
+              )}
+            </div>
+          )}
 
           <div className="mt-4 flex items-center gap-3">
             <button
