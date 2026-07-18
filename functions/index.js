@@ -587,7 +587,7 @@ async function findContactEmail(website, ownerName, businessName) {
   }
 
   // ── 3b. Snov.io domain search — fallback for once Hunter's free tier
-  // (25/month) runs dry. Same idea as the AI vision-provider chain: another
+  // (50/month) runs dry. Same idea as the AI vision-provider chain: another
   // provider's own free tier (50/month, recurring) picks up where the first
   // one stops, instead of the whole email pipeline degrading to scraping
   // alone. Snov's domain search is a nested async job: start a search, poll

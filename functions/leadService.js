@@ -5,7 +5,7 @@ const axios = require('axios');
 /**
  * Looks up a business owner's email address using the Hunter.io Email Finder API.
  *
- * Hunter.io free tier allows 25 searches/month — enough for initial outreach.
+ * Hunter.io free tier allows 50 searches/month — enough for initial outreach.
  * Docs: https://hunter.io/api-documentation/v2#email-finder
  *
  * @param {string} domain    - The business domain, e.g. "riversidegym.com"
