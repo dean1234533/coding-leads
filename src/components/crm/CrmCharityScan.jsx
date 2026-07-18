@@ -10,7 +10,7 @@ const RADII = [
   { value: 10000, label: '10km' },
 ];
 
-// Searches Google Places for charities, charity shops, and community/
+// Searches Google Places for churches, places of worship, charities, charity shops, and community/
 // voluntary organisations (scanMode: 'charity' on the backend, mirroring
 // how 'agency' mode works) — kept as its own scan rather than folded into
 // the regular Business Scout, since these are a genuinely different kind of
@@ -71,7 +71,7 @@ export default function CrmCharityScan() {
         email: lead.contactEmail ?? null,
         phone: lead.phone ?? null,
         contactName: lead.ownerName ?? null,
-        industry: 'Charity / Non-Profit',
+        industry: lead.industryLabel ?? 'Charity / Non-Profit',
         category: 'Charity',
         address: lead.address ?? null,
         googleMapsUrl: lead.googleMapsUrl ?? null,
@@ -102,7 +102,7 @@ export default function CrmCharityScan() {
     <section className="rounded-xl border border-gray-800 bg-gray-900 p-4 sm:p-6">
       <h2 className="text-sm font-semibold text-gray-200">Charity Scan</h2>
       <p className="mt-1 text-xs text-gray-500">
-        Searches for charities, charity shops, and community/voluntary organisations near a location — a good pool for offering free or discounted website work in exchange for word-of-mouth referrals. Use the "Charity / Non-Profit Offer" template in your Template Library when reaching out — it's upfront about the free-work-for-a-recommendation arrangement.
+        Searches for churches, places of worship, charities, charity shops, and community/voluntary organisations near a location — churches especially tend to have large, tight-knit congregations, so a good outcome there travels fast. A good pool for offering free or discounted website work in exchange for word-of-mouth referrals. Use the "Charity / Non-Profit Offer" template in your Template Library when reaching out — it's upfront about the free-work-for-a-recommendation arrangement.
       </p>
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">

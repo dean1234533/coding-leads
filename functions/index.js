@@ -727,6 +727,8 @@ async function runBusinessScan({
       ? [{ value: 'agency', keyword: 'digital agency' }]
       : scanMode === 'charity'
       ? [
+          { value: 'church', label: 'Church', keyword: 'church' },
+          { value: 'place_of_worship', label: 'Place of Worship', keyword: 'place of worship' },
           { value: 'charity', label: 'Charity / Non-Profit', keyword: 'charity' },
           { value: 'charity_shop', label: 'Charity Shop', keyword: 'charity shop' },
           { value: 'community_org', label: 'Community Organisation', keyword: 'community organisation' },
