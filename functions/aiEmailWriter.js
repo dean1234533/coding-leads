@@ -106,6 +106,21 @@ async function generateAuditEmail(lead, myName, keys) {
     // ("multimodal_not_enabled"), so it's text-only and can't join the
     // website design audit's vision chain. Fine here since this is plain text.
     { name: 'cerebras', key: keys?.cerebras, run: () => writeWithOpenAiCompatible(prompt, keys.cerebras, { baseUrl: 'https://api.cerebras.ai/v1', model: 'gpt-oss-120b' }) },
+    // Cloudflare Workers AI — 10,000 Neurons/day free, recurring daily (not
+    // a one-time grant). Verified live via its OpenAI-compatible endpoint;
+    // needs an account ID baked into the URL, not just a bearer key, so the
+    // key here is actually "accountId:apiToken" — split below.
+    {
+      name: 'cloudflare',
+      key: keys?.cloudflare,
+      run: () => {
+        const [accountId, apiToken] = String(keys.cloudflare).split(':');
+        return writeWithOpenAiCompatible(prompt, apiToken, {
+          baseUrl: `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1`,
+          model: '@cf/meta/llama-3.1-8b-fast-v2',
+        });
+      },
+    },
   ];
 
   for (const provider of providers) {
