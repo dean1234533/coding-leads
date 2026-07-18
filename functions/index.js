@@ -766,6 +766,42 @@ async function findInstagramHandle(businessName, location) {
 }
 
 /**
+ * OpenWeb Ninja's Website Contacts Scraper — crawls an entire site and
+ * returns structured emails (with source pages) plus social profile links
+ * (Instagram, Facebook, LinkedIn, etc.) in one call. Needs an actual domain
+ * (confirmed live: a bare business name returns "Invalid query (domain)"),
+ * so this only ever applies to leads that already have a website — it
+ * can't help the no-website case, which stays on findInstagramHandle's
+ * name-based search instead. Used both as another email-finder fallback
+ * and, uniquely among all the providers here, to grab Instagram even when
+ * an email was already found some other way.
+ */
+async function scrapeWebsiteContacts(website) {
+  const apiKey = process.env.OPENWEBNINJA_KEY;
+  if (!apiKey || !website) return null;
+
+  let domain;
+  try { domain = new URL(website).hostname.replace(/^www\./, ''); } catch { return null; }
+
+  try {
+    const { data } = await axios.get('https://api.openwebninja.com/website-contacts-scraper/scrape-contacts', {
+      params: { query: domain },
+      headers: { 'x-api-key': apiKey },
+      timeout: 15_000,
+    });
+    const row = data?.data?.[0];
+    if (!row) return null;
+    return {
+      email: row.emails?.[0]?.value?.toLowerCase() ?? null,
+      instagramUrl: row.instagram ?? null,
+    };
+  } catch (err) {
+    console.warn('[scrapeWebsiteContacts] failed:', err.response?.data?.error?.message ?? err.message);
+    return null;
+  }
+}
+
+/**
  * Master owner-name resolver.
  *   1. Business name parsing  (instant — "Sarah's Salon" → "Sarah")
  *   2. Companies House API    (authoritative for registered UK companies)
@@ -961,12 +997,20 @@ async function runBusinessScan({
         const email = await findContactEmail(lead.website, lead.ownerName, lead.name);
         lead.contactEmail    = email ?? null;
 
-        // No website and no email to fall back on — plenty of small
-        // businesses run entirely off Instagram instead of a real site, so
-        // this is a genuine alternative contact channel, not a consolation
-        // prize. Only bothers looking when there's nothing else, to avoid
-        // burning Serper quota on leads that already have a real email.
-        if (!lead.contactEmail) {
+        if (lead.website) {
+          // Has a website — Website Contacts Scraper can crawl it directly.
+          // Fills in an email if every other provider came up empty, and
+          // grabs Instagram as a bonus even when an email was already found
+          // some other way (nothing else in the chain surfaces Instagram
+          // for a lead that already has a website).
+          const contacts = await scrapeWebsiteContacts(lead.website);
+          if (!lead.contactEmail && contacts?.email) lead.contactEmail = contacts.email;
+          lead.instagramUrl = contacts?.instagramUrl ?? null;
+        } else if (!lead.contactEmail) {
+          // No website and no email to fall back on — plenty of small
+          // businesses run entirely off Instagram instead of a real site,
+          // so this is a genuine alternative contact channel, not a
+          // consolation prize.
           const ig = await findInstagramHandle(lead.name, lead.address);
           lead.instagramUrl = ig?.url ?? null;
         }
@@ -1004,7 +1048,7 @@ exports.scanBusinessLeads = onCall(
     cors:           true,
     timeoutSeconds: 90,
     memory:         '512MiB',
-    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SERPAPI_KEY'],
+    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SERPAPI_KEY', 'OPENWEBNINJA_KEY'],
   },
   async (request) => {
     try {
@@ -1016,7 +1060,7 @@ exports.scanBusinessLeads = onCall(
   }
 );
 
-const QUICK_LOOKUP_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SERPAPI_KEY', 'GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY'];
+const QUICK_LOOKUP_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SERPAPI_KEY', 'OPENWEBNINJA_KEY', 'GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY'];
 
 /**
  * "Walk-by" lookup: search for a business by name (optionally biased toward
@@ -1100,9 +1144,19 @@ exports.getBusinessContactByPlaceId = onCall(
         : Promise.resolve(null),
     ]);
 
-    // No website and no email — try Instagram as a last resort, same as
+    // Has a website — try the contacts scraper for a better email +
+    // Instagram bonus. No website — fall back to Instagram search, same as
     // the batch scan.
-    const instagram = !contactEmail ? await findInstagramHandle(d.name ?? '', d.formatted_address ?? '') : null;
+    let finalEmail = contactEmail ?? null;
+    let instagramUrl = null;
+    if (d.website) {
+      const contacts = await scrapeWebsiteContacts(d.website);
+      if (!finalEmail && contacts?.email) finalEmail = contacts.email;
+      instagramUrl = contacts?.instagramUrl ?? null;
+    } else if (!finalEmail) {
+      const ig = await findInstagramHandle(d.name ?? '', d.formatted_address ?? '');
+      instagramUrl = ig?.url ?? null;
+    }
 
     return {
       name:            d.name ?? null,
@@ -1112,8 +1166,8 @@ exports.getBusinessContactByPlaceId = onCall(
       googleMapsUrl:   d.url ?? null,
       ownerName,
       ownerNameSource: ownerResult?.source ?? null,
-      contactEmail:    contactEmail ?? null,
-      instagramUrl:    instagram?.url ?? null,
+      contactEmail:    finalEmail,
+      instagramUrl,
       websiteScore:      audit?.websiteScore ?? null,
       issuesChecklist:   audit?.issuesChecklist ?? [],
       overallImpression: audit?.auditFailed
@@ -1584,7 +1638,7 @@ async function runAutoBusinessScan({ bypassHourCheck = false, overrides = null }
   return { ran: true, added, candidatesFound: leads.length };
 }
 
-const AUTO_SCAN_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SERPAPI_KEY', ...AUDIT_SECRETS];
+const AUTO_SCAN_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SERPAPI_KEY', 'OPENWEBNINJA_KEY', ...AUDIT_SECRETS];
 
 exports.scheduledAutoBusinessScan = onSchedule(
   { schedule: 'every hour', timeZone: 'Europe/London', timeoutSeconds: 540, memory: '512MiB', secrets: AUTO_SCAN_SECRETS },
