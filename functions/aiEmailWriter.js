@@ -121,6 +121,12 @@ async function generateAuditEmail(lead, myName, keys) {
         });
       },
     },
+    // Hugging Face Inference Providers (router) — verified live. Prepaid,
+    // no card on file (confirmed via /api/whoami-v2: "canPay":false), so
+    // it's hard-capped at the free monthly credit (~$0.10, renews monthly)
+    // rather than able to overcharge. At the per-call cost seen during
+    // testing that's hundreds of thousands of calls/month in practice.
+    { name: 'huggingface', key: keys?.huggingface, run: () => writeWithOpenAiCompatible(prompt, keys.huggingface, { baseUrl: 'https://router.huggingface.co/v1', model: 'meta-llama/Llama-3.1-8B-Instruct' }) },
   ];
 
   for (const provider of providers) {
