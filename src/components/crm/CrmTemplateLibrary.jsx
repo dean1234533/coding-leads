@@ -68,6 +68,14 @@ export default function CrmTemplateLibrary() {
                 <p className="font-medium text-gray-100">{t.name}</p>
                 <p className="mt-1 truncate text-xs text-gray-500">{t.subject}</p>
                 <p className="mt-2 line-clamp-3 break-words text-xs text-gray-600 whitespace-pre-line">{t.body}</p>
+                {t.sentCount > 0 && (
+                  <p className="mt-2 text-[11px] text-gray-500">
+                    {t.sentCount} sent · {t.repliedCount ?? 0} replied
+                    <span className={`ml-1 font-semibold ${(t.repliedCount ?? 0) / t.sentCount >= 0.2 ? 'text-emerald-400' : 'text-gray-500'}`}>
+                      ({Math.round(((t.repliedCount ?? 0) / t.sentCount) * 100)}% reply rate)
+                    </span>
+                  </p>
+                )}
                 <div className="mt-3 flex gap-3">
                   <button onClick={() => startEdit(t)} className="text-xs text-blue-400 hover:text-blue-300">Edit</button>
                   <button onClick={() => handleDelete(t.id)} className="text-xs text-gray-600 hover:text-red-400">Delete</button>

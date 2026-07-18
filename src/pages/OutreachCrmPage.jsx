@@ -863,7 +863,7 @@ export default function OutreachCrmPage() {
             <CrmLeadsPage leads={charityLeads} openLeadId={openLeadId} onOpenLeadHandled={() => setOpenLeadId(null)} />
           </div>
         )}
-        {subTab === 'inbox' && <CrmGmailInbox connected={!!gmailStatus?.connected} />}
+        {subTab === 'inbox' && <CrmGmailInbox connected={!!gmailStatus?.connected} leads={leads ?? []} />}
         {subTab === 'scanner' && (
           <div className="space-y-6">
             <QuickLookup />

@@ -18,7 +18,21 @@ function formatDate(value) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-export default function CrmGmailInbox({ connected }) {
+const CLASSIFICATION_STYLES = {
+  Interested: 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/30',
+  'Not Interested': 'bg-red-500/15 text-red-400 ring-red-500/30',
+  Question: 'bg-amber-500/15 text-amber-400 ring-amber-500/30',
+  Other: 'bg-gray-700/40 text-gray-400 ring-gray-600/40',
+};
+
+export default function CrmGmailInbox({ connected, leads = [] }) {
+  // Cross-references inbox rows against leads with a matching gmailThreadId
+  // so a reply's AI-classified sentiment (set by runReplySync) shows up
+  // right in the list — the difference between triaging replies and having
+  // to open every single one cold to find the ones worth answering first.
+  const classificationByThreadId = new Map(
+    leads.filter((l) => l.gmailThreadId && l.replyClassification).map((l) => [l.gmailThreadId, l.replyClassification])
+  );
   const [folder, setFolder] = useState('inbox');
   const [query, setQuery] = useState('');
   const [items, setItems] = useState(null);
@@ -85,17 +99,25 @@ export default function CrmGmailInbox({ connected }) {
         {error && <p className="p-4 text-sm text-red-400">{error}</p>}
         {!loading && items?.length === 0 && <p className="p-8 text-center text-sm text-gray-600">No messages found.</p>}
         <div className="divide-y divide-gray-800/50">
-          {!loading && items?.map((m) => (
-            <button key={m.id} onClick={() => setOpenThreadId(m.threadId)}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-gray-800/30">
-              <span className={`h-2 w-2 shrink-0 rounded-full ${m.unread ? 'bg-blue-400' : 'bg-transparent'}`} />
-              <span className="w-20 shrink-0 truncate text-sm text-gray-300 sm:w-40">{m.from?.replace(/<.*>/, '').trim() || m.from}</span>
-              <span className="min-w-0 flex-1 truncate text-sm text-gray-200">
-                {m.subject || '(no subject)'} <span className="text-gray-600">— {m.snippet}</span>
-              </span>
-              <span className="shrink-0 text-xs text-gray-600">{formatDate(m.date)}</span>
-            </button>
-          ))}
+          {!loading && items?.map((m) => {
+            const classification = classificationByThreadId.get(m.threadId);
+            return (
+              <button key={m.id} onClick={() => setOpenThreadId(m.threadId)}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-gray-800/30">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${m.unread ? 'bg-blue-400' : 'bg-transparent'}`} />
+                <span className="w-20 shrink-0 truncate text-sm text-gray-300 sm:w-40">{m.from?.replace(/<.*>/, '').trim() || m.from}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-gray-200">
+                  {m.subject || '(no subject)'} <span className="text-gray-600">— {m.snippet}</span>
+                </span>
+                {classification && (
+                  <span className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset sm:inline-block ${CLASSIFICATION_STYLES[classification] ?? CLASSIFICATION_STYLES.Other}`}>
+                    {classification}
+                  </span>
+                )}
+                <span className="shrink-0 text-xs text-gray-600">{formatDate(m.date)}</span>
+              </button>
+            );
+          })}
         </div>
       </section>
 

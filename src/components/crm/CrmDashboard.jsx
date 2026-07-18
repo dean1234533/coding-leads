@@ -62,6 +62,23 @@ export default function CrmDashboard({ leads, onOpenLead, onGoToLeads, onGoToInb
     return { openLeads, quotesSent, won, lost, replied };
   }, [leads]);
 
+  // Pipeline/revenue — estimatedProjectValue is already captured per lead
+  // (manual entry or the auto-scan's leadScore-derived estimate) but never
+  // rolled up anywhere before this, so there was no way to see total
+  // pipeline value or an actual win rate at a glance.
+  const revenue = useMemo(() => {
+    const value = (l) => (typeof l.estimatedProjectValue === 'number' ? l.estimatedProjectValue : 0);
+    const openValue = leads.filter((l) => !['Won', 'Lost', 'Archive'].includes(l.status)).reduce((sum, l) => sum + value(l), 0);
+    const wonLeads = leads.filter((l) => l.status === 'Won');
+    const wonValue = wonLeads.reduce((sum, l) => sum + value(l), 0);
+    const lostCount = leads.filter((l) => l.status === 'Lost').length;
+    const decided = wonLeads.length + lostCount;
+    const winRate = decided > 0 ? Math.round((wonLeads.length / decided) * 100) : null;
+    return { openValue, wonValue, winRate };
+  }, [leads]);
+
+  const formatGbp = (n) => n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${n}`;
+
   const recentActivity = useMemo(() => {
     return [...leads]
       .filter((l) => l.updatedAt)
@@ -83,6 +100,13 @@ export default function CrmDashboard({ leads, onOpenLead, onGoToLeads, onGoToInb
         <StatCard label="Clients Lost" value={counts.lost} accent="text-red-400" />
         <StatCard label="Late Follow Ups" value={followUps.late.length} accent={followUps.late.length ? 'text-red-400' : 'text-gray-100'} />
         <StatCard label="Follow Ups This Week" value={followUps.thisWeek.length} />
+      </div>
+
+      {/* Pipeline / revenue */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatCard label="Open Pipeline Value" value={formatGbp(revenue.openValue)} accent="text-cyan-400" sub="Sum of estimated value across open leads" />
+        <StatCard label="Won Revenue" value={formatGbp(revenue.wonValue)} accent="text-emerald-400" sub="Sum of estimated value across won leads" />
+        <StatCard label="Win Rate" value={revenue.winRate === null ? '—' : `${revenue.winRate}%`} accent="text-purple-400" sub={revenue.winRate === null ? 'No decided leads yet' : 'Won ÷ (Won + Lost)'} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

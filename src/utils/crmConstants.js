@@ -114,6 +114,9 @@ export const DEFAULT_PORTFOLIO = [
 //     sentence.
 //   {{website_score_note}} — " It scored N/100 on page speed." when the
 //     lead's been through the auto-audit, else empty.
+//   {{competitor_line}} — a sentence naming a genuinely stronger-rated
+//     nearby competitor found in the same scan batch, only when the
+//     comparison is real and meaningful (see runBusinessScan), else empty.
 //   {{signature}} — the full sign-off block (name, dean-da-dev, email, site).
 export const DEFAULT_TEMPLATES = [
   {
@@ -437,7 +440,7 @@ Thank you for your time, and I hope to hear from you.
     subject: `A quick audit of {{business}}'s website`,
     body: `Hi {{contact}},
 
-I'm {{myname}}, a web developer who builds websites for local businesses. I ran {{business}}'s website through a quick audit and wanted to share what came up, in case it's useful.{{website_score_note}}
+I'm {{myname}}, a web developer who builds websites for local businesses. I ran {{business}}'s website through a quick audit and wanted to share what came up, in case it's useful.{{website_score_note}}{{competitor_line}}
 
 {{issue_list}}
 
@@ -684,6 +687,13 @@ export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
     : "  • Nothing major stood out, but there's usually still room to sharpen things up";
   const websiteScoreNote = typeof lead?.websiteScore === 'number' ? ` It scored ${lead.websiteScore}/100 on page speed.` : '';
 
+  // Only ever set when the scan found a genuinely stronger nearby
+  // competitor (see runBusinessScan's Step 4b) — empty otherwise, so this
+  // never forces a weak or invented comparison into a template.
+  const competitorLine = lead?.competitorName
+    ? ` For comparison, ${lead.competitorName} nearby is rated ${lead.competitorRating}★ from ${lead.competitorReviewCount} reviews — worth knowing what's working for them.`
+    : '';
+
   return {
     business: lead?.businessName ?? '',
     contact: lead?.contactName?.trim() ?? '',
@@ -696,6 +706,7 @@ export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
     issue_highlight: issueDetail ? ` — ${issueDetail}` : '',
     issue_list: issueListText,
     website_score_note: websiteScoreNote,
+    competitor_line: competitorLine,
     tool_pitch: `\n\n${pickRelevantTools(lead).map((t) => `  • ${t.name} — https://www.dean-da-dev.co.uk/${t.slug}`).join('\n')}`,
     myname: myName ?? '',
     signature: myName ? `Kind regards,\n\n${myName}\ndean-da-dev\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}` : '',

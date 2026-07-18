@@ -942,7 +942,11 @@ async function runBusinessScan({
           opportunityScore: 5,
           opportunityLabel: 'No Website — Prime Lead',
           ownerName:        null,
+          instagramUrl:     null,
           industryLabel:    p.__industryLabel ?? null,
+          competitorName:       null,
+          competitorRating:     null,
+          competitorReviewCount: null,
         };
       }
       const d = r.value.data.result ?? {};
@@ -964,8 +968,37 @@ async function runBusinessScan({
         contactEmail:     null,
         instagramUrl:     null,
         industryLabel:    places[i].__industryLabel ?? null,
+        competitorName:       null,
+        competitorRating:     null,
+        competitorReviewCount: null,
       };
     });
+
+    // ── Step 4b: Nearby competitor comparison ────────────────────────────────
+    // Every place found in this same scan batch is a genuine nearby
+    // competitor in the same category — no extra API calls needed, the
+    // rating/review data is already sitting right here. For each lead,
+    // finds the strongest same-category competitor in the batch (excluding
+    // itself) and only attaches it if the comparison is actually compelling
+    // (meaningfully higher rating AND a real review count) — a weak/fake
+    // comparison would undercut the pitch rather than strengthen it.
+    for (const lead of rawLeads) {
+      const rivals = rawLeads.filter((other) =>
+        other.id !== lead.id &&
+        other.industryLabel === lead.industryLabel &&
+        typeof other.rating === 'number' &&
+        (other.reviewCount ?? 0) >= 10
+      );
+      if (!rivals.length) continue;
+
+      const best = rivals.reduce((a, b) => (b.rating > a.rating ? b : a));
+      const leadRating = typeof lead.rating === 'number' ? lead.rating : 0;
+      if (best.rating - leadRating >= 0.3) {
+        lead.competitorName = best.name;
+        lead.competitorRating = best.rating;
+        lead.competitorReviewCount = best.reviewCount;
+      }
+    }
 
     // ── Step 5: Resolve owner names + contact emails, skipping anything
     // already looked up in a previous scan ──────────────────────────────────
@@ -1525,6 +1558,9 @@ async function addBusinessLeadToCrm(lead, fallbackIndustryLabel, pagespeedKey, v
     phone: lead.phone ?? null,
     contactName: lead.ownerName ?? null,
     instagramUrl: lead.instagramUrl ?? null,
+    competitorName: lead.competitorName ?? null,
+    competitorRating: lead.competitorRating ?? null,
+    competitorReviewCount: lead.competitorReviewCount ?? null,
     // Each lead carries which of the (possibly several) selected categories
     // actually found it, so a multi-type scan doesn't lump every result
     // under whichever type happened to be first.

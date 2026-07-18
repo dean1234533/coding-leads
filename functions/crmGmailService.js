@@ -11,6 +11,17 @@ const { OAUTH_SECRETS } = require('./gmailOAuth');
 const { OUTREACH_FROM_ADDRESS } = require('./emailConfig');
 const { encodeMimeHeader } = require('./mimeHeader');
 const { generateAuditEmail } = require('./aiEmailWriter');
+const { classifyReply } = require('./aiReplyClassifier');
+
+const REPLY_AI_KEYS = () => ({
+  gemini: process.env.GEMINI_API_KEY,
+  groq: process.env.GROQ_API_KEY,
+  mistral: process.env.MISTRAL_API_KEY,
+  openrouter: process.env.OPENROUTER_API_KEY,
+  cerebras: process.env.CEREBRAS_API_KEY,
+  cloudflare: process.env.CLOUDFLARE_AI_KEY,
+  huggingface: process.env.HUGGINGFACE_API_KEY,
+});
 
 const CRM_GMAIL_SECRETS = [...new Set([...OAUTH_SECRETS, 'GMAIL_REFRESH_TOKEN'])];
 
@@ -308,11 +319,31 @@ async function runReplySync() {
       const isUnreadInInbox = (last.labelIds ?? []).includes('INBOX');
 
       if (isInbound && isUnreadInInbox) {
-        await doc.ref.update({ status: 'Replied', updatedAt: FieldValue.serverTimestamp() });
+        // Classifies the reply's sentiment so it shows up triaged in the
+        // Inbox instead of Dean having to read every reply cold to find the
+        // ones actually worth answering first. Best-effort — a classifier
+        // failure shouldn't block marking the lead as replied.
+        const classification = await classifyReply(last.snippet, lead.businessName, REPLY_AI_KEYS()).catch(() => null);
+
+        await doc.ref.update({
+          status: 'Replied',
+          replyClassification: classification,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
         await doc.ref.collection('notes').add({
-          text: 'Reply detected in Gmail.',
+          text: classification ? `Reply detected in Gmail — looks ${classification}.` : 'Reply detected in Gmail.',
           createdAt: FieldValue.serverTimestamp(),
         });
+
+        // Template performance tracking — a reply on a lead whose last send
+        // used a known template counts as that template earning a reply,
+        // so the Template Library can show a real reply rate per template.
+        if (lead.lastTemplateId) {
+          await db.collection('crmTemplates').doc(lead.lastTemplateId)
+            .update({ repliedCount: FieldValue.increment(1) })
+            .catch((err) => console.warn(`[syncGmailReplies] template repliedCount update failed:`, err.message));
+        }
+
         updated += 1;
       }
     } catch (err) {
@@ -323,13 +354,15 @@ async function runReplySync() {
   return { checked: snap.size, updated };
 }
 
+const REPLY_SYNC_SECRETS = [...CRM_GMAIL_SECRETS, 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY', 'CLOUDFLARE_AI_KEY', 'HUGGINGFACE_API_KEY'];
+
 const checkRepliesNow = onCall(
-  { cors: true, timeoutSeconds: 120, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
+  { cors: true, timeoutSeconds: 120, memory: '256MiB', secrets: REPLY_SYNC_SECRETS },
   async () => runReplySync()
 );
 
 const syncGmailReplies = onSchedule(
-  { schedule: 'every 15 minutes', timeoutSeconds: 300, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
+  { schedule: 'every 15 minutes', timeoutSeconds: 300, memory: '256MiB', secrets: REPLY_SYNC_SECRETS },
   async () => { await runReplySync(); }
 );
 
@@ -369,7 +402,11 @@ const sendScheduledEmails = onSchedule(
             gmailThreadId: res.data.threadId,
             lastContactDate: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
+            ...(item.templateId ? { lastTemplateId: item.templateId } : {}),
           }).catch(() => {});
+        }
+        if (item.templateId) {
+          await db.collection('crmTemplates').doc(item.templateId).update({ sentCount: FieldValue.increment(1) }).catch(() => {});
         }
       } catch (err) {
         console.error(`[sendScheduledEmails] failed for ${doc.id}:`, err.message);

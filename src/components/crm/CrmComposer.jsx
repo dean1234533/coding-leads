@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, doc, increment, serverTimestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase';
 import { applyTemplateVars, buildTemplateVars } from '../../utils/crmConstants';
@@ -39,6 +39,7 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
   const [sending, setSending] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [aiError, setAiError] = useState(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const editorRef = useRef(null);
 
   useEffect(() => {
@@ -88,6 +89,7 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
   function applyTemplate(templateId) {
     const t = templates.find((x) => x.id === templateId);
     if (!t) return;
+    setSelectedTemplateId(templateId);
     setSubject(applyTemplateVars(t.subject, vars));
     const body = applyTemplateVars(t.body, vars);
     if (richMode && editorRef.current) {
@@ -153,7 +155,7 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
         const { bodyHtml, bodyText } = getBody();
         await addDoc(collection(db, 'scheduledEmails'), {
           to: to.trim(), cc: cc.trim() || null, subject, bodyHtml: bodyHtml ?? null, bodyText: bodyText ?? null,
-          attachments, sendAt: new Date(scheduleAt), leadId: lead?.id ?? null, sent: false, createdAt: serverTimestamp(),
+          attachments, sendAt: new Date(scheduleAt), leadId: lead?.id ?? null, templateId: selectedTemplateId || null, sent: false, createdAt: serverTimestamp(),
         });
         setStatus({ type: 'success', message: 'Email scheduled.' });
       } else {
@@ -162,6 +164,16 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
         const { data } = await fn({ to: to.trim(), cc: cc.trim() || undefined, subject, bodyHtml, bodyText, attachments, threadId, inReplyTo, references });
         setStatus({ type: 'success', message: 'Email sent.' });
         onSent?.(data.threadId);
+
+        // Template performance tracking — records which template (if any)
+        // was used so the Template Library can show real send/reply counts,
+        // and remembers it on the lead so a later reply can be attributed
+        // back to this specific template. Best-effort: a tracking failure
+        // shouldn't be reported as a failed send, the email already sent.
+        if (selectedTemplateId) {
+          updateDoc(doc(db, 'crmTemplates', selectedTemplateId), { sentCount: increment(1) }).catch(() => {});
+          if (lead?.id) updateDoc(doc(db, 'crmLeads', lead.id), { lastTemplateId: selectedTemplateId }).catch(() => {});
+        }
       }
     } catch (err) {
       setStatus({ type: 'error', message: err?.message ?? 'Send failed.' });
