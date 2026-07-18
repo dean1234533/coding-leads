@@ -10,6 +10,32 @@ const RADII = [
   { value: 10000, label: '10km' },
 ];
 
+// Same opportunity ranking Business Scout uses — the scan already scores
+// every result (no website / weak website via http or a free page-builder
+// domain / has a real site) without needing a full audit up front, so it's
+// shown right away instead of only after adding to the CRM.
+function OpportunityBadge({ lead }) {
+  if (lead.opportunityScore === 5) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400 ring-1 ring-inset ring-emerald-500/30">
+        No Website
+      </span>
+    );
+  }
+  if (lead.opportunityScore === 3) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-orange-400 ring-1 ring-inset ring-orange-500/30">
+        Weak Website
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-700/40 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 ring-1 ring-inset ring-gray-600/40">
+      Has Website
+    </span>
+  );
+}
+
 // Searches Google Places for churches, places of worship, charities, charity shops, and community/
 // voluntary organisations (scanMode: 'charity' on the backend, mirroring
 // how 'agency' mode works) — kept as its own scan rather than folded into
@@ -139,8 +165,12 @@ export default function CrmCharityScan() {
               <div key={lead.id} className="rounded-lg border border-gray-800 bg-gray-800/40 p-3.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-gray-100">{lead.name}</p>
-                    <p className="truncate text-xs text-gray-500">{lead.address}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-gray-100">{lead.name}</p>
+                      <OpportunityBadge lead={lead} />
+                      {lead.industryLabel && <span className="text-[10px] uppercase tracking-wider text-gray-600">{lead.industryLabel}</span>}
+                    </div>
+                    <p className="truncate text-xs text-gray-500">{lead.address}{lead.rating ? ` · ★ ${lead.rating} (${lead.reviewCount ?? 0})` : ''}</p>
                     <p className="mt-1 text-xs text-gray-400">
                       {lead.website ? <a href={lead.website} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">{lead.website}</a> : 'No website found'}
                       {lead.contactEmail ? ` · ${lead.contactEmail}` : ' · No email found'}
