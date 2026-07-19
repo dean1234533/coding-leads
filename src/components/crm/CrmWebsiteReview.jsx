@@ -33,7 +33,7 @@ export default function CrmWebsiteReview({ lead, onUpdate }) {
     setAuditing(true);
     setAuditError(null);
     try {
-      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 90000 });
+      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 130000 });
       const { data } = await fn({ urls: [local.website] });
       const audit = data.results?.[local.website];
       if (!audit) {
@@ -93,7 +93,11 @@ export default function CrmWebsiteReview({ lead, onUpdate }) {
           onClick={handleRerunAudit}
           disabled={auditing || !local.website}
           title={!local.website ? 'No website on this lead to audit' : 'Runs the automated PageSpeed + AI vision audit against this website again'}
-          className="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
+          className={`rounded-lg px-4 py-2 text-xs font-semibold transition disabled:cursor-not-allowed ${
+            auditing || !local.website
+              ? 'bg-gray-700 text-gray-400'
+              : 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-400 hover:to-cyan-400'
+          }`}
         >
           {auditing ? 'Auditing…' : 'Re-run Audit'}
         </button>

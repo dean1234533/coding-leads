@@ -70,7 +70,7 @@ export default function CrmCharityScan() {
   async function auditLeadWebsite(website) {
     if (!website) return null;
     try {
-      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 90000 });
+      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 130000 });
       const { data } = await fn({ urls: [website] });
       return data.results?.[website] ?? null;
     } catch (err) {
