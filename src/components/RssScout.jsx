@@ -8,9 +8,9 @@
  * Outreach CRM's lead database, individually or all at once.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { collection, addDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, getDocs, onSnapshot, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { app, db } from '../firebase';
 
 // ─── Scan modes ───────────────────────────────────────────────────────────────
@@ -434,7 +434,6 @@ export default function RssScout() {
 
   function handleScanModeChange(mode) {
     setScanMode(mode);
-    setLeads([]);
     setMeta(null);
     setError(null);
   }
@@ -443,18 +442,39 @@ export default function RssScout() {
     setTypes((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
   }
 
+  // Loads whatever was found on the last scan (of this mode) straight from
+  // Firestore, so leaving this tab or refreshing the page doesn't lose
+  // results that already cost real Places/Hunter/Serper API quota to
+  // produce — re-running "Scan Now" is only needed to look for genuinely
+  // new businesses, not just to see the same ones again.
+  useEffect(() => {
+    const q = query(collection(db, 'scannerResults'), where('scanMode', '==', scanMode), orderBy('scannedAt', 'desc'));
+    return onSnapshot(q, (snap) => setLeads(snap.docs.map((d) => d.data())), (err) => {
+      console.error('[BusinessScout] Failed to load saved results:', err);
+    });
+  }, [scanMode]);
+
   const scan = useCallback(async () => {
     if (!location.trim()) return;
     if (scanMode === 'business' && types.length === 0) { setError('Pick at least one business type.'); return; }
     setLoading(true);
     setError(null);
-    setLeads([]);
     setMeta(null);
     try {
       const fns = getFunctions(app);
       const res = await httpsCallable(fns, 'scanBusinessLeads', { timeout: 100000 })({ location, types, radius, scanMode });
-      setLeads(res.data.leads ?? []);
+      const found = res.data.leads ?? [];
       setMeta(res.data.meta);
+      // Persisted (not just held in local state) — the onSnapshot listener
+      // above picks this up automatically. Keyed by Google's place_id, so a
+      // re-scan naturally refreshes an already-seen business's data rather
+      // than duplicating it.
+      const batch = writeBatch(db);
+      for (const lead of found) {
+        if (!lead.id) continue;
+        batch.set(doc(db, 'scannerResults', lead.id), { ...lead, scanMode, location, radius, scannedAt: serverTimestamp() }, { merge: true });
+      }
+      if (found.length > 0) await batch.commit();
     } catch (err) {
       console.error('[BusinessScout]', err);
       setError(err?.message ?? 'Scan failed. Check your Google Places API key is set.');
@@ -482,7 +502,10 @@ export default function RssScout() {
   async function auditLeadWebsite(website) {
     if (!website) return null;
     try {
-      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 130000 });
+      // Kept above auditWebsitesNow's own timeoutSeconds (900s, raised when a
+      // second desktop PageSpeed + vision pass was added to the audit) — see
+      // the comment on the equivalent call in CrmWebsiteReview.jsx.
+      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 950000 });
       const { data } = await fn({ urls: [website] });
       return data.results?.[website] ?? null;
     } catch (err) {
@@ -514,6 +537,7 @@ export default function RssScout() {
         phone: lead.phone ?? null,
         contactName: lead.ownerName ?? null,
         instagramUrl: lead.instagramUrl ?? null,
+        whatsappUrl: lead.whatsappUrl ?? null,
         competitorName: lead.competitorName ?? null,
         competitorRating: lead.competitorRating ?? null,
         competitorReviewCount: lead.competitorReviewCount ?? null,

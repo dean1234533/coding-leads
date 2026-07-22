@@ -1,51 +1,74 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Every collection below used to allow any authenticated session
+    // through, including the app's own silent anonymous sign-in — meaning
+    // literally anyone who loaded the app URL got full read/write/delete
+    // access to every lead, template, and note. Restricted to the one real
+    // Google account that's actually allowed to use this CRM.
+    function isOwner() {
+      return request.auth != null && request.auth.token.email == 'deanburt1308@gmail.com';
+    }
+
     match /leads/{leadId} {
-      allow read, write, delete: if request.auth != null;
+      allow read, write, delete: if isOwner();
     }
     match /codingLeads/{leadId} {
-      allow read, write, delete: if request.auth != null;
+      allow read, write, delete: if isOwner();
     }
     match /codingLeadsConfig/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isOwner();
     }
 
     // ─── Outreach CRM ────────────────────────────────────────────────────
     match /crmLeads/{leadId} {
-      allow read, write, delete: if request.auth != null;
+      allow read, write, delete: if isOwner();
 
       match /notes/{noteId} {
-        allow read, write, delete: if request.auth != null;
+        allow read, write, delete: if isOwner();
       }
       match /tasks/{taskId} {
-        allow read, write, delete: if request.auth != null;
+        allow read, write, delete: if isOwner();
       }
     }
     match /crmTemplates/{templateId} {
-      allow read, write, delete: if request.auth != null;
+      allow read, write, delete: if isOwner();
     }
     match /crmPortfolio/{demoId} {
-      allow read, write, delete: if request.auth != null;
+      allow read, write, delete: if isOwner();
+    }
+    // Raw Scanner/Charity Scan results (keyed by Google place_id) — kept
+    // around so leaving the tab or refreshing the page doesn't lose a scan
+    // that already cost real Places/Hunter/Serper quota to produce, and
+    // re-scanning the same area isn't the only way to see it again.
+    match /scannerResults/{placeId} {
+      allow read, write, delete: if isOwner();
+    }
+    // Sent-count is written client-side on send (like crmTemplates'
+    // sentCount); replied/interested counts are written server-side by
+    // syncGmailReplies (Admin SDK bypasses rules) when a reply is detected.
+    match /issueAnalytics/{issueId} {
+      allow read, write: if isOwner();
     }
     match /backlinkConfig/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isOwner();
     }
     match /autoScanConfig/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isOwner();
     }
     match /autoFollowUpConfig/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isOwner();
     }
     match /autoAuditEmailConfig/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isOwner();
     }
     match /scheduledEmails/{emailId} {
-      allow read, write, delete: if request.auth != null;
+      allow read, write, delete: if isOwner();
     }
-    // Connection status has no token in it — safe for the client to read.
+    // Connection status has no token in it, but there's no remaining reason
+    // for anyone other than the owner to read it either.
     match /gmailConnectionStatus/{docId} {
-      allow read: if request.auth != null;
+      allow read: if isOwner();
       allow write: if false; // only written by Cloud Functions (Admin SDK bypasses rules)
     }
     // Encrypted refresh token — never exposed to the client.
@@ -62,6 +85,29 @@ service cloud.firestore {
     // already checked — written only by runBusinessScan (Admin SDK).
     match /emailLookupCache/{placeId} {
       allow read, write: if false;
+    }
+
+    // ─── Workflow automation / AI comms / insights ──────────────────────
+    // Workflow definitions are only ever written via the saveWorkflow
+    // Cloud Function (validates trigger/action types before writing) —
+    // read directly by the Workflows tab, but not written client-side.
+    match /workflows/{workflowId} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    // Approval-queue drafts are read and status-updated (approve/reject)
+    // only through generateCommsMessage/approveApproval/rejectApproval/
+    // markApprovalSent — all Admin SDK, all requireOwner-gated. The client
+    // only ever reads this collection to render the Approvals tab.
+    match /pendingApprovals/{approvalId} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    // Cached AI business-insights snapshot — written only by
+    // getBusinessInsights (Admin SDK).
+    match /businessInsightsCache/{docId} {
+      allow read: if isOwner();
+      allow write: if false;
     }
   }
 }

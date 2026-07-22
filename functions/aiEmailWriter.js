@@ -6,6 +6,7 @@ const ISSUE_DETAILS = {
   'Outdated Design': 'the design looks dated next to competitors, which can make people question how established the business is',
   'Slow Loading': "it takes too long to load, and most visitors leave before it even finishes",
   'Not Mobile Friendly': "it doesn't work properly on mobile, where most visitors are browsing from",
+  'Site Doesn\'t Load': "the website didn't load at all when I tried to visit it, which means you're losing every single visitor who tries to find you online right now",
   'Broken Links': 'there are broken links, which makes the site feel unfinished',
   'Broken Images': "several images aren't loading properly, which looks unprofessional",
   'Missing SSL': `the site isn't secured with SSL, so browsers flag it as "Not Secure"`,
@@ -22,6 +23,7 @@ const ISSUE_DETAILS = {
   'Confusing Layout': 'the layout is confusing, so visitors likely leave before finding what they came for',
   'Cluttered Mobile Nav': 'the mobile menu takes up a big chunk of the screen and feels cluttered',
   'Weak Logo': "the logo doesn't reflect the quality of the business",
+  'Page Jumps While Loading': 'the page visibly jumps around as it loads, which is disorienting and can make people click the wrong thing',
 };
 
 // Turns the raw audit fields on a lead into the kind of plain-English issue

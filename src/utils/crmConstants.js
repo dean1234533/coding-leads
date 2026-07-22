@@ -43,6 +43,7 @@ export const WEBSITE_ISSUES = [
   'Outdated Design',
   'Slow Loading',
   'Not Mobile Friendly',
+  'Site Doesn\'t Load',
   'Broken Links',
   'Broken Images',
   'Missing SSL',
@@ -59,6 +60,8 @@ export const WEBSITE_ISSUES = [
   'Confusing Layout',
   'Cluttered Mobile Nav',
   'Weak Logo',
+  'Page Jumps While Loading',
+  'Too Much Scrolling',
   'Other',
 ];
 
@@ -70,6 +73,7 @@ export const ISSUE_DETAILS = {
   'Outdated Design': 'the design looks dated next to competitors, which can make people question how established the business is',
   'Slow Loading': "it takes too long to load, and most visitors leave before it even finishes",
   'Not Mobile Friendly': "it doesn't work properly on mobile, where most visitors are browsing from",
+  'Site Doesn\'t Load': "the website didn't load at all when I tried to visit it, which means you're losing every single visitor who tries to find you online right now",
   'Broken Links': 'there are broken links, which makes the site feel unfinished',
   'Broken Images': "several images aren't loading properly, which looks unprofessional",
   'Missing SSL': `the site isn't secured with SSL, so browsers flag it as "Not Secure" — enough on its own to make people leave`,
@@ -86,6 +90,8 @@ export const ISSUE_DETAILS = {
   'Confusing Layout': 'the layout is confusing, so visitors likely leave before finding what they came for',
   'Cluttered Mobile Nav': 'the mobile menu takes up a big chunk of the screen and feels cluttered, pushing your actual content further down and making the site harder to use on a phone',
   'Weak Logo': "the logo doesn't reflect the quality of the business, which can undersell how professional and established you actually are",
+  'Page Jumps While Loading': 'the page visibly jumps around as it loads (images, ads, or embeds shifting things after the fact), which is disorienting and can make people click the wrong thing',
+  'Too Much Scrolling': "the homepage is packed with images and takes a long time to scroll through on both mobile and desktop, which can make visitors give up before they reach what they came for",
 };
 
 // ─── Portfolio demos (seed data — Dean fills in real URLs) ────────────────
@@ -123,17 +129,27 @@ export const DEFAULT_TEMPLATES = [
     name: 'General Outreach',
     category: 'Outreach',
     subject: 'A quick idea for {{business}}',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local businesses in the area and had a look at {{business}}'s website{{issue_highlight}}.
 
-I came across {{business}} and had a look at your website. I noticed a few areas where I believe it could be improved{{issue_highlight}}, which could be affecting enquiries from potential customers.
+That means anyone finding you through Google, social media, or a recommendation could be leaving within seconds instead of getting in touch — which can result in missed enquiries and bookings without you even realising it.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building and improving websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
+
+  • Find you easily on Google
+  • Contact you instantly from their phone
+  • Trust the business from the first impression
+  • Enquire or book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -204,17 +220,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'Salon',
     category: 'Industry',
     subject: 'Helping {{business}} book more appointments online',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local salons in the area and had a look at {{business}}'s website — there isn't currently an easy way for clients to book online{{issue_highlight}}.
 
-I had a look at {{business}} and noticed there isn't currently an easy way for clients to book online{{issue_highlight}}. That usually means missed bookings from people browsing outside your opening hours, who end up booking with a salon that lets them book instantly instead.
+That usually means missed bookings from people browsing outside your opening hours, who end up booking somewhere that lets them book instantly instead.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A working, fast, mobile-friendly website with online booking can make a big difference because it allows potential clients to:
+
+  • Find you easily on Google
+  • Book an appointment instantly from their phone
+  • Trust the business from the first impression
+  • Book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -222,17 +248,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'Gym',
     category: 'Industry',
     subject: 'A modern website + booking system for {{business}}',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local gyms in the area and had a look at {{business}}'s website — it doesn't currently make it easy to see class times or sign up for a membership online{{issue_highlight}}.
 
-I had a look at {{business}} and noticed the website doesn't currently make it easy to see class times or sign up for a membership online{{issue_highlight}}. That's often enough to make someone try a different gym instead.
+That's often enough to make someone try a different gym instead, without ever getting in touch to ask.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A working, fast, mobile-friendly website with online booking can make a big difference because it allows potential members to:
+
+  • Find you easily on Google
+  • See class times and sign up instantly from their phone
+  • Trust the business from the first impression
+  • Book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -240,17 +276,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'Law Firm',
     category: 'Industry',
     subject: 'A more professional online presence for {{business}}',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local law firms in the area and had a look at {{business}}'s website — it could do more to build trust with new visitors before they ever pick up the phone{{issue_highlight}}.
 
-I had a look at {{business}}'s website and noticed it could do more to build trust with new visitors before they ever pick up the phone{{issue_highlight}}. First impressions matter a great deal in your industry.
+First impressions matter a great deal when someone's choosing who to trust with a legal matter, and a weak website can quietly cost you enquiries before you're even aware of it.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A working, fast, professional website can make a big difference because it allows potential clients to:
+
+  • Find you easily on Google
+  • Contact you instantly from their phone
+  • Trust the firm from the first impression
+  • Enquire even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -258,17 +304,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'Restaurant',
     category: 'Industry',
     subject: 'Getting {{business}} more online orders/bookings',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local restaurants in the area and had a look at {{business}}'s website — it isn't easy to see the menu or book a table online{{issue_highlight}}.
 
-I had a look at {{business}}'s website and noticed it isn't easy to see the menu or book a table online{{issue_highlight}}. That's often enough for someone to choose a different restaurant instead.
+That's often enough for someone to choose a different restaurant instead, especially when they're deciding in the moment.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A working, fast, mobile-friendly website with online booking can make a big difference because it allows potential diners to:
+
+  • Find you easily on Google
+  • See the menu and book a table instantly from their phone
+  • Trust the business from the first impression
+  • Book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -276,17 +332,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'Trades',
     category: 'Industry',
     subject: 'A website that brings {{business}} more enquiries',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local tradespeople in the area and had a look at {{business}} online — the website could do more to build trust with potential customers before they decide who to call{{issue_highlight}}.
 
-I had a look at {{business}} online and noticed the website could do more to build trust with potential customers before they decide who to call{{issue_highlight}}.
+That can mean enquiries quietly going to a competitor instead, without you ever knowing they existed.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
+
+  • Find you easily on Google
+  • Contact you instantly from their phone
+  • Trust the business from the first impression
+  • Enquire or request a quote even when you're out on a job
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -294,17 +360,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'Dentist',
     category: 'Industry',
     subject: 'Helping {{business}} book more patients online',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local dental practices in the area and had a look at {{business}}'s website — there isn't an easy way for new patients to book online{{issue_highlight}}.
 
-I had a look at {{business}}'s website and noticed there isn't an easy way for new patients to book online{{issue_highlight}}. That extra step of having to call can be enough to put some people off.
+That extra step of having to call can be enough to put some people off, especially anyone looking outside opening hours.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A working, fast, mobile-friendly website with online booking can make a big difference because it allows potential patients to:
+
+  • Find you easily on Google
+  • Book an appointment instantly from their phone
+  • Trust the practice from the first impression
+  • Book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -312,17 +388,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'Electrician',
     category: 'Industry',
     subject: 'More enquiries for {{business}} online',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local electricians in the area and had a look at {{business}} online — the website could do more to help customers request a quote quickly{{issue_highlight}}.
 
-I had a look at {{business}} online and noticed the website could do more to help customers request a quote quickly{{issue_highlight}}.
+That can mean urgent jobs go to whoever responds fastest online — not necessarily whoever'd actually do the best job.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
+
+  • Find you easily on Google
+  • Contact you instantly from their phone
+  • Trust the business from the first impression
+  • Request a quote even when you're out on a job
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -330,17 +416,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'Plumber',
     category: 'Industry',
     subject: 'Getting {{business}} found online',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local plumbers in the area and had a look at {{business}} online — the website could do more to help customers find you and get in touch quickly, especially for more urgent jobs{{issue_highlight}}.
 
-I had a look at {{business}} online and noticed the website could do more to help customers find you and get in touch quickly, especially for more urgent jobs{{issue_highlight}}.
+That can mean the job goes to whoever answers first — not necessarily whoever'd actually do it properly.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
+
+  • Find you easily on Google
+  • Contact you instantly from their phone
+  • Trust the business from the first impression
+  • Get in touch even when you're out on a job
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -348,17 +444,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'No Website',
     category: 'Issue-based',
     subject: 'Getting {{business}} online',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local businesses in the area and noticed {{business}} doesn't currently have a website.
 
-I had a look and noticed {{business}} doesn't currently have a website. That means potential customers searching online can't easily find you, and are likely finding a competitor instead.
+That means anyone searching Google, checking social media, or asking for a recommendation has no way to find or check you out online — which usually means they end up going with a competitor who does show up.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about getting a website set up, just reply to this email and I'd be happy to help.
+I specialise in building websites for local businesses, and I'd be happy to put a few ideas together and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A fast, mobile-friendly website can make a big difference because it allows potential customers to:
+
+  • Find you easily on Google
+  • Contact you instantly from their phone
+  • Trust the business from the first impression
+  • Enquire or book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing what a difference this could make for {{business}}.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -366,17 +472,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'Broken Website',
     category: 'Issue-based',
     subject: 'Noticed an issue on {{website}}',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local businesses in the area and tried visiting your website. Unfortunately, it didn't load properly on my end{{issue_note}}.
 
-I was checking out {{website}} and noticed a few areas where I believe it could be improved{{issue_note}}. That's likely costing {{business}} visitors and enquiries.
+That means anyone finding you through Google, social media, or a recommendation could be hitting the same problem and leaving within seconds — which can result in missed enquiries and bookings without you even realising it.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building and repairing websites for local businesses, and I'd be happy to check what's causing the issue and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
+
+  • Find you easily on Google
+  • Contact you instantly from their phone
+  • Trust the business from the first impression
+  • Enquire or book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when trying to access the site.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -384,17 +500,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'Slow Website',
     category: 'Issue-based',
     subject: '{{website}} is loading slowly — quick fix ideas',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local businesses in the area and ran a quick check on {{business}}'s website — it's loading slower than it should{{issue_highlight}}.
 
-I ran a quick check on {{website}} and noticed it's loading slower than it should{{issue_highlight}}, which can affect both how visitors experience the site and where it ranks in Google.
+That affects both how visitors experience the site and where it ranks in Google, which can mean fewer people ever find you in the first place.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building and repairing websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
+
+  • Find you easily on Google
+  • Contact you instantly from their phone
+  • Trust the business from the first impression
+  • Enquire or book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when checking your site's speed.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -402,17 +528,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'Outdated Website',
     category: 'Issue-based',
     subject: 'A modern refresh for {{business}}',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local businesses in the area and had a look at {{business}}'s website — it could use a modern refresh{{issue_highlight}}.
 
-I had a look at {{business}}'s website and noticed it could use a modern refresh{{issue_highlight}}.
+An outdated design can make people question how established a business is, even when the work itself is great — which can quietly cost you enquiries before anyone even reads what you offer.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A modern, fast, mobile-friendly website can make a big difference because it allows potential customers to:
+
+  • Find you easily on Google
+  • Contact you instantly from their phone
+  • Trust the business from the first impression
+  • Enquire or book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -420,17 +556,27 @@ Thank you for your time, and I hope to hear from you.
     name: 'Missing Booking System',
     category: 'Issue-based',
     subject: 'Add online booking to {{business}}',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I hope you're doing well.
+I was looking at local businesses in the area and had a look at {{business}}'s website — there isn't currently a way for customers to book online{{issue_highlight}}.
 
-I had a look at {{business}}'s website and noticed there isn't currently a way for customers to book online{{issue_highlight}}.
+That likely means missed bookings from people browsing outside your opening hours, who end up booking somewhere that lets them book instantly instead.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
+The good news is that this is usually a straightforward fix.
 
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-Thank you for your time, and I hope to hear from you.
+A working, fast, mobile-friendly website with online booking can make a big difference because it allows potential customers to:
+
+  • Find you easily on Google
+  • Book instantly from their phone
+  • Trust the business from the first impression
+  • Book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -438,17 +584,29 @@ Thank you for your time, and I hope to hear from you.
     name: 'Website Audit Findings',
     category: 'Issue-based',
     subject: `A quick audit of {{business}}'s website`,
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer who builds websites for local businesses. I ran {{business}}'s website through a quick audit and wanted to share what came up, in case it's useful.{{website_score_note}}{{competitor_line}}
+I was looking at local businesses in the area and ran {{business}}'s website through a quick audit — a few things stood out that are worth knowing about.{{website_score_note}}{{competitor_line}}
 
 {{issue_list}}
 
-None of this is a huge job to fix, and getting it sorted properly tends to make a real difference to how many visitors actually turn into enquiries — a modern, mobile-friendly website is often the first impression a potential customer gets before deciding whether to trust you, and it means you can pick up enquiries any time, not just during opening hours.{{portfolio_line}}
+That means anyone finding you through Google, social media, or a recommendation could be leaving without getting in touch — which can result in missed enquiries and bookings without you even realising it.
 
-If you'd be interested in a no-obligation chat about any of this, just reply to this email and I'd be happy to help.
+The good news is that none of this is a huge job to fix.
 
-Thank you for your time, and I hope to hear from you.
+I specialise in building and improving websites for local businesses, and I'd be happy to walk through the findings and give you a clear recommendation, with no obligation.
+
+A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
+
+  • Find you easily on Google
+  • Contact you instantly from their phone
+  • Trust the business from the first impression
+  • Enquire or book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording walking through exactly what I found.
+
+Just reply with "audit" and I'll send it over.
 
 {{signature}}`,
   },
@@ -458,19 +616,12 @@ Thank you for your time, and I hope to hear from you.
     subject: 'Following up — {{business}}',
     body: `Hi {{contact}},
 
-I hope you're doing well.
+Just following up in case my last email got buried — I noticed a few things on {{business}}'s website that are likely costing you enquiries{{issue_highlight}}.{{portfolio_line}}
 
-I just wanted to follow up on my previous email in case you hadn't had a chance to read it.
+Worth a quick chat this week to see if I can help?
 
-When I visited your website, I noticed a few areas where I believe it could be improved. Whether that was an outdated design, mobile usability issues, slow loading, or another issue, I'd be happy to discuss it further if it's something you're already considering.
-
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
-
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
-
-Thank you for your time, and I hope to hear from you.
-
-{{signature}}`,
+{{myname}}
+dean-da-dev.co.uk`,
   },
   {
     name: 'Quote Follow Up',
@@ -520,23 +671,53 @@ Thank you for your time, and I hope to hear from you.
     name: 'Two-Path Offer',
     category: 'Bookrightly',
     subject: 'Quick idea for {{business}}',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I had a look at {{business}}'s website and think it's likely costing you enquiries{{issue_highlight}}. Visitors expect a fast, mobile-friendly site with a clear way to book or get in touch, and without that they tend to move straight on to a competitor who does offer it. I build custom websites through Dean Da Dev from £399 to fix that properly, but if a full rebuild is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform that gets clients booking and paying online in about ten minutes, for £10–20/month with a 90-day free trial. Either way, would you be up for a quick chat to see which one actually fits?
+I was looking at local businesses in the area and had a look at {{business}}'s website{{issue_highlight}}.
 
-Dean
-dean-da-dev.co.uk`,
+That means anyone finding you through Google, social media, or a recommendation could be leaving without getting in touch — which can result in missed enquiries and bookings without you even realising it.
+
+The good news is that this is usually a straightforward fix, and there are two ways to go about it. I build custom websites through Dean Da Dev from £399, or if a full rebuild is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform that gets clients booking and paying online in about ten minutes, for £10–20/month with a 90-day free trial.
+
+Either way, a working, fast, mobile-friendly site can make a big difference because it allows potential customers to:
+
+  • Find you easily on Google
+  • Contact you instantly from their phone
+  • Trust the business from the first impression
+  • Enquire or book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
+
+Just reply with "audit" and I'll send it over — or let me know which of the two paths sounds more like a fit and we'll take it from there.
+
+{{signature}}`,
   },
   {
     name: 'Two-Path Offer (No Website)',
     category: 'Bookrightly',
     subject: 'Quick idea for {{business}}',
-    body: `Hi {{contact}},
+    body: `Hi {{greeting}},
 
-I had a look and noticed {{business}} doesn't currently have a website — which likely means customers searching online can't find you and are booking with a competitor who does show up. I build custom websites through Dean Da Dev from £399, but if a full site is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform that gets you a professional online presence plus bookings and payments live in about ten minutes, for £10–20/month with a 90-day free trial. Either way, would you be up for a quick chat to see which one actually fits?
+I was looking at local businesses in the area and noticed {{business}} doesn't currently have a website.
 
-Dean
-dean-da-dev.co.uk`,
+That means anyone searching Google, checking social media, or asking for a recommendation has no way to find or check you out online — which usually means they end up going with a competitor who does show up.
+
+The good news is that this is usually a straightforward fix, and there are two ways to go about it. I build custom websites through Dean Da Dev from £399, or if a full site is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform that gets you a professional online presence plus bookings and payments live in about ten minutes, for £10–20/month with a 90-day free trial.
+
+Either way, a fast, mobile-friendly site can make a big difference because it allows potential customers to:
+
+  • Find you easily on Google
+  • Contact you instantly from their phone
+  • Trust the business from the first impression
+  • Enquire or book even when you're not available to answer the phone
+{{portfolio_line}}
+
+If you'd like, I can also send a free 2-minute screen recording showing what a difference this could make for {{business}}.
+
+Just reply with "audit" and I'll send it over — or let me know which of the two paths sounds more like a fit and we'll take it from there.
+
+{{signature}}`,
   },
   {
     name: 'Backlink Outreach',
@@ -587,6 +768,104 @@ If that's of interest, just reply and let me know a bit about what you're lookin
 
 {{signature}}`,
   },
+  {
+    name: 'Instagram DM — Bookrightly Flyer',
+    category: 'Instagram',
+    subject: 'Instagram DM (not sent by email — copy the caption and attach the flyer manually)',
+    imageUrl: '/bookrightly-flyer.png',
+    // Instagram DMs don't render markdown — a literal "**word**" shows the
+    // asterisks — so this stays plain text even though the version this was
+    // based on used bold for emphasis.
+    body: `Hey 👋 I came across {{business}} and noticed you're taking bookings through Instagram.
+
+I've built a simple booking page called Bookrightly that lets clients book online and pay a deposit automatically, so you're not chasing appointments in DMs.
+
+I've attached a quick screenshot of how it looks 👇
+
+It's free for 90 days, no card required, and I can set the whole thing up for you in about 10 minutes.
+
+If you'd like me to create a booking page for your business, just reply "book" and I'll get it ready.
+
+— {{myname}}`,
+  },
+  {
+    name: 'Instagram DM — Free Ideas',
+    category: 'Instagram',
+    channels: ['Instagram', 'WhatsApp'],
+    subject: 'Instagram DM (not sent by email — send as a direct message)',
+    // Uses {{issue_highlight}} for a real, specific observation instead of
+    // a vague "a few quick changes" line — same reasoning as the WhatsApp
+    // template: a genuine specific detail reads as "I actually looked."
+    body: `Hi, I'm {{myname}} from dean-da-dev.co.uk 👋
+
+I came across {{business}} and had a quick look at the website{{issue_highlight}}.
+
+I think a few relatively small changes could make the site feel much more modern and help turn more visitors into bookings and enquiries.
+
+You can see some of my recent work here:
+https://www.dean-da-dev.co.uk/portfolio
+
+If you're interested, I'd be happy to put together 3 quick ideas specifically for {{business}} and send them over — completely free and with no obligation.
+
+— {{myname}}`,
+  },
+  {
+    name: 'Instagram DM — Free Mockup',
+    category: 'Instagram',
+    // Also usable on WhatsApp — the pitch itself isn't Instagram-specific,
+    // just the "book in under 60 seconds from Instagram" line, which still
+    // reads fine there since it's talking about where their customers come
+    // from, not which app this message is arriving through.
+    channels: ['Instagram', 'WhatsApp'],
+    subject: 'Instagram DM (not sent by email — send as a direct message)',
+    body: `Hey 👋 I came across {{business}} and your work looks really strong.
+
+I had a quick look at your website too{{issue_highlight}}. On top of that, most customers are probably coming through Instagram/Facebook, which is great for showing your work, but people still have to message or search around for pricing and availability.
+
+I build simple booking pages for local businesses that let clients:
+
+  • See services + prices
+  • Choose a time
+  • Pay a deposit
+  • Book in under 60 seconds from Instagram
+
+The goal isn't to replace your Instagram — it's to turn more profile visitors into confirmed appointments.
+
+I can mock up a version using your current branding so you can see what it would look like, completely free.
+
+— {{myname}}`,
+  },
+  {
+    name: 'WhatsApp — Quick Intro',
+    category: 'WhatsApp',
+    subject: 'WhatsApp message (not sent by email — opens a pre-filled WhatsApp chat instead)',
+    // Rewritten after real feedback: the old version opened with an
+    // unprompted critique of their site ("an easy win or two") — fine in an
+    // email with a full signature/subject line for context, but reads as
+    // rude out of nowhere on a personal channel like WhatsApp. Also never
+    // said who Dean actually is or gave any way to verify him, which kills
+    // trust and conversion on a channel with no email signature to lean on.
+    // Leads with identity + a link instead of a critique. Signs off with
+    // the name, not the link again — it's already in the first line, no
+    // need to repeat it.
+    //
+    // {{issue_highlight}} was later added back in, but only AFTER identity
+    // is established (not as the opening line) — that's what made the
+    // original version read as rude, not the observation itself. Coming
+    // after "here's who I am, here's proof," a specific detail instead
+    // reads as "I actually looked," same as the email templates.
+    body: `Hi, I'm Dean — a web developer/designer at dean-da-dev.co.uk (that's got my work on it if you want to have a look). I came across {{business}} and had a quick look at your site{{issue_highlight}}. Think I could help you pick up more bookings/enquiries online — happy to put a few ideas together if you're interested, no pressure either way.
+
+— Dean`,
+  },
+  {
+    name: 'SMS — Quick Intro',
+    category: 'SMS',
+    subject: 'SMS (not sent by email — opens a pre-filled text message instead)',
+    // Kept deliberately short — SMS has no formatting and reads worse the
+    // longer it gets, unlike email/WhatsApp where a few paragraphs are normal.
+    body: `Hi, it's {{myname}} — I help local businesses like {{business}} with their website/bookings. Noticed a quick win on yours. Worth a 5 min chat? No pressure either way.`,
+  },
 ];
 
 // ─── Free tools on dean-da-dev.co.uk (for backlink outreach) ──────────────
@@ -625,6 +904,60 @@ function pickRelevantTools(lead) {
   const matched = DEAN_TOOLS.filter((tool) => tool.keywords.some((k) => haystack.includes(k)));
   const picked = matched.length > 0 ? matched.slice(0, 3) : DEFAULT_TOOLS;
   return picked;
+}
+
+// Relevance order for the template pickers (Composer's "Insert template…"
+// dropdown, Bulk Send's default selection) — most-personalized/likely-to-
+// convert first, working down to later-funnel/relationship templates that
+// only apply once a lead is already warm. Audit Findings leads since it's
+// built entirely from that specific lead's real scan results, not a
+// one-size-fits-all pitch. Anything not listed here (a custom template
+// someone adds through the Template Library) sorts after all of these,
+// alphabetically.
+const TEMPLATE_RELEVANCE_ORDER = [
+  'Website Audit Findings',
+  'Broken Website',
+  'Slow Website',
+  'Outdated Website',
+  'Missing Booking System',
+  'No Website',
+  'Salon',
+  'Gym',
+  'Law Firm',
+  'Restaurant',
+  'Trades',
+  'Dentist',
+  'Electrician',
+  'Plumber',
+  'General Outreach',
+  'Two-Path Offer',
+  'Two-Path Offer (No Website)',
+  'Bookrightly Platform Pitch',
+  'Bookrightly Subscription Pitch',
+  'Instagram DM — Free Ideas',
+  'Instagram DM — Free Mockup',
+  'Instagram DM — Bookrightly Flyer',
+  'WhatsApp — Quick Intro',
+  'SMS — Quick Intro',
+  'Digital Agency Partner',
+  'Follow Up',
+  'Quote Follow Up',
+  'Thank You',
+  'Referral Request',
+  'Backlink Outreach',
+  'Guest Post Pitch',
+  'Charity / Non-Profit Offer',
+];
+
+export function sortTemplatesByRelevance(templates) {
+  return [...templates].sort((a, b) => {
+    const ai = TEMPLATE_RELEVANCE_ORDER.indexOf(a.name);
+    const bi = TEMPLATE_RELEVANCE_ORDER.indexOf(b.name);
+    if (ai === -1 && bi === -1) return a.name.localeCompare(b.name);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 }
 
 // Deterministic id from a name — used so auto-seeding writes the same doc ID
@@ -689,14 +1022,26 @@ export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
 
   // Only ever set when the scan found a genuinely stronger nearby
   // competitor (see runBusinessScan's Step 4b) — empty otherwise, so this
-  // never forces a weak or invented comparison into a template.
-  const competitorLine = lead?.competitorName
+  // never forces a weak or invented comparison into a template. Also
+  // suppressed when the site doesn't even work — "your site isn't loading"
+  // is a strong enough hook on its own, and immediately following it with a
+  // competitor's star rating reads as tone-deaf rather than persuasive.
+  const siteIsBroken = allIssues.includes("Site Doesn't Load") || allIssues.includes('Broken Links');
+  const competitorLine = lead?.competitorName && !siteIsBroken
     ? ` For comparison, ${lead.competitorName} nearby is rated ${lead.competitorRating}★ from ${lead.competitorReviewCount} reviews — worth knowing what's working for them.`
     : '';
 
+  const contactTrimmed = lead?.contactName?.trim() ?? '';
+  const business = lead?.businessName ?? '';
+
   return {
-    business: lead?.businessName ?? '',
-    contact: lead?.contactName?.trim() ?? '',
+    business,
+    contact: contactTrimmed,
+    // "Hi {{contact}}," leaves a bare "Hi," when no contact name is on
+    // file (the common case for scraped local-business leads) — falls back
+    // to "Hi <Business> team," instead, which still reads as addressed to
+    // someone rather than a mail-merge blank.
+    greeting: contactTrimmed || (business ? `${business} team` : 'there'),
     website: lead?.website ?? '',
     industry: lead?.industry ?? '',
     issue,

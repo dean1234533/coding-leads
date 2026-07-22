@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
 import { registerSW } from 'virtual:pwa-register';
 
-const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+// 1 hour was too slow in practice — real symptom seen: calls to
+// authenticated functions going out with no auth token at all for hours,
+// traced back to a PWA tab that had been open across a stretch of backend
+// auth changes and never got the update prompt in time to reload. iOS PWAs
+// also freeze `setInterval` while backgrounded, so even 5 minutes isn't
+// enough on its own — the visibilitychange listener below covers that by
+// checking the instant the app comes back to the foreground, regardless of
+// how long it was frozen.
+const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 /**
  * skipWaiting + clientsClaim alone only mean a new service worker takes over
@@ -20,6 +28,9 @@ export default function PwaUpdatePrompt() {
       onRegisteredSW(_url, registration) {
         if (!registration) return;
         setInterval(() => registration.update(), UPDATE_CHECK_INTERVAL_MS);
+        const checkOnResume = () => { if (document.visibilityState === 'visible') registration.update(); };
+        document.addEventListener('visibilitychange', checkOnResume);
+        window.addEventListener('focus', checkOnResume);
       },
       onNeedRefresh() {
         setNeedRefresh(true);

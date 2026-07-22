@@ -4,6 +4,7 @@ const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https')
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const crypto = require('crypto');
 const { google } = require('googleapis');
+const { requireOwner } = require('./authGuard');
 
 // Full mailbox access (read, send, labels, drafts) via a single scope/consent.
 const GMAIL_SCOPES = [
@@ -76,7 +77,8 @@ async function getStoredRefreshToken() {
 // ─────────────────────────────────────────────────────────────────────────────
 const getGmailAuthUrl = onCall(
   { cors: true, timeoutSeconds: 10, memory: '256MiB', secrets: OAUTH_SECRETS },
-  async () => {
+  async (request) => {
+    requireOwner(request);
     const oauth2Client = buildOAuthClient();
     const url = oauth2Client.generateAuthUrl({
       access_type: 'offline',
@@ -141,7 +143,8 @@ const gmailOAuthCallback = onRequest(
 // ─────────────────────────────────────────────────────────────────────────────
 const disconnectGmail = onCall(
   { cors: true, timeoutSeconds: 20, memory: '256MiB', secrets: OAUTH_SECRETS },
-  async () => {
+  async (request) => {
+    requireOwner(request);
     const db = getFirestore();
     const refreshToken = await getStoredRefreshToken();
 

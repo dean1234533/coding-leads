@@ -3,7 +3,7 @@ import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, d
 import { db } from '../../firebase';
 import Modal from '../Modal';
 
-const EMPTY = { name: '', category: 'Outreach', subject: '', body: '' };
+const EMPTY = { name: '', category: 'Outreach', subject: '', body: '', imageUrl: '' };
 
 export default function CrmTemplateLibrary() {
   const [templates, setTemplates] = useState(null);
@@ -17,7 +17,7 @@ export default function CrmTemplateLibrary() {
 
   function startEdit(t) {
     setEditing(t ?? 'new');
-    setForm(t ? { name: t.name, category: t.category, subject: t.subject, body: t.body } : EMPTY);
+    setForm(t ? { name: t.name, category: t.category, subject: t.subject, body: t.body, imageUrl: t.imageUrl ?? '' } : EMPTY);
   }
 
   async function handleSave(e) {
@@ -46,9 +46,9 @@ export default function CrmTemplateLibrary() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-gray-200">Email Templates</h2>
+          <h2 className="text-sm font-semibold text-gray-200">Templates</h2>
           <p className="mt-0.5 text-xs text-gray-500">
-            Reusable templates with {'{{business}} {{contact}} {{website}} {{industry}} {{myname}}'} variables, plus fallback-safe {'{{portfolio_line}}'}, {'{{issue_note}}'}/{'{{issue_highlight}}'}, and {'{{signature}}'} — use these instead of bare {'{{portfolio}}'}/{'{{issue}}'}/{'{{myname}}'} so the sentence and sign-off still read fine no matter what's known about the lead.
+            Reusable templates with {'{{business}} {{contact}} {{website}} {{industry}} {{myname}}'} variables, plus fallback-safe {'{{portfolio_line}}'}, {'{{issue_note}}'}/{'{{issue_highlight}}'}, and {'{{signature}}'} — use these instead of bare {'{{portfolio}}'}/{'{{issue}}'}/{'{{myname}}'} so the sentence and sign-off still read fine no matter what's known about the lead. An "Instagram" category template can also carry an Image URL — there's no DM-send API, so it's a caption to copy plus an image to attach by hand.
           </p>
         </div>
         <button onClick={() => startEdit(null)}
@@ -65,6 +65,9 @@ export default function CrmTemplateLibrary() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {list.map((t) => (
               <div key={t.id} className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+                {t.imageUrl && (
+                  <img src={t.imageUrl} alt="" className="mb-2 h-28 w-full rounded-lg object-cover object-top" />
+                )}
                 <p className="font-medium text-gray-100">{t.name}</p>
                 <p className="mt-1 truncate text-xs text-gray-500">{t.subject}</p>
                 <p className="mt-2 line-clamp-3 break-words text-xs text-gray-600 whitespace-pre-line">{t.body}</p>
@@ -97,6 +100,8 @@ export default function CrmTemplateLibrary() {
               <input value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="Subject line"
                 className="w-full rounded-lg border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none" />
               <textarea rows={8} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="Email body…"
+                className="w-full rounded-lg border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none" />
+              <input value={form.imageUrl} onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))} placeholder="Image URL (optional — e.g. an Instagram flyer to attach)"
                 className="w-full rounded-lg border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none" />
             </div>
             <div className="mt-4 flex items-center gap-3">

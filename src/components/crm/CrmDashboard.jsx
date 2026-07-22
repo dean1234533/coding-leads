@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '../../firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { app, db } from '../../firebase';
 import { groupFollowUps } from '../../utils/crmFollowUps';
 import { STATUS_COLORS } from '../../utils/crmConstants';
 
@@ -45,11 +46,28 @@ function LeadRow({ lead, onClick, trailing }) {
 export default function CrmDashboard({ leads, onOpenLead, onGoToLeads, onGoToInbox }) {
   const [gmailStats, setGmailStats] = useState(null);
   const [statsError, setStatsError] = useState(null);
+  const [issueStats, setIssueStats] = useState(null);
 
   useEffect(() => {
     const fn = httpsCallable(getFunctions(app), 'getGmailSentStats');
     fn().then(({ data }) => setGmailStats(data)).catch((err) => setStatsError(err?.message ?? 'Unavailable'));
   }, []);
+
+  useEffect(() => {
+    return onSnapshot(collection(db, 'issueAnalytics'), (snap) => setIssueStats(snap.docs.map((d) => d.data())), () => setIssueStats([]));
+  }, []);
+
+  // Which *kind* of finding actually gets replies, not just which template —
+  // sorted by reply rate so the most-worth-leading-with issues surface first.
+  // Needs a handful of sends before the rate means anything, so anything
+  // under 3 sends is excluded rather than shown as a misleadingly definitive
+  // 0% or 100%.
+  const issueRanking = useMemo(() => {
+    return (issueStats ?? [])
+      .filter((s) => (s.sentCount ?? 0) >= 3)
+      .map((s) => ({ ...s, replyRate: Math.round(((s.repliedCount ?? 0) / s.sentCount) * 100) }))
+      .sort((a, b) => b.replyRate - a.replyRate);
+  }, [issueStats]);
 
   const followUps = useMemo(() => groupFollowUps(leads), [leads]);
 
@@ -91,8 +109,18 @@ export default function CrmDashboard({ leads, onOpenLead, onGoToLeads, onGoToInb
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard label="Today's Follow Ups" value={followUps.today.length} accent="text-amber-400" />
-        <StatCard label="Emails Sent Today" value={gmailStats ? gmailStats.sentToday : statsError ? '—' : '…'} accent="text-blue-400" />
-        <StatCard label="Emails Sent This Week" value={gmailStats ? gmailStats.sentThisWeek : statsError ? '—' : '…'} accent="text-cyan-400" />
+        <StatCard
+          label="Emails Sent Today"
+          value={gmailStats ? gmailStats.sentToday : statsError ? '—' : '…'}
+          accent="text-blue-400"
+          sub={gmailStats ? `${gmailStats.sentTodayManual} manual, ${gmailStats.sentTodayAuto} auto follow-up` : undefined}
+        />
+        <StatCard
+          label="Emails Sent This Week"
+          value={gmailStats ? gmailStats.sentThisWeek : statsError ? '—' : '…'}
+          accent="text-cyan-400"
+          sub={gmailStats ? `${gmailStats.sentThisWeekManual} manual, ${gmailStats.sentThisWeekAuto} auto follow-up` : undefined}
+        />
         <StatCard label="Replies Received" value={counts.replied} accent="text-violet-400" />
         <StatCard label="Open Leads" value={counts.openLeads} />
         <StatCard label="Quotes Sent" value={counts.quotesSent} accent="text-purple-400" />
@@ -157,6 +185,28 @@ export default function CrmDashboard({ leads, onOpenLead, onGoToLeads, onGoToInb
           </div>
         </section>
       </div>
+
+      {/* Reply rate by issue */}
+      {issueRanking.length > 0 && (
+        <section className="rounded-xl border border-gray-800 bg-gray-900">
+          <div className="border-b border-gray-800 px-4 py-3 sm:px-6 sm:py-4">
+            <h2 className="text-sm font-semibold text-gray-200">Reply Rate by Issue</h2>
+            <p className="mt-0.5 text-xs text-gray-600">Which kind of finding actually gets replies — issues with under 3 sends aren't shown yet.</p>
+          </div>
+          <div className="divide-y divide-gray-800/50">
+            {issueRanking.map((s) => (
+              <div key={s.issue} className="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
+                <p className="truncate text-sm text-gray-300">{s.issue}</p>
+                <div className="flex shrink-0 items-center gap-3 text-xs text-gray-500">
+                  <span>{s.sentCount} sent</span>
+                  <span>{s.repliedCount ?? 0} replied</span>
+                  <span className={`font-semibold ${s.replyRate >= 20 ? 'text-emerald-400' : 'text-gray-500'}`}>{s.replyRate}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

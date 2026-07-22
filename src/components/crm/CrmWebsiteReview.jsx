@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '../../firebase';
 import { WEBSITE_ISSUES } from '../../utils/crmConstants';
+import { openAuditReportPrintWindow } from '../../utils/auditReportPdf';
 
 const FIELDS = [
   ['screenshotUrl', 'Website Screenshot URL', 'text', 'Paste a screenshot link (e.g. from a manual capture)'],
@@ -33,7 +34,11 @@ export default function CrmWebsiteReview({ lead, onUpdate }) {
     setAuditing(true);
     setAuditError(null);
     try {
-      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 130000 });
+      // Must stay above auditWebsitesNow's own timeoutSeconds (900s, raised
+      // when a second desktop PageSpeed + vision pass was added) — a shorter
+      // client timeout cuts the request off before the server-side work
+      // even finishes.
+      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 950000 });
       const { data } = await fn({ urls: [local.website] });
       const audit = data.results?.[local.website];
       if (!audit) {
@@ -100,6 +105,14 @@ export default function CrmWebsiteReview({ lead, onUpdate }) {
           }`}
         >
           {auditing ? 'Auditing…' : 'Re-run Audit'}
+        </button>
+        <button
+          onClick={() => openAuditReportPrintWindow(local)}
+          disabled={!local.issuesChecklist?.length && !local.overallImpression}
+          title="Opens a printable audit report — use your browser's 'Save as PDF' to download it"
+          className="rounded-lg bg-gray-800 px-4 py-2 text-xs font-semibold text-gray-200 transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Generate PDF Report
         </button>
         <span className="text-xs text-gray-500">
           {local.website ? 'Re-runs the same automated audit used everywhere else — useful if this lead scanned badly or never got audited.' : 'Add a website in the Overview tab to enable auditing.'}

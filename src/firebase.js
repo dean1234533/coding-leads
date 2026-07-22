@@ -1,6 +1,6 @@
 import { initializeApp }          from 'firebase/app';
 import { getFirestore }           from 'firebase/firestore';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getMessaging, isSupported as isMessagingSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
@@ -20,14 +20,31 @@ export const auth = getAuth(app);
 // or non-HTTPS) — resolve to null instead of throwing on init.
 export const messagingPromise = isMessagingSupported().then((supported) => (supported ? getMessaging(app) : null));
 
-// Silently sign in anonymously so that:
-//   1. Firestore security rules (request.auth != null) are satisfied
-//   2. Firebase callable functions receive a valid auth token (fixes CORS/IAM rejection)
-// The user never sees a login screen — the session is transparent.
-onAuthStateChanged(auth, (user) => {
-  if (!user) {
-    signInAnonymously(auth).catch((err) => {
-      console.error('[firebase] Anonymous sign-in failed:', err.message);
-    });
-  }
-});
+// The only account allowed into the CRM/tools — enforced again server-side
+// by every Cloud Function and by Firestore rules, so this client-side check
+// is a UX convenience (fast "wrong account" feedback), not the real gate.
+export const OWNER_EMAIL = 'deanburt1308@gmail.com';
+
+const googleProvider = new GoogleAuthProvider();
+// Lets a user with multiple Google accounts pick the right one instead of
+// silently reusing whichever one Chrome/Gmail already had signed in.
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+export function signInWithGoogle() {
+  return signInWithPopup(auth, googleProvider);
+}
+
+export function signOutUser() {
+  return signOut(auth);
+}
+
+// Previously: silent anonymous sign-in on every page load, so Firestore
+// rules and callable functions had *some* auth token to check — but that
+// meant `request.auth != null` was true for literally any visitor, with
+// full read/write/delete on every lead and the ability to invoke every
+// Cloud Function (including sending email through the connected Gmail
+// account). Replaced with real Google Sign-In gated to OWNER_EMAIL — see
+// AuthGate.jsx, which wraps the CRM/tools routes only. The public /book
+// page needs no auth at all: its two callable functions (getLiveAvailability,
+// confirmBooking) are intentionally public and don't touch Firestore
+// directly from the client.

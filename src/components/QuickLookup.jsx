@@ -65,7 +65,11 @@ export default function QuickLookup() {
     setLoadingContact(true);
     setError(null);
     try {
-      const fn = httpsCallable(getFunctions(app), 'getBusinessContactByPlaceId', { timeout: 120000 });
+      // Kept above getBusinessContactByPlaceId's own timeoutSeconds (480s,
+      // raised when a second desktop PageSpeed + vision pass was added to
+      // the audit it runs internally) — a shorter client timeout cuts the
+      // request off before the server-side work even finishes.
+      const fn = httpsCallable(getFunctions(app), 'getBusinessContactByPlaceId', { timeout: 500000 });
       const { data } = await fn({ placeId: candidate.placeId });
       setContact(data);
     } catch (err) {
@@ -95,6 +99,7 @@ export default function QuickLookup() {
         phone: contact.phone ?? null,
         contactName: contact.ownerName ?? null,
         instagramUrl: contact.instagramUrl ?? null,
+        whatsappUrl: contact.whatsappUrl ?? null,
         industry: null,
         address: contact.address ?? null,
         googleMapsUrl: contact.googleMapsUrl ?? null,

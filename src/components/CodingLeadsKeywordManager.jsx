@@ -78,16 +78,16 @@ function SourcesManager({ sources, onChange }) {
 
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900 p-4">
-      <h3 className="mb-1 text-sm font-semibold text-gray-200">RSS Sources</h3>
+      <h3 className="mb-1 text-sm font-semibold text-gray-200">Sources</h3>
       <p className="mb-3 text-xs text-gray-500">
-        Public RSS feeds scanned every 6 hours (or on demand via "Scan Now"). Only public feeds — no logins, no private groups.
+        Public RSS feeds scanned every 2 hours, plus Google-search sources (via SerpApi) that run at most once/day to stay within the shared free quota. Only public feeds — no logins, no private groups.
       </p>
       <div className="mb-3 space-y-2">
         {sources.map((s) => (
           <div key={s.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-800 bg-gray-950/50 px-3 py-2">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm text-gray-200">{s.name}</p>
-              <p className="truncate text-xs text-gray-600">{s.url}</p>
+              <p className="truncate text-xs text-gray-600">{s.type === 'serpapi' ? `Google search: ${s.query}` : s.url}</p>
             </div>
             <div className="flex items-center gap-2">
               <button

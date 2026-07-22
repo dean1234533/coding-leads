@@ -14,6 +14,9 @@ import RssScout from '../components/RssScout';
 import QuickLookup from '../components/QuickLookup';
 import InstallBanner from '../components/InstallBanner';
 import CrmAutoSeed from '../components/crm/CrmAutoSeed';
+import CrmApprovals from '../components/crm/CrmApprovals';
+import CrmWorkflows from '../components/crm/CrmWorkflows';
+import CrmInsights from '../components/crm/CrmInsights';
 import { enablePushNotifications, onForegroundPush } from '../utils/pushNotifications';
 import Modal from '../components/Modal';
 
@@ -25,6 +28,9 @@ const SUB_TABS = [
   { key: 'inbox',      label: 'Inbox'      },
   { key: 'scanner',    label: 'Scanner'    },
   { key: 'templates',  label: 'Templates'  },
+  { key: 'approvals',  label: 'Approvals'  },
+  { key: 'workflows',  label: 'Workflows'  },
+  { key: 'insights',   label: 'Insights'   },
   { key: 'settings',   label: 'Settings'   },
 ];
 
@@ -194,6 +200,8 @@ function CrmAutoFollowUp() {
   const [enabled, setEnabled] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
 
   useEffect(() => {
     getDoc(doc(db, 'autoFollowUpConfig', 'settings'))
@@ -213,6 +221,27 @@ function CrmAutoFollowUp() {
       setError(err?.message ?? 'Failed to save.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  // There was no way to check on demand whether this was actually working —
+  // only the 9am schedule ever ran it, so a quiet day (nothing due) looked
+  // identical to a broken one until the next morning. This runs the exact
+  // same logic immediately, ignoring the enabled toggle above (same pattern
+  // as "Draft Now" below), and reports back what it actually found/sent.
+  async function handleSendNow() {
+    setTesting(true);
+    setError(null);
+    setTestResult(null);
+    try {
+      const fn = httpsCallable(getFunctions(app), 'sendAutoFollowUpNow', { timeout: 120000 });
+      const { data } = await fn();
+      setTestResult(data);
+    } catch (err) {
+      console.error('[CrmAutoFollowUp] send now failed:', err);
+      setError(err?.message ?? 'Send failed.');
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -240,7 +269,19 @@ function CrmAutoFollowUp() {
       <p className="mt-1 text-xs text-gray-500">
         Every morning at 9am, automatically sends the "Follow Up" template to any lead whose follow-up date is due — no manual send needed. Skips anyone who's already replied, Won, Lost, or Archived. This sends real emails with no review step, so double-check the "Follow Up" template in your Template Library reads how you want before turning this on. Turned {enabled ? 'on' : 'off'} right now.
       </p>
+      <button
+        onClick={handleSendNow}
+        disabled={testing}
+        className="mt-3 rounded-lg border border-gray-700 px-4 py-2 text-xs font-semibold text-gray-300 transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {testing ? 'Checking…' : 'Send Now'}
+      </button>
       {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
+      {testResult && (
+        <p className="mt-3 text-xs text-gray-400">
+          {testResult.matched ?? 0} lead{(testResult.matched ?? 0) === 1 ? '' : 's'} had a follow-up date due; sent to {testResult.sent ?? 0} of them (the rest were excluded — already replied, Won/Lost/Archive, or no email address).
+        </p>
+      )}
     </section>
   );
 }
@@ -380,7 +421,10 @@ function CrmAutoScan() {
     setError(null);
     setScanResult(null);
     try {
-      const fn = httpsCallable(getFunctions(app), 'triggerAutoBusinessScanNow', { timeout: 540000 });
+      // Kept above triggerAutoBusinessScanNow's own timeoutSeconds (1800s) —
+      // it audits each candidate lead sequentially, and each audit now runs
+      // a second desktop PageSpeed + vision pass on top of the mobile one.
+      const fn = httpsCallable(getFunctions(app), 'triggerAutoBusinessScanNow', { timeout: 1850000 });
       const { data } = await fn({
         location: config.location,
         radius: config.radius,
@@ -871,6 +915,9 @@ export default function OutreachCrmPage() {
           </div>
         )}
         {subTab === 'templates' && <CrmTemplateLibrary />}
+        {subTab === 'approvals' && <CrmApprovals />}
+        {subTab === 'workflows' && <CrmWorkflows />}
+        {subTab === 'insights' && <CrmInsights />}
         {subTab === 'settings' && (
           <div className="space-y-6">
             <section className="rounded-xl border border-gray-800 bg-gray-900 p-4 sm:p-6">

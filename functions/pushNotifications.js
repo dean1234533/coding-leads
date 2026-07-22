@@ -4,6 +4,8 @@ const { onCall } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
+const { requireOwner } = require('./authGuard');
+const { withErrorAlert } = require('./errorAlert');
 
 const TERMINAL_STATUSES = ['Won', 'Lost', 'Archive'];
 
@@ -14,6 +16,7 @@ const TERMINAL_STATUSES = ['Won', 'Lost', 'Archive'];
 const savePushToken = onCall(
   { cors: true, timeoutSeconds: 10, memory: '256MiB' },
   async (request) => {
+    requireOwner(request);
     const { token } = request.data ?? {};
     if (!token?.trim()) return { success: false };
     const db = getFirestore();
@@ -83,7 +86,7 @@ async function runDigest() {
 // ─────────────────────────────────────────────────────────────────────────────
 const sendFollowUpDigest = onSchedule(
   { schedule: '0 8 * * *', timeZone: 'Europe/London', timeoutSeconds: 60, memory: '256MiB', secrets: ['APP_URL'] },
-  async () => { await runDigest(); }
+  withErrorAlert('sendFollowUpDigest', async () => { await runDigest(); })
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,7 +94,56 @@ const sendFollowUpDigest = onSchedule(
 // ─────────────────────────────────────────────────────────────────────────────
 const sendFollowUpDigestNow = onCall(
   { cors: true, timeoutSeconds: 60, memory: '256MiB', secrets: ['APP_URL'] },
-  async () => runDigest()
+  async (request) => { requireOwner(request); return runDigest(); }
 );
 
-module.exports = { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow };
+// ─────────────────────────────────────────────────────────────────────────────
+// notifyNewHotLeads — same-night alert for a standout lead the overnight
+// business auto-scan just added, so Dean can respond fast instead of only
+// finding out the next time he opens the app. The coding-leads scan already
+// has the equivalent (notifyHighScoreLeads, email-based); this is the
+// business-scan counterpart, push-based like the rest of this file.
+// ─────────────────────────────────────────────────────────────────────────────
+async function notifyNewHotLeads(hotLeads) {
+  if (!hotLeads?.length) return;
+  const db = getFirestore();
+  const tokensSnap = await db.collection('pushTokens').get();
+  const tokens = tokensSnap.docs.map((d) => d.id);
+  if (tokens.length === 0) return;
+
+  const names = hotLeads.slice(0, 2).map((l) => l.businessName || 'a lead').join(', ');
+  const body = hotLeads.length > 2 ? `${names}, and ${hotLeads.length - 2} more.` : names;
+  const appUrl = (process.env.APP_URL?.trim() ?? '').replace(/\/$/, '');
+
+  await getMessaging().sendEachForMulticast({
+    tokens,
+    notification: {
+      title: `${hotLeads.length} hot lead${hotLeads.length === 1 ? '' : 's'} found overnight`,
+      body,
+    },
+    webpush: { fcmOptions: { link: `${appUrl}/outreach-crm` } },
+  }).catch((err) => console.error('[notifyNewHotLeads] send failed:', err.message));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// notifyOwner — generic single-notification send, for the workflow engine's
+// NOTIFY_OWNER action and anything else that just needs "push Dean a message"
+// without the lead-list-specific formatting the two functions above do.
+// ─────────────────────────────────────────────────────────────────────────────
+async function notifyOwner(title, body, link) {
+  const db = getFirestore();
+  const tokensSnap = await db.collection('pushTokens').get();
+  const tokens = tokensSnap.docs.map((d) => d.id);
+  if (tokens.length === 0) return { notified: 0 };
+
+  const appUrl = (process.env.APP_URL?.trim() ?? '').replace(/\/$/, '');
+  const response = await getMessaging().sendEachForMulticast({
+    tokens,
+    notification: { title, body },
+    webpush: { fcmOptions: { link: `${appUrl}${link ?? '/outreach-crm'}` } },
+  }).catch((err) => { console.error('[notifyOwner] send failed:', err.message); return null; });
+
+  return { notified: response?.successCount ?? 0 };
+}
+
+module.exports = { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow, notifyNewHotLeads, notifyOwner };

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, doc, increment, serverTimestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase';
-import { applyTemplateVars, buildTemplateVars } from '../../utils/crmConstants';
+import { applyTemplateVars, buildTemplateVars, sortTemplatesByRelevance } from '../../utils/crmConstants';
+import { recordIssuesSent } from '../../utils/issueAnalytics';
 
 const MY_NAME = 'Dean Burt';
 const SIGNATURE = `<p>Kind regards,</p><p>Dean Burt<br>dean-da-dev<br>📧 dean@dean-da-dev.co.uk<br>🌐 https://www.dean-da-dev.co.uk</p>`;
@@ -43,7 +44,7 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
   const editorRef = useRef(null);
 
   useEffect(() => {
-    const unsubT = onSnapshot(query(collection(db, 'crmTemplates'), orderBy('name')), (snap) => setTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const unsubT = onSnapshot(query(collection(db, 'crmTemplates'), orderBy('name')), (snap) => setTemplates(sortTemplatesByRelevance(snap.docs.map((d) => ({ id: d.id, ...d.data() })))));
     const unsubP = onSnapshot(collection(db, 'crmPortfolio'), (snap) => setPortfolioDemos(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
     return () => { unsubT(); unsubP(); };
   }, []);
@@ -148,6 +149,17 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
 
   async function handleSend() {
     if (!to.trim()) { setStatus({ type: 'error', message: 'Recipient email is required.' }); return; }
+    // A reply already got AI-classified as "Not Interested" (declined,
+    // asked to be removed/unsubscribed) — that classification was only ever
+    // shown as a badge in the inbox, nothing actually stopped re-sending to
+    // them. This doesn't block it outright (a classification can be wrong,
+    // or a lead can un-decline later), but it can't be silently skippable.
+    if (lead?.replyClassification === 'Not Interested') {
+      const proceed = window.confirm(
+        `${lead.businessName ?? 'This lead'} previously replied and was marked "Not Interested" (declined or asked to be removed). Send anyway?`
+      );
+      if (!proceed) return;
+    }
     setSending(true);
     setStatus(null);
     try {
@@ -174,6 +186,7 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
           updateDoc(doc(db, 'crmTemplates', selectedTemplateId), { sentCount: increment(1) }).catch(() => {});
           if (lead?.id) updateDoc(doc(db, 'crmLeads', lead.id), { lastTemplateId: selectedTemplateId }).catch(() => {});
         }
+        recordIssuesSent(lead?.issuesChecklist);
       }
     } catch (err) {
       setStatus({ type: 'error', message: err?.message ?? 'Send failed.' });

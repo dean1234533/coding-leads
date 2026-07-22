@@ -12,6 +12,16 @@ const { OUTREACH_FROM_ADDRESS } = require('./emailConfig');
 const { encodeMimeHeader } = require('./mimeHeader');
 const { generateAuditEmail } = require('./aiEmailWriter');
 const { classifyReply } = require('./aiReplyClassifier');
+const { requireOwner } = require('./authGuard');
+const { withErrorAlert } = require('./errorAlert');
+const { notifyOwner } = require('./pushNotifications');
+
+// Mirrors slugify() in src/utils/crmConstants.js — same deterministic-ID
+// purpose (one doc per issue name in issueAnalytics), duplicated rather than
+// shared since the frontend util isn't reachable from this CommonJS backend.
+function slugifyIssue(name) {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
 
 const REPLY_AI_KEYS = () => ({
   gemini: process.env.GEMINI_API_KEY,
@@ -24,6 +34,42 @@ const REPLY_AI_KEYS = () => ({
 });
 
 const CRM_GMAIL_SECRETS = [...new Set([...OAUTH_SECRETS, 'GMAIL_REFRESH_TOKEN'])];
+
+// Ground-truth way to tell "Dean sent this himself" apart from "an
+// automation sent this" for the sent-count dashboard tile — a Firestore
+// counter could drift out of sync with what's actually in Gmail (a failed
+// write after a successful send, etc.), whereas a label applied to the real
+// sent message can't. Hidden from the label sidebar (labelHide) since it's
+// internal bookkeeping, not something Dean needs cluttering his inbox UI —
+// still fully searchable via `label:Auto-Sent`. Cached in module scope since
+// Cloud Functions containers are reused across warm-start invocations.
+const AUTO_SENT_LABEL_NAME = 'Auto-Sent';
+let autoSentLabelIdCache = null;
+
+async function getAutoSentLabelId(gmail) {
+  if (autoSentLabelIdCache) return autoSentLabelIdCache;
+  const { data } = await gmail.users.labels.list({ userId: 'me' });
+  const existing = data.labels?.find((l) => l.name === AUTO_SENT_LABEL_NAME);
+  if (existing) { autoSentLabelIdCache = existing.id; return existing.id; }
+  const { data: created } = await gmail.users.labels.create({
+    userId: 'me',
+    requestBody: { name: AUTO_SENT_LABEL_NAME, labelListVisibility: 'labelHide', messageListVisibility: 'show' },
+  });
+  autoSentLabelIdCache = created.id;
+  return created.id;
+}
+
+// Best-effort — a labeling failure shouldn't undo or fail the send itself,
+// it would just mean this one message doesn't count toward "auto" on the
+// dashboard tile.
+async function labelAsAutoSent(gmail, messageId) {
+  try {
+    const labelId = await getAutoSentLabelId(gmail);
+    await gmail.users.messages.modify({ userId: 'me', id: messageId, requestBody: { addLabelIds: [labelId] } });
+  } catch (err) {
+    console.warn('[labelAsAutoSent] failed:', err.response?.data?.error?.message ?? err.message);
+  }
+}
 
 /**
  * Builds a raw base64url RFC 2822 message, optionally multipart with attachments.
@@ -132,6 +178,7 @@ function headerValue(headers, name) {
 const gmailListMessages = onCall(
   { cors: true, timeoutSeconds: 30, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
   async (request) => {
+    requireOwner(request);
     const { folder = 'inbox', query = '', pageToken } = request.data ?? {};
     const gmail = await getGmailClient();
 
@@ -176,6 +223,7 @@ const gmailListMessages = onCall(
 const gmailGetThread = onCall(
   { cors: true, timeoutSeconds: 30, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
   async (request) => {
+    requireOwner(request);
     const { threadId } = request.data ?? {};
     if (!threadId) throw new HttpsError('invalid-argument', 'threadId is required.');
 
@@ -208,6 +256,7 @@ const gmailGetThread = onCall(
 const gmailSendEmail = onCall(
   { cors: true, timeoutSeconds: 45, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
   async (request) => {
+    requireOwner(request);
     const { to, cc, subject, bodyHtml, bodyText, attachments, threadId, inReplyTo, references } = request.data ?? {};
     if (!to?.trim()) throw new HttpsError('invalid-argument', 'to is required.');
 
@@ -233,6 +282,7 @@ const gmailSendEmail = onCall(
 const gmailSaveDraft = onCall(
   { cors: true, timeoutSeconds: 45, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
   async (request) => {
+    requireOwner(request);
     const { to, cc, subject, bodyHtml, bodyText, attachments, threadId } = request.data ?? {};
 
     const gmail = await getGmailClient();
@@ -252,7 +302,8 @@ const gmailSaveDraft = onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 const gmailListLabels = onCall(
   { cors: true, timeoutSeconds: 15, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
-  async () => {
+  async (request) => {
+    requireOwner(request);
     const gmail = await getGmailClient();
     const res = await gmail.users.labels.list({ userId: 'me' });
     return { labels: res.data.labels ?? [] };
@@ -262,25 +313,59 @@ const gmailListLabels = onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 // getGmailSentStats — live counts for the two Gmail-backed dashboard tiles
 // ─────────────────────────────────────────────────────────────────────────────
+// Cloud Functions run in UTC — plain `date.setHours(0,0,0,0)` gives UTC
+// midnight, not UK midnight, silently shifting the "today" boundary by an
+// hour during BST (and would be wrong outright for any deploy region not
+// defaulting to UTC). Confirmed this app is UK-only elsewhere (booking page
+// timezone, follow-up schedule), so "today" should mean the UK calendar day.
+function startOfUkDay(date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(date).map((p) => [p.type, p.value])
+  );
+  const utcMidnightGuess = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), 0, 0, 0));
+  // If UK is on BST (UTC+1), midnight UTC reads as 01:00 in London — that
+  // hour value IS the offset to subtract to land on true UK midnight.
+  const ukHourAtGuess = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hourCycle: 'h23' }).format(utcMidnightGuess));
+  return new Date(utcMidnightGuess.getTime() - ukHourAtGuess * 3_600_000);
+}
+
 const getGmailSentStats = onCall(
   { cors: true, timeoutSeconds: 20, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
-  async () => {
+  async (request) => {
+    requireOwner(request);
     const gmail = await getGmailClient();
 
     const now = new Date();
-    const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
-    const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay()); startOfWeek.setHours(0, 0, 0, 0);
+    const startOfToday = startOfUkDay(now);
+    const startOfWeek = startOfUkDay(new Date(now.getTime() - now.getUTCDay() * 86_400_000));
 
     const epoch = (d) => Math.floor(d.getTime() / 1000);
+    const countOf = (res) => res.data.messages?.length ?? res.data.resultSizeEstimate ?? 0;
 
-    const [todayRes, weekRes] = await Promise.all([
+    // Auto-Sent (see labelAsAutoSent) is only ever applied to emails a human
+    // never reviewed — automated follow-ups. Everything else (manual sends,
+    // and Composer "send later" schedules, which Dean wrote and reviewed
+    // himself before scheduling) counts as manual by not carrying that label.
+    const [todayTotal, todayAuto, weekTotal, weekAuto] = await Promise.all([
       gmail.users.messages.list({ userId: 'me', q: `in:sent after:${epoch(startOfToday)}`, maxResults: 500 }),
+      gmail.users.messages.list({ userId: 'me', q: `in:sent after:${epoch(startOfToday)} label:${AUTO_SENT_LABEL_NAME}`, maxResults: 500 }),
       gmail.users.messages.list({ userId: 'me', q: `in:sent after:${epoch(startOfWeek)}`, maxResults: 500 }),
+      gmail.users.messages.list({ userId: 'me', q: `in:sent after:${epoch(startOfWeek)} label:${AUTO_SENT_LABEL_NAME}`, maxResults: 500 }),
     ]);
 
+    const sentTodayTotal = countOf(todayTotal);
+    const sentTodayAuto = countOf(todayAuto);
+    const sentThisWeekTotal = countOf(weekTotal);
+    const sentThisWeekAuto = countOf(weekAuto);
+
     return {
-      sentToday: todayRes.data.messages?.length ?? todayRes.data.resultSizeEstimate ?? 0,
-      sentThisWeek: weekRes.data.messages?.length ?? weekRes.data.resultSizeEstimate ?? 0,
+      sentToday: sentTodayTotal,
+      sentTodayManual: Math.max(0, sentTodayTotal - sentTodayAuto),
+      sentTodayAuto,
+      sentThisWeek: sentThisWeekTotal,
+      sentThisWeekManual: Math.max(0, sentThisWeekTotal - sentThisWeekAuto),
+      sentThisWeekAuto,
     };
   }
 );
@@ -316,9 +401,27 @@ async function runReplySync() {
       const last = messages[messages.length - 1];
       const from = (headerValue(last.payload?.headers, 'From') ?? '').toLowerCase();
       const isInbound = from && !from.includes(selfEmail);
-      const isUnreadInInbox = (last.labelIds ?? []).includes('INBOX');
+      const labelIds = last.labelIds ?? [];
+      const isInInbox = labelIds.includes('INBOX');
+      const isInSpam  = labelIds.includes('SPAM');
 
-      if (isInbound && isUnreadInInbox) {
+      // A genuine lead reply landing in Spam is worse than one sitting
+      // unread in the Inbox — it's invisible unless someone thinks to check
+      // Spam manually. Since we already know this thread belongs to a real
+      // lead we emailed first, false-positive risk is low, so it's moved
+      // out automatically (removeLabelIds/addLabelIds is Gmail's own "Not
+      // spam" action) rather than just flagging it and leaving it buried.
+      let movedFromSpam = false;
+      if (isInbound && isInSpam) {
+        try {
+          await gmail.users.messages.modify({ userId: 'me', id: last.id, requestBody: { removeLabelIds: ['SPAM'], addLabelIds: ['INBOX'] } });
+          movedFromSpam = true;
+        } catch (err) {
+          console.warn(`[syncGmailReplies] failed to un-spam message for lead ${doc.id}:`, err.message);
+        }
+      }
+
+      if (isInbound && (isInInbox || movedFromSpam)) {
         // Classifies the reply's sentiment so it shows up triaged in the
         // Inbox instead of Dean having to read every reply cold to find the
         // ones actually worth answering first. Best-effort — a classifier
@@ -330,10 +433,16 @@ async function runReplySync() {
           replyClassification: classification,
           updatedAt: FieldValue.serverTimestamp(),
         });
+        const spamNote = movedFromSpam ? ' This reply had landed in Spam — moved to Inbox automatically.' : '';
         await doc.ref.collection('notes').add({
-          text: classification ? `Reply detected in Gmail — looks ${classification}.` : 'Reply detected in Gmail.',
+          text: (classification ? `Reply detected in Gmail — looks ${classification}.` : 'Reply detected in Gmail.') + spamNote,
           createdAt: FieldValue.serverTimestamp(),
         });
+
+        if (movedFromSpam) {
+          await notifyOwner('Reply rescued from Spam', `${lead.businessName || 'A lead'}'s reply was in Spam — moved to Inbox.`, '/outreach-crm')
+            .catch(() => {}); // never fail reply sync over a push-notification hiccup
+        }
 
         // Template performance tracking — a reply on a lead whose last send
         // used a known template counts as that template earning a reply,
@@ -342,6 +451,20 @@ async function runReplySync() {
           await db.collection('crmTemplates').doc(lead.lastTemplateId)
             .update({ repliedCount: FieldValue.increment(1) })
             .catch((err) => console.warn(`[syncGmailReplies] template repliedCount update failed:`, err.message));
+        }
+
+        // Per-issue reply tracking — the send-time half of this is written
+        // client-side (recordIssuesSent in issueAnalytics.js) right after a
+        // successful send; this is the reply-time half, so the dashboard can
+        // show which *kind* of finding actually gets replies, not just which
+        // template. interestedCount is a subset of repliedCount, not added
+        // to it separately.
+        for (const issue of lead.issuesChecklist ?? []) {
+          const slug = slugifyIssue(issue);
+          const update = { issue, repliedCount: FieldValue.increment(1) };
+          if (classification === 'Interested') update.interestedCount = FieldValue.increment(1);
+          await db.collection('issueAnalytics').doc(slug).set(update, { merge: true })
+            .catch((err) => console.warn(`[syncGmailReplies] issueAnalytics update failed for "${issue}":`, err.message));
         }
 
         updated += 1;
@@ -358,12 +481,12 @@ const REPLY_SYNC_SECRETS = [...CRM_GMAIL_SECRETS, 'GEMINI_API_KEY', 'GROQ_API_KE
 
 const checkRepliesNow = onCall(
   { cors: true, timeoutSeconds: 120, memory: '256MiB', secrets: REPLY_SYNC_SECRETS },
-  async () => runReplySync()
+  async (request) => { requireOwner(request); return runReplySync(); }
 );
 
 const syncGmailReplies = onSchedule(
   { schedule: 'every 15 minutes', timeoutSeconds: 300, memory: '256MiB', secrets: REPLY_SYNC_SECRETS },
-  async () => { await runReplySync(); }
+  withErrorAlert('syncGmailReplies', async () => { await runReplySync(); })
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -371,7 +494,7 @@ const syncGmailReplies = onSchedule(
 // ─────────────────────────────────────────────────────────────────────────────
 const sendScheduledEmails = onSchedule(
   { schedule: 'every 5 minutes', timeoutSeconds: 300, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
-  async () => {
+  withErrorAlert('sendScheduledEmails', async () => {
     const db = getFirestore();
     const now = new Date();
 
@@ -413,7 +536,7 @@ const sendScheduledEmails = onSchedule(
         await doc.ref.update({ error: err.message }).catch(() => {});
       }
     }
-  }
+  })
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -470,56 +593,86 @@ function nextFollowUpPatch(lead, sentDate) {
   return { status: 'Follow Up Scheduled', followUpStage: stage, followUpDate: nextDate, lastContactDate: sentDate };
 }
 
-const scheduledAutoFollowUp = onSchedule(
-  { schedule: '0 9 * * *', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
-  async () => {
-    const db = getFirestore();
+// Extracted so both the daily schedule and the manual "Send Now" test
+// trigger run identically — previously this only ever ran on a schedule
+// with no way to check on demand whether it was actually working, and
+// several of the early-return paths (nothing due, none past the excluded
+// statuses) logged nothing at all, so a quiet day looked identical to a
+// broken one in the logs. skipEnabledCheck lets the manual trigger verify
+// behavior regardless of the Settings toggle, matching how
+// sendAuditEmailsNow already treats autoAuditEmailConfig.
+async function runAutoFollowUp({ skipEnabledCheck = false } = {}) {
+  const db = getFirestore();
 
+  if (!skipEnabledCheck) {
     const configSnap = await db.collection('autoFollowUpConfig').doc('settings').get();
-    if (!configSnap.exists || !configSnap.data()?.enabled) return;
-
-    const now = new Date();
-    const snap = await db.collection('crmLeads')
-      .where('followUpDate', '<=', now)
-      .limit(30)
-      .get();
-
-    const due = snap.docs.filter((d) => {
-      const lead = d.data();
-      return lead.email?.trim() && !FOLLOW_UP_EXCLUDED_STATUSES.has(lead.status);
-    });
-    if (!due.length) return;
-
-    const gmail = await getGmailClient();
-
-    for (const doc of due) {
-      const lead = doc.data();
-      try {
-        const { subject, body } = renderFollowUpTemplate(lead);
-        const bodyHtml = body.replace(/\n/g, '<br>');
-        // Threading relies on the `threadId` param on the send call below,
-        // not RFC In-Reply-To/References headers — those need the previous
-        // message's actual Message-ID, which isn't stored on the lead (only
-        // the Gmail thread ID is), and Gmail's own UI threads correctly off
-        // threadId alone.
-        const raw = buildRawMessage({ to: lead.email, subject, bodyHtml, bodyText: body });
-        const sentDate = new Date();
-        const res = await gmail.users.messages.send({
-          userId: 'me',
-          requestBody: { raw, threadId: lead.gmailThreadId || undefined },
-        });
-
-        await doc.ref.update({
-          gmailThreadId: res.data.threadId,
-          ...nextFollowUpPatch(lead, sentDate),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        console.log(`[scheduledAutoFollowUp] sent to "${lead.businessName}" (${lead.email}).`);
-      } catch (err) {
-        console.error(`[scheduledAutoFollowUp] failed for "${lead.businessName}":`, err.message);
-      }
+    if (!configSnap.exists || !configSnap.data()?.enabled) {
+      console.log('[autoFollowUp] skipped: disabled in Settings.');
+      return { ran: false, reason: 'disabled' };
     }
   }
+
+  const now = new Date();
+  const snap = await db.collection('crmLeads')
+    .where('followUpDate', '<=', now)
+    .limit(30)
+    .get();
+  console.log(`[autoFollowUp] query matched ${snap.size} lead(s) with followUpDate <= now.`);
+
+  const due = snap.docs.filter((d) => {
+    const lead = d.data();
+    return lead.email?.trim() && !FOLLOW_UP_EXCLUDED_STATUSES.has(lead.status);
+  });
+  console.log(`[autoFollowUp] ${due.length}/${snap.size} have an email and aren't Won/Lost/Archive/Replied.`);
+  if (!due.length) return { ran: true, sent: 0, matched: snap.size };
+
+  const gmail = await getGmailClient();
+  let sent = 0;
+
+  for (const doc of due) {
+    const lead = doc.data();
+    try {
+      const { subject, body } = renderFollowUpTemplate(lead);
+      const bodyHtml = body.replace(/\n/g, '<br>');
+      // Threading relies on the `threadId` param on the send call below,
+      // not RFC In-Reply-To/References headers — those need the previous
+      // message's actual Message-ID, which isn't stored on the lead (only
+      // the Gmail thread ID is), and Gmail's own UI threads correctly off
+      // threadId alone.
+      const raw = buildRawMessage({ to: lead.email, subject, bodyHtml, bodyText: body });
+      const sentDate = new Date();
+      const res = await gmail.users.messages.send({
+        userId: 'me',
+        requestBody: { raw, threadId: lead.gmailThreadId || undefined },
+      });
+      await labelAsAutoSent(gmail, res.data.id);
+
+      await doc.ref.update({
+        gmailThreadId: res.data.threadId,
+        ...nextFollowUpPatch(lead, sentDate),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      console.log(`[autoFollowUp] sent to "${lead.businessName}" (${lead.email}).`);
+      sent++;
+    } catch (err) {
+      console.error(`[autoFollowUp] failed for "${lead.businessName}":`, err.response?.data?.error?.message ?? err.message);
+    }
+  }
+  return { ran: true, sent, matched: snap.size, candidates: due.length };
+}
+
+const scheduledAutoFollowUp = onSchedule(
+  { schedule: '0 9 * * *', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
+  withErrorAlert('scheduledAutoFollowUp', () => runAutoFollowUp())
+);
+
+// Manual "Send Now" trigger for the Settings toggle — runs the exact same
+// logic, ignoring the enabled flag, so it can actually be tested on demand
+// instead of only ever finding out it's broken (or that there's nothing due)
+// by waiting for the next 9am run.
+const sendAutoFollowUpNow = onCall(
+  { cors: true, timeoutSeconds: 120, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
+  async (request) => { requireOwner(request); return runAutoFollowUp({ skipEnabledCheck: true }); }
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -595,12 +748,12 @@ async function runAutoAuditEmail() {
 
 const scheduledAutoAuditEmail = onSchedule(
   { schedule: '15 9 * * *', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: [...CRM_GMAIL_SECRETS, ...AUDIT_EMAIL_AI_SECRETS] },
-  async () => {
+  withErrorAlert('scheduledAutoAuditEmail', async () => {
     const db = getFirestore();
     const configSnap = await db.collection('autoAuditEmailConfig').doc('settings').get();
     if (!configSnap.exists || !configSnap.data()?.enabled) return;
     await runAutoAuditEmail();
-  }
+  })
 );
 
 // Manual "Draft Now" trigger for the Settings toggle — runs the exact same
@@ -608,7 +761,7 @@ const scheduledAutoAuditEmail = onSchedule(
 // the daily schedule on.
 const sendAuditEmailsNow = onCall(
   { cors: true, timeoutSeconds: 300, memory: '256MiB', secrets: [...CRM_GMAIL_SECRETS, ...AUDIT_EMAIL_AI_SECRETS] },
-  async () => runAutoAuditEmail()
+  async (request) => { requireOwner(request); return runAutoAuditEmail(); }
 );
 
 module.exports = {
@@ -622,6 +775,7 @@ module.exports = {
   syncGmailReplies,
   sendScheduledEmails,
   scheduledAutoFollowUp,
+  sendAutoFollowUpNow,
   scheduledAutoAuditEmail,
   sendAuditEmailsNow,
 };

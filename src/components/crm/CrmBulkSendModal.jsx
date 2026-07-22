@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase';
-import { applyTemplateVars, buildTemplateVars } from '../../utils/crmConstants';
+import { applyTemplateVars, buildTemplateVars, sortTemplatesByRelevance } from '../../utils/crmConstants';
+import { recordIssuesSent } from '../../utils/issueAnalytics';
 import { followUpPatchForSend } from '../../utils/crmFollowUps';
 import Modal from '../Modal';
 
@@ -29,7 +30,7 @@ export default function CrmBulkSendModal({ leads, onClose, onDone }) {
 
   useEffect(() => {
     const unsubT = onSnapshot(query(collection(db, 'crmTemplates'), orderBy('name')), (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const list = sortTemplatesByRelevance(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setTemplates(list);
       if (!templateId && list.length) setTemplateId(list[0].id);
     });
@@ -40,7 +41,14 @@ export default function CrmBulkSendModal({ leads, onClose, onDone }) {
 
   const template = templates.find((t) => t.id === templateId);
   const demoUrl = portfolioDemos.find((p) => p.id === demoId)?.url ?? '';
-  const withEmail = leads.filter((l) => l.email?.trim());
+  // A reply already got AI-classified as "Not Interested" (declined, asked
+  // to be removed/unsubscribed) — that classification was only ever shown
+  // as a badge in the inbox, nothing actually stopped a bulk send from
+  // re-contacting them. Unlike the single-composer send, a bulk send has no
+  // per-lead moment to ask "send anyway?", so these are silently excluded
+  // rather than blocked with a dialog per lead.
+  const optedOut = leads.filter((l) => l.email?.trim() && l.replyClassification === 'Not Interested');
+  const withEmail = leads.filter((l) => l.email?.trim() && l.replyClassification !== 'Not Interested');
   const withoutEmail = leads.filter((l) => !l.email?.trim());
   const previewLead = withEmail[0] ?? leads[0];
 
@@ -50,7 +58,7 @@ export default function CrmBulkSendModal({ leads, onClose, onDone }) {
     setFinished(false);
 
     const initial = {};
-    leads.forEach((l) => { initial[l.id] = withoutEmail.includes(l) ? 'skipped' : 'pending'; });
+    leads.forEach((l) => { initial[l.id] = withoutEmail.includes(l) ? 'skipped' : optedOut.includes(l) ? 'opted-out' : 'pending'; });
     setResults(initial);
 
     for (const lead of withEmail) {
@@ -70,6 +78,7 @@ export default function CrmBulkSendModal({ leads, onClose, onDone }) {
           ...followUpPatchForSend(lead),
           updatedAt: serverTimestamp(),
         });
+        recordIssuesSent(lead.issuesChecklist);
 
         setResults((r) => ({ ...r, [lead.id]: 'sent' }));
       } catch (err) {
@@ -127,7 +136,9 @@ export default function CrmBulkSendModal({ leads, onClose, onDone }) {
           )}
 
           <div className="text-xs text-gray-500">
-            {withEmail.length} will be emailed{withoutEmail.length > 0 ? `, ${withoutEmail.length} skipped (no email address)` : ''}.
+            {withEmail.length} will be emailed
+            {withoutEmail.length > 0 ? `, ${withoutEmail.length} skipped (no email address)` : ''}
+            {optedOut.length > 0 ? `, ${optedOut.length} skipped (previously replied "Not Interested")` : ''}.
             Sends one at a time (~{(SEND_DELAY_MS / 1000).toFixed(1)}s apart) to keep things safe.
           </div>
 
@@ -155,6 +166,7 @@ export default function CrmBulkSendModal({ leads, onClose, onDone }) {
                   {status === 'sent' && <span className="text-xs font-medium text-emerald-400">✓ Sent</span>}
                   {status === 'failed' && <span className="text-xs font-medium text-red-400" title={errors[lead.id]}>✗ Failed</span>}
                   {status === 'skipped' && <span className="text-xs text-gray-500">Skipped — no email</span>}
+                  {status === 'opted-out' && <span className="text-xs text-amber-400">Skipped — replied "Not Interested"</span>}
                   {status === 'pending' && <span className="text-xs text-gray-500">Sending…</span>}
                 </div>
               );

@@ -3,6 +3,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { findOwnerEmail, findGenericEmail } = require('./leadService');
+const { requireOwner } = require('./authGuard');
 const axios = require('axios');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -15,6 +16,7 @@ const axios = require('axios');
 const findLeadEmail = onCall(
   { cors: true, timeoutSeconds: 20, memory: '256MiB', secrets: ['HUNTER_KEY'] },
   async (request) => {
+    requireOwner(request);
     const { website, contactName } = request.data ?? {};
     if (!website?.trim()) {
       throw new HttpsError('invalid-argument', 'website is required.');
@@ -47,7 +49,8 @@ const STATUS_MAP = {
 
 const migrateLegacyLeads = onCall(
   { cors: true, timeoutSeconds: 120, memory: '256MiB' },
-  async () => {
+  async (request) => {
+    requireOwner(request);
     const db = getFirestore();
 
     const [legacySnap, crmSnap] = await Promise.all([
@@ -112,7 +115,8 @@ const migrateLegacyLeads = onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 const recoverBacklinkPageTitles = onCall(
   { cors: true, timeoutSeconds: 300, memory: '256MiB' },
-  async () => {
+  async (request) => {
+    requireOwner(request);
     const db = getFirestore();
     const snap = await db.collection('crmLeads').where('category', '==', 'Backlink').get();
 

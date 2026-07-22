@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { collection, addDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, getDocs, onSnapshot, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { app, db } from '../../firebase';
 
 const RADII = [
@@ -50,15 +50,31 @@ export default function CrmCharityScan() {
   const [error, setError] = useState(null);
   const [crmStatusById, setCrmStatusById] = useState({});
 
+  // Loads the last charity scan's results straight from Firestore, so
+  // leaving this tab or refreshing doesn't lose a scan that already cost
+  // real Places/Hunter/Serper API quota to produce — same fix as Business
+  // Scout (see the equivalent effect in RssScout.jsx).
+  useEffect(() => {
+    const q = query(collection(db, 'scannerResults'), where('scanMode', '==', 'charity'), orderBy('scannedAt', 'desc'));
+    return onSnapshot(q, (snap) => setLeads(snap.docs.map((d) => d.data())), (err) => {
+      console.error('[CrmCharityScan] Failed to load saved results:', err);
+    });
+  }, []);
+
   async function scan() {
     if (!location.trim()) return;
     setLoading(true);
     setError(null);
-    setLeads([]);
     try {
       const fn = httpsCallable(getFunctions(app), 'scanBusinessLeads', { timeout: 100000 });
       const { data } = await fn({ location, radius, scanMode: 'charity' });
-      setLeads(data.leads ?? []);
+      const found = data.leads ?? [];
+      const batch = writeBatch(db);
+      for (const lead of found) {
+        if (!lead.id) continue;
+        batch.set(doc(db, 'scannerResults', lead.id), { ...lead, scanMode: 'charity', location, radius, scannedAt: serverTimestamp() }, { merge: true });
+      }
+      if (found.length > 0) await batch.commit();
     } catch (err) {
       console.error('[CrmCharityScan] scan failed:', err);
       setError(err?.message ?? 'Scan failed.');
@@ -70,7 +86,9 @@ export default function CrmCharityScan() {
   async function auditLeadWebsite(website) {
     if (!website) return null;
     try {
-      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 130000 });
+      // Kept above auditWebsitesNow's own timeoutSeconds (540s) — see the
+      // comment on the equivalent call in CrmWebsiteReview.jsx.
+      const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 500000 });
       const { data } = await fn({ urls: [website] });
       return data.results?.[website] ?? null;
     } catch (err) {
@@ -98,6 +116,7 @@ export default function CrmCharityScan() {
         phone: lead.phone ?? null,
         contactName: lead.ownerName ?? null,
         instagramUrl: lead.instagramUrl ?? null,
+        whatsappUrl: lead.whatsappUrl ?? null,
         competitorName: lead.competitorName ?? null,
         competitorRating: lead.competitorRating ?? null,
         competitorReviewCount: lead.competitorReviewCount ?? null,

@@ -1,16 +1,172 @@
 import { useState, useEffect } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '../../firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { app, db } from '../../firebase';
 import Modal from '../Modal';
-import { STATUSES, PRIORITIES, INDUSTRIES, STATUS_COLORS } from '../../utils/crmConstants';
+import { STATUSES, PRIORITIES, INDUSTRIES, STATUS_COLORS, applyTemplateVars, buildTemplateVars } from '../../utils/crmConstants';
 import { computeNextFollowUp, followUpPatchForSend } from '../../utils/crmFollowUps';
 import CrmWebsiteReview from './CrmWebsiteReview';
 import CrmNotesTimeline from './CrmNotesTimeline';
 import CrmTasksList from './CrmTasksList';
 import CrmComposer from './CrmComposer';
 import CrmCallScript from './CrmCallScript';
+import CrmAiDraftWidget from './CrmAiDraftWidget';
 
 const TABS = ['Overview', 'Website Review', 'Notes', 'Tasks', 'Emails', 'Call Script'];
+const MY_NAME = 'Dean Burt';
+
+// Instagram has no send API, so this is a copy-the-caption /
+// download-the-flyer-and-attach-it-by-hand workflow rather than an
+// automated send like the Emails tab's CrmComposer.
+function CrmInstagramOutreach({ lead }) {
+  const [templates, setTemplates] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const q = query(collection(db, 'crmTemplates'), where('category', '==', 'Instagram'));
+    return onSnapshot(q, (snap) => setTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setTemplates([]));
+  }, []);
+
+  if (!templates || templates.length === 0) return null;
+  // More than one Instagram template exists (e.g. a general idea-offer vs a
+  // Bookrightly-specific pitch) — let Dean pick which fits this lead rather
+  // than silently always using whichever one the query happens to return first.
+  const template = templates.find((t) => t.id === selectedId) ?? templates[0];
+  const caption = applyTemplateVars(template.body, buildTemplateVars(lead, { myName: MY_NAME }));
+
+  function handleCopy() {
+    navigator.clipboard.writeText(caption);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="mt-1 flex items-start gap-3 rounded-lg border border-gray-800 bg-gray-900/60 p-3">
+      {template.imageUrl && (
+        <img src={template.imageUrl} alt="" className="h-20 w-20 flex-shrink-0 rounded-md object-cover object-top" />
+      )}
+      <div className="min-w-0 flex-1">
+        {templates.length > 1 ? (
+          <select
+            value={template.id}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className="rounded border border-gray-700 bg-gray-800/50 px-1.5 py-0.5 text-xs font-semibold text-pink-400 focus:border-pink-500 focus:outline-none"
+          >
+            {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        ) : (
+          <p className="text-xs font-semibold text-pink-400">{template.name}</p>
+        )}
+        <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs text-gray-500">{caption}</p>
+        <div className="mt-2 flex flex-wrap gap-3">
+          <button onClick={handleCopy} className="text-xs font-medium text-blue-400 hover:text-blue-300">
+            {copied ? 'Copied!' : 'Copy caption'}
+          </button>
+          {template.imageUrl && (
+            <a href={template.imageUrl} download className="text-xs font-medium text-blue-400 hover:text-blue-300">
+              Download flyer
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// UK-only assumption (this app's leads are all UK businesses) — strips
+// formatting and swaps a leading trunk "0" for the +44 country code, since
+// wa.me/sms: links need the number in international digits-only form, not
+// however it was typed in ("020 1234 5678", "07123-456789", etc.).
+function formatPhoneIntl(phone) {
+  const digits = (phone ?? '').replace(/[^\d+]/g, '');
+  if (digits.startsWith('+')) return digits.slice(1);
+  if (digits.startsWith('44')) return digits;
+  if (digits.startsWith('0')) return `44${digits.slice(1)}`;
+  return digits;
+}
+
+// Unlike Instagram, both WhatsApp and SMS support a pre-filled message via
+// URL (wa.me's `text` param, the sms: URI's `body` param) — no manual
+// copy-paste needed, the link opens the chat with the message already
+// typed in, just needs Dean to hit send himself (there's no send API for
+// either, same reason as Instagram).
+// A template belongs to a channel if its primary category matches, or its
+// optional `channels` array lists it — the latter lets one template (e.g.
+// the "Free Mockup" pitch) be offered on more than one channel without
+// duplicating the content.
+function templatesForChannel(templates, channel) {
+  return templates.filter((t) => t.category === channel || t.channels?.includes(channel));
+}
+
+function CrmPhoneOutreach({ lead }) {
+  const [templates, setTemplates] = useState(null);
+  const [whatsappId, setWhatsappId] = useState(null);
+  const [smsId, setSmsId] = useState(null);
+
+  useEffect(() => {
+    // Fetches the whole (small) template library rather than a `category`
+    // filter — a `channels` array match can't be expressed as a simple
+    // Firestore `where` alongside the category check without a second query,
+    // and this collection is small enough that client-side filtering is fine.
+    return onSnapshot(collection(db, 'crmTemplates'), (snap) => setTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setTemplates([]));
+  }, []);
+
+  if (!templates || templates.length === 0) return null;
+  const whatsappOptions = templatesForChannel(templates, 'WhatsApp');
+  // Same options as WhatsApp — texting the same short, personal pitch on
+  // whichever channel a lead actually has a working number for.
+  const smsOptions = whatsappOptions;
+  const whatsapp = whatsappOptions.find((t) => t.id === whatsappId) ?? whatsappOptions[0];
+  const sms = smsOptions.find((t) => t.id === smsId) ?? smsOptions[0];
+
+  // Prefer a WhatsApp number the business actually put on their own site
+  // (scraped during the scan — see findWhatsAppLink in functions/index.js)
+  // over guessing one from the regular contact number, since plenty of
+  // businesses run a dedicated WhatsApp line separate from their landline.
+  const whatsappNumber = lead.whatsappUrl?.match(/wa\.me\/(\d+)/)?.[1] ?? formatPhoneIntl(lead.phone);
+  const smsNumber = formatPhoneIntl(lead.phone);
+  if (!whatsappNumber && !smsNumber) return null;
+
+  const vars = buildTemplateVars(lead, { myName: MY_NAME });
+  const selectClasses = "rounded border border-gray-700 bg-gray-800/50 px-1.5 py-0.5 text-xs font-medium focus:outline-none";
+
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-3 rounded-lg border border-gray-800 bg-gray-900/60 p-3">
+      {whatsapp && whatsappNumber && (
+        <span className="flex items-center gap-1.5">
+          <a
+            href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(applyTemplateVars(whatsapp.body, vars))}`}
+            target="_blank" rel="noopener noreferrer"
+            className="text-xs font-medium text-emerald-400 hover:text-emerald-300"
+          >
+            Message on WhatsApp {lead.whatsappUrl ? '(number found on their site) ' : ''}→
+          </a>
+          {whatsappOptions.length > 1 && (
+            <select value={whatsapp.id} onChange={(e) => setWhatsappId(e.target.value)} className={`${selectClasses} text-emerald-400 focus:border-emerald-500`}>
+              {whatsappOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
+        </span>
+      )}
+      {sms && smsNumber && (
+        <span className="flex items-center gap-1.5">
+          <a
+            href={`sms:${smsNumber}&body=${encodeURIComponent(applyTemplateVars(sms.body, vars))}`}
+            className="text-xs font-medium text-blue-400 hover:text-blue-300"
+          >
+            Send Text →
+          </a>
+          {smsOptions.length > 1 && (
+            <select value={sms.id} onChange={(e) => setSmsId(e.target.value)} className={`${selectClasses} text-blue-400 focus:border-blue-500`}>
+              {smsOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
+        </span>
+      )}
+    </div>
+  );
+}
 
 // Every core lead field is editable in place — saves on blur (or on change
 // for selects), so bad/missing data (e.g. a lead auto-created with an email
@@ -150,13 +306,14 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
             )}
             {findEmailError && <p className="mt-1 text-xs text-red-400">{findEmailError}</p>}
           </div>
-          <div>
+          <div className="col-span-2 sm:col-span-3">
             <EditableField label="Phone" value={lead.phone} onSave={(v) => onUpdate({ phone: v })} />
             {lead.phone && (
               <a href={`tel:${lead.phone.replace(/[^\d+]/g, '')}`} className="mt-1 inline-block text-xs text-blue-400 hover:text-blue-300">
                 Call →
               </a>
             )}
+            <CrmPhoneOutreach lead={lead} />
           </div>
           <div>
             <EditableField label="Website" value={lead.website} onSave={(v) => onUpdate({ website: v })} />
@@ -166,13 +323,17 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
               </a>
             )}
           </div>
-          <div>
+          <div className="col-span-2 sm:col-span-3">
             <EditableField label="Instagram" value={lead.instagramUrl} onSave={(v) => onUpdate({ instagramUrl: v })} />
             {lead.instagramUrl && (
               <a href={lead.instagramUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs text-pink-400 hover:text-pink-300">
                 Open Instagram →
               </a>
             )}
+            {lead.instagramUrl && <CrmInstagramOutreach lead={lead} />}
+          </div>
+          <div className="col-span-2 sm:col-span-3">
+            <EditableField label="WhatsApp Link (auto-detected from their site, if found)" value={lead.whatsappUrl} onSave={(v) => onUpdate({ whatsappUrl: v })} />
           </div>
           <EditableField label="Address" value={lead.address} onSave={(v) => onUpdate({ address: v })} />
           <EditableSelect label="Industry" value={lead.industry} options={INDUSTRIES} onSave={(v) => onUpdate({ industry: v })} />
@@ -197,6 +358,9 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
                 className="rounded-lg border border-gray-800 bg-gray-800/30 px-2.5 py-1.5 text-sm text-gray-200 transition focus:border-blue-500 focus:bg-gray-800/60 focus:outline-none"
               />
             </label>
+          </div>
+          <div className="col-span-2 sm:col-span-3">
+            <CrmAiDraftWidget lead={lead} />
           </div>
         </div>
       )}

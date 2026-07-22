@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, orderBy, query, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../firebase';
 import { LEAD_TYPES, STATUSES } from '../utils/codingLeadsScoring';
@@ -7,6 +7,7 @@ import { exportLeadsToCsv } from '../utils/codingLeadsCsv';
 import CodingLeadsAnalytics from './CodingLeadsAnalytics';
 import CodingLeadsTable from './CodingLeadsTable';
 import CodingLeadAddForm from './CodingLeadAddForm';
+import CodingLeadsCsvImport from './CodingLeadsCsvImport';
 import CodingLeadDetail from './CodingLeadDetail';
 import CodingLeadsKeywordManager from './CodingLeadsKeywordManager';
 
@@ -30,6 +31,7 @@ export default function CodingLeadsPage() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [search, setSearch] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showCsvImport, setShowCsvImport] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
@@ -81,6 +83,29 @@ export default function CodingLeadsPage() {
     });
   }
 
+  // Firestore batches cap at 500 writes — chunked so a large CSV export
+  // (e.g. from another CRM) can't silently fail past that limit. Each lead's
+  // `id` (a hash of its url/title, see codingLeadsCsvImport.js) is used as
+  // the doc ID with merge:true, so re-importing the same list overwrites the
+  // same docs instead of creating duplicates. Known tradeoff: createdAt gets
+  // reset to "now" on every re-import (needed so the lead still shows up in
+  // the default createdAt-ordered list at all) — acceptable since re-import
+  // is a rare, deliberate action, not something that happens silently.
+  async function handleImportLeads(newLeads) {
+    const CHUNK = 450;
+    for (let i = 0; i < newLeads.length; i += CHUNK) {
+      const batch = writeBatch(db);
+      for (const { id, ...lead } of newLeads.slice(i, i + CHUNK)) {
+        batch.set(doc(db, 'codingLeads', id), {
+          ...lead,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+      await batch.commit();
+    }
+  }
+
   async function handleUpdateLead(id, patch) {
     await updateDoc(doc(db, 'codingLeads', id), { ...patch, updatedAt: serverTimestamp() });
     setSelectedLead((prev) => (prev && prev.id === id ? { ...prev, ...patch } : prev));
@@ -96,9 +121,10 @@ export default function CodingLeadsPage() {
     setScanResult(null);
     try {
       // Default httpsCallable timeout (70s) isn't enough now that there are more
-      // sources staggered 3s apart to avoid Reddit's rate limit — matches the
-      // backend function's own timeoutSeconds.
-      const fn = httpsCallable(getFunctions(app), 'scanCodingLeadsNow', { timeout: 180000 });
+      // sources staggered 3s apart to avoid Reddit's rate limit, plus a
+      // slow-to-timeout AI provider in the per-item analysis chain — matches
+      // the backend function's own timeoutSeconds.
+      const fn = httpsCallable(getFunctions(app), 'scanCodingLeadsNow', { timeout: 300000 });
       const { data } = await fn();
       setScanResult(data);
     } catch (err) {
@@ -141,6 +167,12 @@ export default function CodingLeadsPage() {
             className="rounded-lg bg-gray-800 px-3.5 py-2 text-xs font-semibold text-gray-200 transition hover:bg-gray-700 disabled:opacity-50"
           >
             Export CSV
+          </button>
+          <button
+            onClick={() => setShowCsvImport(true)}
+            className="rounded-lg bg-gray-800 px-3.5 py-2 text-xs font-semibold text-gray-200 transition hover:bg-gray-700"
+          >
+            Import CSV
           </button>
           <button
             onClick={() => setShowAddForm(true)}
@@ -269,6 +301,14 @@ export default function CodingLeadsPage() {
           locationKeywords={keywords?.location}
           onSave={handleAddLead}
           onClose={() => setShowAddForm(false)}
+        />
+      )}
+
+      {showCsvImport && (
+        <CodingLeadsCsvImport
+          locationKeywords={keywords?.location}
+          onImport={handleImportLeads}
+          onClose={() => setShowCsvImport(false)}
         />
       )}
 

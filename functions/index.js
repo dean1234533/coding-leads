@@ -15,13 +15,19 @@ const {
 const {
   gmailListMessages, gmailGetThread, gmailSendEmail, gmailSaveDraft,
   gmailListLabels, getGmailSentStats, checkRepliesNow, syncGmailReplies,
-  sendScheduledEmails, scheduledAutoFollowUp, scheduledAutoAuditEmail, sendAuditEmailsNow,
+  sendScheduledEmails, scheduledAutoFollowUp, sendAutoFollowUpNow, scheduledAutoAuditEmail, sendAuditEmailsNow,
 } = require('./crmGmailService');
 const { findLeadEmail, migrateLegacyLeads, recoverBacklinkPageTitles } = require('./crmMigration');
+const { requireOwner } = require('./authGuard');
+const { withErrorAlert } = require('./errorAlert');
 const { ensureBacklinkConfig, runBacklinkScan } = require('./backlinkScanner');
 const { auditWebsite } = require('./websiteAudit');
 const { generateAuditEmail } = require('./aiEmailWriter');
-const { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow } = require('./pushNotifications');
+const { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow, notifyNewHotLeads } = require('./pushNotifications');
+const { generateCommsMessage, approveApproval, rejectApproval, markApprovalSent } = require('./aiCommsAssistant');
+const { scheduledWorkflowEngine, runWorkflowsNow, saveWorkflow } = require('./workflowEngine');
+const { getBusinessInsights } = require('./businessInsights');
+const { submitPortfolioContact } = require('./portfolioContact');
 
 initializeApp();
 const db = getFirestore();
@@ -40,6 +46,7 @@ exports.checkRepliesNow    = checkRepliesNow;
 exports.syncGmailReplies   = syncGmailReplies;
 exports.sendScheduledEmails = sendScheduledEmails;
 exports.scheduledAutoFollowUp = scheduledAutoFollowUp;
+exports.sendAutoFollowUpNow = sendAutoFollowUpNow;
 exports.scheduledAutoAuditEmail = scheduledAutoAuditEmail;
 exports.sendAuditEmailsNow = sendAuditEmailsNow;
 exports.findLeadEmail      = findLeadEmail;
@@ -48,6 +55,15 @@ exports.recoverBacklinkPageTitles = recoverBacklinkPageTitles;
 exports.savePushToken      = savePushToken;
 exports.sendFollowUpDigest = sendFollowUpDigest;
 exports.sendFollowUpDigestNow = sendFollowUpDigestNow;
+exports.generateCommsMessage = generateCommsMessage;
+exports.approveApproval    = approveApproval;
+exports.rejectApproval     = rejectApproval;
+exports.markApprovalSent   = markApprovalSent;
+exports.scheduledWorkflowEngine = scheduledWorkflowEngine;
+exports.runWorkflowsNow    = runWorkflowsNow;
+exports.saveWorkflow       = saveWorkflow;
+exports.getBusinessInsights = getBusinessInsights;
+exports.submitPortfolioContact = submitPortfolioContact;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Function 3: scanBusinessLeads
@@ -586,6 +602,61 @@ async function findContactEmail(website, ownerName, businessName) {
     }
   }
 
+  // ── 3a6. Seamless.ai search + research + poll — a three-step async flow,
+  // not a single call: search by name+domain to get a searchResultId,
+  // submit that for research to get a requestId, then poll until the
+  // enrichment finishes and reveals the email (or hits a terminal
+  // non-success status). Confirmed against the real API docs (docs.seamless.ai):
+  // POST /search/contacts -> data[].searchResultId,
+  // POST /contacts/research -> requestIds[] (202, async),
+  // GET /contacts/research/poll?requestIds=... -> data[].contact.email once
+  // status is "done". Polling is capped short (max ~9s) since this is one
+  // fallback among several within the overall budget, not the only path.
+  const seamlessKey = process.env.SEAMLESS_AI_KEY;
+  if (seamlessKey && ownerName) {
+    const parts = ownerName.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      try {
+        const headers = { Token: seamlessKey, 'Content-Type': 'application/json' };
+        const searchRes = await axios.post('https://api.seamless.ai/api/client/v1/search/contacts', {
+          fullName: [ownerName.trim()],
+          ...(domain ? { companyDomain: [domain] } : businessName ? { companyName: [businessName] } : {}),
+          limit: 1,
+        }, { headers, timeout: 8_000 });
+
+        const searchResultId = searchRes.data?.data?.[0]?.searchResultId;
+        if (searchResultId) {
+          const researchRes = await axios.post('https://api.seamless.ai/api/client/v1/contacts/research', {
+            searchResultIds: [searchResultId],
+          }, { headers, timeout: 8_000 });
+
+          const requestId = researchRes.data?.requestIds?.[0];
+          if (requestId) {
+            // Verified live: a real lookup took 5 full poll cycles (7.5s) to
+            // finish — 6 attempts left almost no margin, so this is widened
+            // to give slower lookups real room instead of silently falling
+            // through to the next provider right as the result was about to land.
+            for (let attempt = 0; attempt < 12; attempt++) {
+              await new Promise((resolve) => setTimeout(resolve, 1_500));
+              const pollRes = await axios.get('https://api.seamless.ai/api/client/v1/contacts/research/poll', {
+                params: { requestIds: requestId }, headers, timeout: 8_000,
+              });
+              const result = pollRes.data?.data?.[0];
+              if (result?.status === 'done' && result.contact?.email) {
+                return result.contact.email.toLowerCase();
+              }
+              if (result?.status && !['queued', 'researching'].includes(result.status)) {
+                break; // terminal non-success status (error/missing/not found/duplicate/etc.)
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[findContactEmail] Seamless.ai failed:', err.response?.data?.message ?? err.message);
+      }
+    }
+  }
+
   // ── 3b. Snov.io domain search — fallback for once Hunter's free tier
   // (50/month) runs dry. Same idea as the AI vision-provider chain: another
   // provider's own free tier (50/month, recurring) picks up where the first
@@ -723,6 +794,28 @@ function extractInstagramProfile(rows) {
     }
   }
   return null;
+}
+
+// Matches a "Message us on WhatsApp" link/button (wa.me/<number> or
+// api.whatsapp.com/send?phone=<number>) embedded in a business's own site —
+// the OpenWebNinja contacts scraper below returns facebook/instagram/tiktok/
+// etc. but has no WhatsApp field, and plenty of UK small businesses list a
+// dedicated WhatsApp number that's different from their main landline, so a
+// bare phone-number guess isn't a reliable substitute for the real thing.
+const WHATSAPP_LINK_RE = /(?:wa\.me\/|api\.whatsapp\.com\/send\?phone=)\+?(\d{7,15})/i;
+
+async function findWhatsAppLink(website) {
+  if (!website) return null;
+  try {
+    const { data: html } = await axios.get(website, {
+      timeout: 6_000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' },
+    });
+    const match = String(html).match(WHATSAPP_LINK_RE);
+    return match ? `https://wa.me/${match[1]}` : null;
+  } catch {
+    return null;
+  }
 }
 
 async function findInstagramHandle(businessName, location) {
@@ -943,6 +1036,7 @@ async function runBusinessScan({
           opportunityLabel: 'No Website — Prime Lead',
           ownerName:        null,
           instagramUrl:     null,
+          whatsappUrl:      null,
           industryLabel:    p.__industryLabel ?? null,
           competitorName:       null,
           competitorRating:     null,
@@ -967,6 +1061,7 @@ async function runBusinessScan({
         ownerName:        null,
         contactEmail:     null,
         instagramUrl:     null,
+        whatsappUrl:      null,
         industryLabel:    places[i].__industryLabel ?? null,
         competitorName:       null,
         competitorRating:     null,
@@ -1020,7 +1115,8 @@ async function runBusinessScan({
           lead.ownerNameSource = cached.ownerNameSource ?? null;
           lead.contactEmail    = cached.email ?? null;
           lead.instagramUrl    = cached.instagramUrl ?? null;
-          console.log(`[owner] "${lead.name}" → cached: ${cached.ownerName ?? 'null'} | email: ${cached.email ?? 'none'} | instagram: ${cached.instagramUrl ?? 'none'}`);
+          lead.whatsappUrl     = cached.whatsappUrl ?? null;
+          console.log(`[owner] "${lead.name}" → cached: ${cached.ownerName ?? 'null'} | email: ${cached.email ?? 'none'} | instagram: ${cached.instagramUrl ?? 'none'} | whatsapp: ${cached.whatsappUrl ?? 'none'}`);
           return;
         }
 
@@ -1035,10 +1131,15 @@ async function runBusinessScan({
           // Fills in an email if every other provider came up empty, and
           // grabs Instagram as a bonus even when an email was already found
           // some other way (nothing else in the chain surfaces Instagram
-          // for a lead that already has a website).
-          const contacts = await scrapeWebsiteContacts(lead.website);
+          // for a lead that already has a website). WhatsApp isn't a field
+          // the scraper returns, so that's a separate lightweight fetch.
+          const [contacts, whatsappUrl] = await Promise.all([
+            scrapeWebsiteContacts(lead.website),
+            findWhatsAppLink(lead.website),
+          ]);
           if (!lead.contactEmail && contacts?.email) lead.contactEmail = contacts.email;
           lead.instagramUrl = contacts?.instagramUrl ?? null;
+          lead.whatsappUrl = whatsappUrl;
         } else if (!lead.contactEmail) {
           // No website and no email to fall back on — plenty of small
           // businesses run entirely off Instagram instead of a real site,
@@ -1046,9 +1147,10 @@ async function runBusinessScan({
           // consolation prize.
           const ig = await findInstagramHandle(lead.name, lead.address);
           lead.instagramUrl = ig?.url ?? null;
+          lead.whatsappUrl = null;
         }
 
-        console.log(`[owner] "${lead.name}" → ${ownerResult ? `${ownerResult.name} (${ownerResult.source})` : 'null'} | email: ${email ?? 'none'} | instagram: ${lead.instagramUrl ?? 'none'}`);
+        console.log(`[owner] "${lead.name}" → ${ownerResult ? `${ownerResult.name} (${ownerResult.source})` : 'null'} | email: ${email ?? 'none'} | instagram: ${lead.instagramUrl ?? 'none'} | whatsapp: ${lead.whatsappUrl ?? 'none'}`);
 
         // Cache the result either way — a confirmed "no email found" is just
         // as worth remembering as a hit, so a dead end isn't re-queried
@@ -1058,6 +1160,7 @@ async function runBusinessScan({
           ownerName: lead.ownerName,
           ownerNameSource: lead.ownerNameSource,
           instagramUrl: lead.instagramUrl,
+          whatsappUrl: lead.whatsappUrl,
           checkedAt: FieldValue.serverTimestamp(),
         }).catch((err) => console.warn(`[owner] cache write failed for ${lead.id}:`, err.message));
       })
@@ -1081,9 +1184,10 @@ exports.scanBusinessLeads = onCall(
     cors:           true,
     timeoutSeconds: 90,
     memory:         '512MiB',
-    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SERPAPI_KEY', 'OPENWEBNINJA_KEY'],
+    secrets:        ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SEAMLESS_AI_KEY', 'SERPAPI_KEY', 'OPENWEBNINJA_KEY'],
   },
   async (request) => {
+    requireOwner(request);
     try {
       return await runBusinessScan(request.data ?? {});
     } catch (err) {
@@ -1093,7 +1197,7 @@ exports.scanBusinessLeads = onCall(
   }
 );
 
-const QUICK_LOOKUP_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SERPAPI_KEY', 'OPENWEBNINJA_KEY', 'GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY'];
+const QUICK_LOOKUP_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SEAMLESS_AI_KEY', 'SERPAPI_KEY', 'OPENWEBNINJA_KEY', 'GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY', 'CLOUDFLARE_AI_KEY', 'HUGGINGFACE_API_KEY', 'SAMBANOVA_API_KEY', 'GITHUB_MODELS_TOKEN'];
 
 /**
  * "Walk-by" lookup: search for a business by name (optionally biased toward
@@ -1104,6 +1208,7 @@ const QUICK_LOOKUP_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTE
 exports.searchBusinessByName = onCall(
   { cors: true, timeoutSeconds: 20, memory: '256MiB', secrets: ['GOOGLE_PLACES_KEY'] },
   async (request) => {
+    requireOwner(request);
     const { query, lat, lng } = request.data ?? {};
     if (!query || !String(query).trim()) {
       throw new HttpsError('invalid-argument', 'A business name is required.');
@@ -1145,8 +1250,14 @@ exports.searchBusinessByName = onCall(
  * this way is just as ready to add to the CRM as one found by scanning.
  */
 exports.getBusinessContactByPlaceId = onCall(
-  { cors: true, timeoutSeconds: 120, memory: '512MiB', secrets: QUICK_LOOKUP_SECRETS },
+  // 120s used to be enough margin over the PageSpeed call this makes
+  // internally, but that call's own timeout has since grown past 120s on
+  // its own (see websiteAudit.js) — raised so this function's ceiling
+  // stays above the audit it runs, not below it. Raised again to 480s when
+  // auditWebsite started running a second (desktop) PageSpeed + vision pass.
+  { cors: true, timeoutSeconds: 480, memory: '512MiB', secrets: QUICK_LOOKUP_SECRETS },
   async (request) => {
+    requireOwner(request);
     const { placeId } = request.data ?? {};
     if (!placeId) throw new HttpsError('invalid-argument', 'A place ID is required.');
     const apiKey = process.env.GOOGLE_PLACES_KEY;
@@ -1173,20 +1284,35 @@ exports.getBusinessContactByPlaceId = onCall(
             groq: process.env.GROQ_API_KEY,
             mistral: process.env.MISTRAL_API_KEY,
             openrouter: process.env.OPENROUTER_API_KEY,
+            cerebras: process.env.CEREBRAS_API_KEY,
+            cloudflare: process.env.CLOUDFLARE_AI_KEY,
+            huggingface: process.env.HUGGINGFACE_API_KEY,
+            sambanova: process.env.SAMBANOVA_API_KEY,
+            github: process.env.GITHUB_MODELS_TOKEN,
           })
         : Promise.resolve(null),
     ]);
 
     // Has a website — try the contacts scraper for a better email +
-    // Instagram bonus. No website — fall back to Instagram search, same as
-    // the batch scan.
+    // Instagram bonus.
     let finalEmail = contactEmail ?? null;
     let instagramUrl = null;
+    let whatsappUrl = null;
     if (d.website) {
-      const contacts = await scrapeWebsiteContacts(d.website);
+      const [contacts, whatsapp] = await Promise.all([
+        scrapeWebsiteContacts(d.website),
+        findWhatsAppLink(d.website),
+      ]);
       if (!finalEmail && contacts?.email) finalEmail = contacts.email;
       instagramUrl = contacts?.instagramUrl ?? null;
-    } else if (!finalEmail) {
+      whatsappUrl = whatsapp;
+    }
+    // No website, or the website exists but never actually links to
+    // Instagram anywhere the scraper could find it (footer link missed, a
+    // link-in-bio service instead of a direct link, etc.) — a single
+    // on-demand Quick Lookup can afford the extra search call that the
+    // hourly batch scan intentionally skips to control API usage at volume.
+    if (!instagramUrl) {
       const ig = await findInstagramHandle(d.name ?? '', d.formatted_address ?? '');
       instagramUrl = ig?.url ?? null;
     }
@@ -1201,6 +1327,7 @@ exports.getBusinessContactByPlaceId = onCall(
       ownerNameSource: ownerResult?.source ?? null,
       contactEmail:    finalEmail,
       instagramUrl,
+      whatsappUrl,
       websiteScore:      audit?.websiteScore ?? null,
       issuesChecklist:   audit?.issuesChecklist ?? [],
       overallImpression: audit?.auditFailed
@@ -1231,6 +1358,7 @@ exports.getAvailableSlots = onCall(
     secrets:        ['CALENDAR_CLIENT_ID', 'CALENDAR_CLIENT_SECRET', 'CALENDAR_REFRESH_TOKEN'],
   },
   async (request) => {
+    requireOwner(request);
     const { durationMins = 60, daysAhead = 14 } = request.data ?? {};
 
     const now  = new Date();
@@ -1257,7 +1385,8 @@ exports.getAvailableSlots = onCall(
  */
 exports.getBookingSettings = onCall(
   { cors: true, timeoutSeconds: 10, memory: '256MiB' },
-  async () => {
+  async (request) => {
+    requireOwner(request);
     const snap = await db.collection('booking_config').doc('default').get();
     if (!snap.exists) {
       return { title: 'Discovery Call — Dean Burt', durationMins: 15, approvedSlots: [] };
@@ -1282,6 +1411,7 @@ exports.updateBookingSettings = onCall(
     memory:         '256MiB',
   },
   async (request) => {
+    requireOwner(request);
     const { title, durationMins, approvedSlots } = request.data ?? {};
     const payload = { updatedAt: FieldValue.serverTimestamp() };
     if (title        !== undefined) payload.title        = title;
@@ -1396,7 +1526,23 @@ async function notifyHighScoreLeads(newHighScoreLeads) {
   }).catch(() => {}); // don't fail the scan if the email fails
 }
 
-const CODING_LEADS_SECRETS = ['GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN', 'TOKEN_ENCRYPTION_KEY'];
+const CODING_LEADS_SECRETS = ['GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN', 'TOKEN_ENCRYPTION_KEY', 'SERPAPI_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY', 'CLOUDFLARE_AI_KEY', 'HUGGINGFACE_API_KEY'];
+
+// Same shape used by the website audit's vision chain and the AI email
+// writer — the Local Intent Intelligence Engine (see localIntentAnalyzer.js)
+// reuses this app's existing free-tier text-AI fallback chain rather than
+// needing its own separate provider setup.
+function codingLeadsAiKeys() {
+  return {
+    gemini: process.env.GEMINI_API_KEY,
+    groq: process.env.GROQ_API_KEY,
+    mistral: process.env.MISTRAL_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    cerebras: process.env.CEREBRAS_API_KEY,
+    cloudflare: process.env.CLOUDFLARE_AI_KEY,
+    huggingface: process.env.HUGGINGFACE_API_KEY,
+  };
+}
 
 /**
  * Function 8: scanCodingLeadsNow (authenticated, manual trigger)
@@ -1405,10 +1551,11 @@ const CODING_LEADS_SECRETS = ['GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_R
  * as leads. Safe to call repeatedly — already-seen posts are skipped.
  */
 exports.scanCodingLeadsNow = onCall(
-  { cors: true, timeoutSeconds: 180, memory: '256MiB', secrets: CODING_LEADS_SECRETS },
-  async () => {
+  { cors: true, timeoutSeconds: 300, memory: '256MiB', secrets: CODING_LEADS_SECRETS },
+  async (request) => {
+    requireOwner(request);
     await ensureConfigDocs(db);
-    const result = await runScan(db, FieldValue);
+    const result = await runScan(db, FieldValue, codingLeadsAiKeys());
     await notifyHighScoreLeads(result.newHighScoreLeads);
     return result;
   }
@@ -1421,11 +1568,11 @@ exports.scanCodingLeadsNow = onCall(
  */
 exports.scheduledCodingLeadsScan = onSchedule(
   { schedule: 'every 2 hours', timeoutSeconds: 300, memory: '256MiB', secrets: CODING_LEADS_SECRETS },
-  async () => {
+  withErrorAlert('scheduledCodingLeadsScan', async () => {
     await ensureConfigDocs(db);
-    const result = await runScan(db, FieldValue);
+    const result = await runScan(db, FieldValue, codingLeadsAiKeys());
     await notifyHighScoreLeads(result.newHighScoreLeads);
-  }
+  })
 );
 
 const BACKLINK_SECRETS = ['SERPAPI_KEY'];
@@ -1442,7 +1589,8 @@ const BACKLINK_SECRETS = ['SERPAPI_KEY'];
  */
 exports.scanBacklinkProspectsNow = onCall(
   { cors: true, timeoutSeconds: 180, memory: '256MiB', secrets: BACKLINK_SECRETS },
-  async () => {
+  async (request) => {
+    requireOwner(request);
     await ensureBacklinkConfig(db);
     return runBacklinkScan(db, FieldValue, { apiKey: process.env.SERPAPI_KEY });
   }
@@ -1456,10 +1604,10 @@ exports.scanBacklinkProspectsNow = onCall(
  */
 exports.scheduledBacklinkScan = onSchedule(
   { schedule: 'every monday 08:00', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: BACKLINK_SECRETS },
-  async () => {
+  withErrorAlert('scheduledBacklinkScan', async () => {
     await ensureBacklinkConfig(db);
     await runBacklinkScan(db, FieldValue, { apiKey: process.env.SERPAPI_KEY });
-  }
+  })
 );
 
 /**
@@ -1473,11 +1621,15 @@ exports.scheduledBacklinkScan = onSchedule(
  */
 const PAGESPEED_CONCURRENCY = 4;
 
-const AUDIT_SECRETS = ['GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY', 'CLOUDFLARE_AI_KEY', 'HUGGINGFACE_API_KEY'];
+const AUDIT_SECRETS = ['GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY', 'CLOUDFLARE_AI_KEY', 'HUGGINGFACE_API_KEY', 'SAMBANOVA_API_KEY', 'GITHUB_MODELS_TOKEN'];
 
 exports.auditWebsitesNow = onCall(
-  { cors: true, timeoutSeconds: 540, memory: '256MiB', secrets: AUDIT_SECRETS },
+  // Raised alongside the other auditWebsite callers when a second (desktop)
+  // PageSpeed + vision pass was added — each site in the batch can now take
+  // roughly twice as long.
+  { cors: true, timeoutSeconds: 900, memory: '256MiB', secrets: AUDIT_SECRETS },
   async (request) => {
+    requireOwner(request);
     const { urls } = request.data ?? {};
     if (!Array.isArray(urls) || urls.length === 0) {
       throw new HttpsError('invalid-argument', 'urls (array) is required.');
@@ -1491,6 +1643,11 @@ exports.auditWebsitesNow = onCall(
       groq: process.env.GROQ_API_KEY,
       mistral: process.env.MISTRAL_API_KEY,
       openrouter: process.env.OPENROUTER_API_KEY,
+      cerebras: process.env.CEREBRAS_API_KEY,
+      cloudflare: process.env.CLOUDFLARE_AI_KEY,
+      huggingface: process.env.HUGGINGFACE_API_KEY,
+      sambanova: process.env.SAMBANOVA_API_KEY,
+      github: process.env.GITHUB_MODELS_TOKEN,
     };
     const results = {};
     const queue = [...urls];
@@ -1518,6 +1675,7 @@ exports.auditWebsitesNow = onCall(
 exports.generateAuditEmailNow = onCall(
   { cors: true, timeoutSeconds: 30, memory: '256MiB', secrets: AUDIT_SECRETS },
   async (request) => {
+    requireOwner(request);
     const { lead, myName } = request.data ?? {};
     if (!lead?.businessName) throw new HttpsError('invalid-argument', 'lead.businessName is required.');
 
@@ -1546,10 +1704,12 @@ exports.generateAuditEmailNow = onCall(
 async function addBusinessLeadToCrm(lead, fallbackIndustryLabel, pagespeedKey, visionKeys) {
   if (lead.googleMapsUrl) {
     const dupeSnap = await db.collection('crmLeads').where('googleMapsUrl', '==', lead.googleMapsUrl).limit(1).get();
-    if (!dupeSnap.empty) return 'duplicate';
+    if (!dupeSnap.empty) return { status: 'duplicate' };
   }
 
   const audit = lead.website ? await auditWebsite(lead.website, pagespeedKey, visionKeys) : null;
+
+  const leadScore = typeof lead.opportunityScore === 'number' ? lead.opportunityScore * 20 : null;
 
   await db.collection('crmLeads').add({
     businessName: lead.name ?? null,
@@ -1558,6 +1718,7 @@ async function addBusinessLeadToCrm(lead, fallbackIndustryLabel, pagespeedKey, v
     phone: lead.phone ?? null,
     contactName: lead.ownerName ?? null,
     instagramUrl: lead.instagramUrl ?? null,
+    whatsappUrl: lead.whatsappUrl ?? null,
     competitorName: lead.competitorName ?? null,
     competitorRating: lead.competitorRating ?? null,
     competitorReviewCount: lead.competitorReviewCount ?? null,
@@ -1579,12 +1740,17 @@ async function addBusinessLeadToCrm(lead, fallbackIndustryLabel, pagespeedKey, v
     status: 'New',
     priority: 'Medium',
     source: 'Google Maps (Auto)',
-    leadScore: typeof lead.opportunityScore === 'number' ? lead.opportunityScore * 20 : null,
+    leadScore,
     tags: ['Auto-Scanned'],
     dateAdded: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   });
-  return 'added';
+  // businessName/leadScore surfaced to the caller (not just 'added') so
+  // runAutoBusinessScan can push a same-night alert for anything genuinely
+  // hot, instead of Dean only finding out by opening the app the next day —
+  // the coding-leads scan already does the equivalent (notifyHighScoreLeads),
+  // this closes the same gap for the more actively-used business scan.
+  return { status: 'added', businessName: lead.name ?? null, leadScore, googleMapsUrl: lead.googleMapsUrl ?? null };
 }
 
 /**
@@ -1643,15 +1809,14 @@ async function runAutoBusinessScan({ bypassHourCheck = false, overrides = null }
     return { ran: true, error: err.message };
   }
 
-  // Nobody's reviewing these overnight — a lead with no email AND no
-  // Instagram is just dead weight in the CRM with no way to actually
-  // contact it, so it's skipped here rather than added anyway (unlike the
-  // manual Scanner tab, where "Has Email" is just a display filter Dean can
-  // toggle). An Instagram-only lead still counts, since that's now a real
-  // (manual) contact channel, not just consolation data.
+  // Nobody's reviewing these overnight — a lead with no email is just dead
+  // weight in the CRM with no reliable way to actually contact it, so it's
+  // skipped here rather than added anyway (unlike the manual Scanner tab,
+  // where "Has Email" is just a display filter Dean can toggle and
+  // Instagram-only leads are still findable for manual follow-up).
   const totalFound = leads.length;
-  leads = leads.filter((l) => l.contactEmail || l.instagramUrl);
-  console.log(`[autoBusinessScan] ${leads.length}/${totalFound} candidates have an email or Instagram; skipping the rest.`);
+  leads = leads.filter((l) => l.contactEmail);
+  console.log(`[autoBusinessScan] ${leads.length}/${totalFound} candidates have an email; skipping the rest.`);
 
   const fallbackIndustryLabel = BUSINESS_TYPES.find((t) => t.value === businessTypes[0])?.label ?? null;
   const pagespeedKey = process.env.GOOGLE_PAGESPEED_KEY;
@@ -1660,30 +1825,51 @@ async function runAutoBusinessScan({ bypassHourCheck = false, overrides = null }
     groq: process.env.GROQ_API_KEY,
     mistral: process.env.MISTRAL_API_KEY,
     openrouter: process.env.OPENROUTER_API_KEY,
+    cerebras: process.env.CEREBRAS_API_KEY,
+    cloudflare: process.env.CLOUDFLARE_AI_KEY,
+    huggingface: process.env.HUGGINGFACE_API_KEY,
+    sambanova: process.env.SAMBANOVA_API_KEY,
+    github: process.env.GITHUB_MODELS_TOKEN,
   };
 
+  // A leadScore of 80+ (opportunityScore 4-5 out of 5) is the same "worth
+  // interrupting for" bar the coding-leads scan uses on its own 0-100 scale.
+  const HOT_LEAD_SCORE_THRESHOLD = 80;
+
   let added = 0;
+  const hotLeads = [];
   for (const lead of leads) {
     if (added >= dailyLimit) break;
     try {
       const result = await addBusinessLeadToCrm(lead, fallbackIndustryLabel, pagespeedKey, visionKeys);
-      if (result === 'added') added++;
+      if (result.status === 'added') {
+        added++;
+        if (typeof result.leadScore === 'number' && result.leadScore >= HOT_LEAD_SCORE_THRESHOLD) {
+          hotLeads.push(result);
+        }
+      }
     } catch (err) {
       console.warn(`[autoBusinessScan] failed to add "${lead.name}":`, err.message);
     }
   }
 
   console.log(`[autoBusinessScan] added ${added}/${dailyLimit} new leads (${leads.length} candidates found).`);
+  await notifyNewHotLeads(hotLeads);
   return { ran: true, added, candidatesFound: leads.length };
 }
 
-const AUTO_SCAN_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SERPAPI_KEY', 'OPENWEBNINJA_KEY', ...AUDIT_SECRETS];
+const AUTO_SCAN_SECRETS = ['GOOGLE_PLACES_KEY', 'COMPANIES_HOUSE_KEY', 'HUNTER_KEY', 'SERPER_KEY', 'SNOV_CLIENT_ID', 'SNOV_CLIENT_SECRET', 'PROSPEO_KEY', 'GETPROSPECT_KEY', 'ROCKETREACH_KEY', 'LUSHA_KEY', 'SEAMLESS_AI_KEY', 'SERPAPI_KEY', 'OPENWEBNINJA_KEY', 'APP_URL', ...AUDIT_SECRETS];
 
 exports.scheduledAutoBusinessScan = onSchedule(
-  { schedule: 'every hour', timeZone: 'Europe/London', timeoutSeconds: 540, memory: '512MiB', secrets: AUTO_SCAN_SECRETS },
-  async () => {
+  // Audits each candidate lead sequentially up to dailyLimit (see
+  // runAutoBusinessScan) — with a second (desktop) PageSpeed + vision pass
+  // now added per site, 540s was already tight for a dailyLimit of even 10
+  // and risked the batch dying partway through. 1800s is the practical max
+  // for onSchedule functions.
+  { schedule: 'every hour', timeZone: 'Europe/London', timeoutSeconds: 1800, memory: '512MiB', secrets: AUTO_SCAN_SECRETS },
+  withErrorAlert('scheduledAutoBusinessScan', async () => {
     await runAutoBusinessScan({ bypassHourCheck: false });
-  }
+  })
 );
 
 // Manual "Test Now" trigger for the Settings tab — runs the exact same auto
@@ -1691,8 +1877,10 @@ exports.scheduledAutoBusinessScan = onSchedule(
 // (time, business types, quota) actually works without waiting for the next
 // real hourly tick.
 exports.triggerAutoBusinessScanNow = onCall(
-  { timeoutSeconds: 540, memory: '512MiB', secrets: AUTO_SCAN_SECRETS },
+  // Same reasoning as scheduledAutoBusinessScan above.
+  { timeoutSeconds: 1800, memory: '512MiB', secrets: AUTO_SCAN_SECRETS },
   async (request) => {
+    requireOwner(request);
     const { location, radius, businessTypes, dailyLimit, scanMode } = request.data ?? {};
     const overrides = {};
     if (location) overrides.location = location;

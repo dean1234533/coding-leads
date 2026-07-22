@@ -9,6 +9,18 @@ function formatDate(timestamp) {
   return date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// The AI analysis behind serviceNeeded/urgency/etc. doesn't always return
+// the plain string the prompt asked for (seen live: one lead came back with
+// service_needed as a nested {developer_preference, target} object instead
+// of a string) — rendering a raw object directly in JSX crashes the whole
+// tree with no useful error on screen (React error #31), so every
+// AI-sourced field goes through this first.
+function safeText(value) {
+  if (value == null) return null;
+  if (typeof value === 'string' || typeof value === 'number') return value;
+  try { return JSON.stringify(value); } catch { return String(value); }
+}
+
 function Section({ label, children }) {
   return (
     <div>
@@ -57,10 +69,10 @@ export default function CodingLeadDetail({ lead, onUpdate, onDelete, onClose }) 
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Section label="Location">
-            <p className="text-sm text-gray-200">{lead.location || '—'}</p>
+            <p className="text-sm text-gray-200">{safeText(lead.location) || '—'}</p>
           </Section>
           <Section label="Budget">
-            <p className="text-sm text-gray-200">{lead.budget || '—'}</p>
+            <p className="text-sm text-gray-200">{safeText(lead.budget) || '—'}</p>
           </Section>
           <Section label="Source">
             <p className="text-sm text-gray-200">{lead.source || '—'}</p>
@@ -102,6 +114,22 @@ export default function CodingLeadDetail({ lead, onUpdate, onDelete, onClose }) 
           </Section>
         )}
 
+        {lead.aiAnalyzed && (
+          <Section label="AI Analysis">
+            {safeText(lead.summary) && (
+              <p className="mb-2 text-sm text-gray-300">{safeText(lead.summary)}</p>
+            )}
+            <div className="grid grid-cols-2 gap-2 text-xs text-gray-400 sm:grid-cols-3">
+              {safeText(lead.serviceNeeded) && <p><span className="text-gray-600">Service:</span> {safeText(lead.serviceNeeded)}</p>}
+              {safeText(lead.urgency) && <p><span className="text-gray-600">Urgency:</span> {safeText(lead.urgency)}</p>}
+              {typeof lead.crmAction === 'string' && <p><span className="text-gray-600">Action:</span> {lead.crmAction.replace(/_/g, ' ')}</p>}
+              <p><span className="text-gray-600">Decision-maker:</span> {lead.decisionMaker ? 'Yes' : 'Unclear'}</p>
+              <p><span className="text-gray-600">Budget mentioned:</span> {lead.budgetMentioned ? 'Yes' : 'No'}</p>
+              <p><span className="text-gray-600">Competitor mentioned:</span> {lead.competitorMentioned ? 'Yes' : 'No'}</p>
+            </div>
+          </Section>
+        )}
+
         {(lead.detectedKeywords?.length > 0) && (
           <Section label="Detected Keywords">
             <div className="flex flex-wrap gap-1.5">
@@ -115,7 +143,7 @@ export default function CodingLeadDetail({ lead, onUpdate, onDelete, onClose }) 
         {(lead.scoreReasons?.length > 0) && (
           <Section label="Why This Score">
             <ul className="space-y-1 text-sm text-gray-400">
-              {lead.scoreReasons.map((r, i) => <li key={i} className="flex gap-2"><span className="text-gray-600">•</span>{r}</li>)}
+              {lead.scoreReasons.map((r, i) => <li key={i} className="flex gap-2"><span className="text-gray-600">•</span>{safeText(r)}</li>)}
             </ul>
           </Section>
         )}
