@@ -1,108 +1,105 @@
 const WEBSITE_PACKAGES = [
   {
-    name: 'Essential',
-    price: '£399',
-    agencyPrice: 'Agencies charge £1,500–£2,500',
-    description: 'Their details swapped into a pre-built professional design. Live within a week.',
+    name: 'Launch Website',
+    price: '£249',
+    description: 'A clean, professional site to get them online and taking enquiries.',
     features: [
-      'Professional ready-made design',
-      'Their logo, colours & contact details',
-      'Services, reviews & enquiry form',
-      'Mobile optimised',
-      '1 round of revisions',
+      'Mobile-friendly design',
+      '1–3 pages',
+      'Contact form',
+      'Basic SEO setup',
+      'Fast loading',
+      'Hosting guidance',
     ],
   },
   {
-    name: 'Standard',
+    name: 'Core Website',
+    price: '£399',
+    agencyPrice: 'Agencies charge £1,500–£2,500',
+    description: 'A ready-made setup with their branding, built to look credible fast.',
+    features: [
+      'Everything in Launch',
+      'Up to 5 pages',
+      'Logo & brand colours',
+      'Google Maps & reviews',
+      '30 days support',
+    ],
+  },
+  {
+    name: 'Business Website',
     price: '£699',
     agencyPrice: 'Agencies charge £3,000–£5,000',
-    description: 'Fully tailored — custom content, their branding, SEO ready.',
+    description: 'Custom-written content and stronger SEO for businesses ready to grow.',
     features: [
-      'Everything in Essential',
-      'Custom-written content for their firm',
+      'Everything in Core',
+      'Custom-written content',
       'SEO titles & meta descriptions',
-      'Google Maps & Reviews integration',
-      '3 rounds of revisions',
-      '2 months free support',
+      'Analytics setup',
+      'One revision round',
     ],
     highlight: true,
   },
   {
-    name: 'Premium',
+    name: 'Elite Website',
     price: '£1,200',
     agencyPrice: 'Agencies charge £6,000–£10,000',
-    description: 'Extra pages, client portal & full local SEO to bring in new clients.',
+    description: 'A complete, conversion-focused site for growing, multi-location businesses.',
     features: [
-      'Everything in Standard',
-      'Individual service area pages',
-      'Online client intake form',
-      'Local SEO & Google Business setup',
-      'Unlimited revisions',
-      '6 months free support',
+      'Everything in Business',
+      '8+ pages',
+      'Conversion-focused sections',
+      'Booking/intake forms',
+      'Security hardening',
+      '60 days support',
     ],
   },
 ];
 
 const APP_PACKAGES = [
   {
-    name: 'MVP App',
-    price: '£3,500',
-    description: 'Get your idea live quickly with the core features that matter most.',
+    name: 'App Prototype',
+    price: '£1,999',
+    description: 'Clickable app design or lean proof-of-concept for validating the idea before a full MVP.',
     features: [
-      'Single platform (Android or iOS)',
-      'Up to 3 core features',
-      'App store submission',
+      'User journey & core screens',
+      'Clickable prototype',
+      'Build direction for a full MVP',
+    ],
+  },
+  {
+    name: 'Starter App MVP',
+    price: '£4,999',
+    description: 'A focused app build with the core screens and backend needed to launch.',
+    features: [
+      'UX & core screens',
+      'Authentication',
+      'Simple backend/database',
+      'Testing & launch-ready foundations',
       'Delivered in 4–6 weeks',
     ],
-  },
-  {
-    name: 'Standard App',
-    price: '£7,500',
-    description: 'A fully featured app for both platforms with user accounts and notifications.',
-    features: [
-      'Android + iOS',
-      'User login & accounts',
-      'Database integration',
-      'Push notifications',
-      'App store submission',
-      'Delivered in 6–10 weeks',
-    ],
     highlight: true,
   },
   {
-    name: 'Full Product',
-    price: '£15,000+',
-    description: 'End-to-end product development with payments, admin dashboard, and ongoing support.',
+    name: 'Growth App',
+    price: '£7,999',
+    description: 'A more complete app with dashboards, booking, payments, or AI features.',
     features: [
-      'Custom features',
-      'Payment integration',
-      'Admin dashboard',
-      'Ongoing support plan',
-      'Timeline agreed per project',
-    ],
-  },
-];
-
-const RETAINER_PLANS = [
-  {
-    name: 'Basic',
-    price: '£75/mo',
-    features: [
-      'Hosting & uptime monitoring',
-      'Security updates',
-      'Minor text & image changes',
+      'Everything in Starter MVP',
+      'Dashboards & admin tools',
+      'Booking & payments',
+      'AI features / integrations',
+      'Launch support',
     ],
   },
   {
-    name: 'Pro',
-    price: '£150/mo',
+    name: 'AI Tool or Dashboard',
+    price: '£2,999',
+    description: 'A focused AI tool, calculator, dashboard, or automation that solves one clear business problem.',
     features: [
-      'Everything in Basic',
-      'Priority support',
-      'Monthly performance report',
-      'Up to 2hrs development per month',
+      'Scoped to a single business problem',
+      'Admin view or intake form',
+      'Automation or AI-powered output',
     ],
-    highlight: true,
   },
 ];
 
@@ -116,31 +113,35 @@ const MAINTENANCE_FEATURES = [
 
 const MAINTENANCE_PLANS = [
   {
-    name: 'Essential',
-    price: '£49/mo',
-    agencyPrice: 'Agencies charge £100–£150/mo',
-    best: 'Static sites & portfolios',
+    name: 'Basic',
+    price: '£29/mo',
     features: [
-      'Managed hosting & SSL',
-      '24/7 uptime monitoring',
-      'Monthly security & backups',
-      'Content updates at hourly rate',
-      'Email support',
+      'Hosting included',
+      'Security monitoring',
+      'Automatic backups',
+      'Uptime monitoring',
     ],
   },
   {
-    name: 'Professional',
-    price: '£99/mo',
-    agencyPrice: 'Agencies charge £200–£350/mo',
-    best: 'Small businesses & e-commerce',
+    name: 'Business',
+    price: '£59/mo',
     features: [
-      'Everything in Essential',
-      'Weekly security & backups',
-      '1 hour content updates included/mo',
-      'Priority email & phone support',
-      'Monthly performance report',
+      'Everything in Basic',
+      'Monthly software updates',
+      'Up to 2 small content edits/mo',
+      'Priority email support',
     ],
     highlight: true,
+  },
+  {
+    name: 'Growth',
+    price: '£99/mo',
+    features: [
+      'Everything in Business',
+      'Unlimited small content edits',
+      'Same-day priority support',
+      'Monthly performance report',
+    ],
   },
 ];
 
@@ -206,7 +207,7 @@ export default function Pricing() {
           title="Websites"
           subtitle="Custom-built, mobile-first websites — not templates."
         />
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {WEBSITE_PACKAGES.map((pkg) => <PackageCard key={pkg.name} pkg={pkg} />)}
         </div>
       </section>
@@ -214,10 +215,10 @@ export default function Pricing() {
       {/* Mobile Apps */}
       <section>
         <SectionHeader
-          title="Mobile Apps"
+          title="Mobile Apps & AI Tools"
           subtitle="Full-cycle development — design, build, and store submission."
         />
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {APP_PACKAGES.map((pkg) => <PackageCard key={pkg.name} pkg={pkg} />)}
         </div>
       </section>
@@ -245,7 +246,7 @@ export default function Pricing() {
         </div>
 
         {/* Plans */}
-        <div className="grid gap-4 sm:grid-cols-2 max-w-xl">
+        <div className="grid gap-4 sm:grid-cols-3 max-w-2xl">
           {MAINTENANCE_PLANS.map((pkg) => <PackageCard key={pkg.name} pkg={pkg} />)}
         </div>
 

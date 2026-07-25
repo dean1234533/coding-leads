@@ -677,7 +677,7 @@ I was looking at local businesses in the area and had a look at {{business}}'s w
 
 That means anyone finding you through Google, social media, or a recommendation could be leaving without getting in touch — which can result in missed enquiries and bookings without you even realising it.
 
-The good news is that this is usually a straightforward fix, and there are two ways to go about it. I build custom websites through Dean Da Dev from £399, or if a full rebuild is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform that gets clients booking and paying online in about ten minutes, for £10–20/month with a 90-day free trial.
+The good news is that this is usually a straightforward fix, and there are two ways to go about it. I build custom websites through Dean Da Dev from £249, or if a full rebuild is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform that gets clients booking and paying online in about ten minutes, for £10–20/month with a 90-day free trial.
 
 Either way, a working, fast, mobile-friendly site can make a big difference because it allows potential customers to:
 
@@ -703,7 +703,7 @@ I was looking at local businesses in the area and noticed {{business}} doesn't c
 
 That means anyone searching Google, checking social media, or asking for a recommendation has no way to find or check you out online — which usually means they end up going with a competitor who does show up.
 
-The good news is that this is usually a straightforward fix, and there are two ways to go about it. I build custom websites through Dean Da Dev from £399, or if a full site is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform that gets you a professional online presence plus bookings and payments live in about ten minutes, for £10–20/month with a 90-day free trial.
+The good news is that this is usually a straightforward fix, and there are two ways to go about it. I build custom websites through Dean Da Dev from £249, or if a full site is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform that gets you a professional online presence plus bookings and payments live in about ten minutes, for £10–20/month with a 90-day free trial.
 
 Either way, a fast, mobile-friendly site can make a big difference because it allows potential customers to:
 

@@ -81,7 +81,7 @@ Subject: A thought on your website
 
 Hi Sarah,
 
-I came across Bright Sparks Electrical's website and noticed it hasn't been updated in a while — no clear call to action, no reviews shown, and it doesn't render well on mobile. I'm a freelance developer trading as Dean Da Dev; I build custom websites from £950 and handle everything from design through to launch, but if a full build is more than you need right now, I also run Bookrightly — a booking platform for service businesses where you can take online appointments and payments straight away, and if your industry isn't listed yet there's a form to request it be added. Either way, would you be up for a quick 5-minute chat?
+I came across Bright Sparks Electrical's website and noticed it hasn't been updated in a while — no clear call to action, no reviews shown, and it doesn't render well on mobile. I'm a freelance developer trading as Dean Da Dev; I build custom websites from £249 and handle everything from design through to launch, but if a full build is more than you need right now, I also run Bookrightly — a booking platform for service businesses where you can take online appointments and payments straight away, and if your industry isn't listed yet there's a form to request it be added. Either way, would you be up for a quick 5-minute chat?
 
 Dean
 dean-da-dev.co.uk
@@ -90,11 +90,15 @@ dean-da-dev.co.uk
 
 ## PRICING REFERENCE (for your own use — do not paste into emails)
 
-| Plan         | Price  | Best for                                      |
-|--------------|--------|-----------------------------------------------|
-| Starter      | £950   | Clean refresh, up to 5 pages                  |
-| Professional | £1,200 | Full site with SEO + booking form             |
-| Premium      | £2,000 | Site + client portal + live chat + blog       |
+| Plan             | Price  | Best for                                                |
+|------------------|--------|----------------------------------------------------------|
+| Launch Website   | £249   | Sole traders & startups, 1–3 pages                      |
+| Core Website     | £399   | Local trades, up to 5 pages + branding                  |
+| Business Website | £699   | Growing service businesses, custom content + SEO        |
+| Elite Website    | £1,200 | Multi-location/booking-led, 8+ pages + conversion focus |
+
+App/AI work: App Prototype £1,999 · Starter App MVP £4,999 · Growth App £7,999 · AI Tool/Dashboard £2,999
+Maintenance plans: Basic £29/mo · Business £59/mo · Growth £99/mo
 
 Bookrightly: £10/month (barbers, salons, decorators) · £20/month (PTs) · 90-day free trial
 
