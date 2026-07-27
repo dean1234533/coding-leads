@@ -17,6 +17,7 @@ import CrmAutoSeed from '../components/crm/CrmAutoSeed';
 import CrmApprovals from '../components/crm/CrmApprovals';
 import CrmWorkflows from '../components/crm/CrmWorkflows';
 import CrmInsights from '../components/crm/CrmInsights';
+import CrmAdAdvice from '../components/crm/CrmAdAdvice';
 import { enablePushNotifications, onForegroundPush } from '../utils/pushNotifications';
 import Modal from '../components/Modal';
 
@@ -31,6 +32,7 @@ const SUB_TABS = [
   { key: 'approvals',  label: 'Approvals'  },
   { key: 'workflows',  label: 'Workflows'  },
   { key: 'insights',   label: 'Insights'   },
+  { key: 'adAdvice',   label: 'Ad Advice'  },
   { key: 'settings',   label: 'Settings'   },
 ];
 
@@ -133,6 +135,7 @@ const AUTO_SCAN_BUSINESS_TYPES = [
   { value: 'barber',             label: 'Barbers'                  },
   { value: 'nail_salon',         label: 'Nail Salons'              },
   { value: 'spa',                label: 'Spas & Massage'           },
+  { value: 'tattoo_shop',        label: 'Tattoo Shops'             },
   { value: 'gym',                label: 'Gyms & Fitness'           },
   { value: 'personal_trainer',   label: 'Personal Trainers'        },
   { value: 'yoga_studio',        label: 'Yoga Studios'             },
@@ -918,6 +921,7 @@ export default function OutreachCrmPage() {
         {subTab === 'approvals' && <CrmApprovals />}
         {subTab === 'workflows' && <CrmWorkflows />}
         {subTab === 'insights' && <CrmInsights />}
+        {subTab === 'adAdvice' && <CrmAdAdvice />}
         {subTab === 'settings' && (
           <div className="space-y-6">
             <section className="rounded-xl border border-gray-800 bg-gray-900 p-4 sm:p-6">

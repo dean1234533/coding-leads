@@ -28,6 +28,26 @@ async function fetchPageHtml(url, timeout = 15_000) {
   return typeof data === 'string' ? data : '';
 }
 
+// Cheap, deterministic complement to the AI's subjective "does this look
+// dated" screenshot judgment — a site whose own copyright notice hasn't
+// been updated in 3+ years is a concrete, unambiguous staleness signal that
+// doesn't depend on an AI vision call succeeding at all, and gives outreach
+// something specific and hard to dispute to point at.
+const STALE_COPYRIGHT_YEARS = 3;
+
+async function checkCopyrightStaleness(url) {
+  if (!url) return null;
+  try {
+    const html = await fetchPageHtml(url, 10_000);
+    const years = [...html.matchAll(/(?:©|copyright)\s*(\d{4})/gi)].map((m) => Number(m[1]));
+    if (!years.length) return null;
+    const oldest = Math.min(...years);
+    return new Date().getFullYear() - oldest >= STALE_COPYRIGHT_YEARS ? oldest : null;
+  } catch {
+    return null; // can't fetch -> no evidence either way
+  }
+}
+
 async function pageHtmlHasReviewWidget(url) {
   if (!url) return false;
   try {
@@ -169,6 +189,25 @@ function pickScreenshot(lighthouseResult) {
  *   (dead site, blocked, timed out) — never throws, since one bad site
  *   shouldn't break a batch of leads being added.
  */
+// PageSpeed's "Unable to process request. Please wait a while and try
+// again." is a rate-limit response, not a real per-site failure — confirmed
+// live: it started appearing regularly once auditWebsite began making two
+// PageSpeed calls per site (mobile + desktop) instead of one. Retrying once
+// after a short delay recovers most of these instead of the audit failing
+// outright with no result.
+const RATE_LIMIT_RE = /unable to process request.*wait a while|rate limit|quota exceeded/i;
+
+async function fetchPageSpeed(reqUrl) {
+  try {
+    return await axios.get(reqUrl.toString(), { timeout: 170_000 });
+  } catch (err) {
+    const message = err.response?.data?.error?.message ?? err.message;
+    if (!RATE_LIMIT_RE.test(message)) throw err;
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
+    return axios.get(reqUrl.toString(), { timeout: 170_000 });
+  }
+}
+
 async function auditWebsite(url, apiKey, visionKeys) {
   if (!url || !apiKey) return null;
 
@@ -192,7 +231,7 @@ async function auditWebsite(url, apiKey, visionKeys) {
     // auditWebsitesNow callers) and the function's own timeoutSeconds are
     // both set higher still to give this — plus the AI vision fallback
     // chain that runs after it — room to actually finish.
-    const { data } = await axios.get(reqUrl.toString(), { timeout: 170_000 });
+    const { data } = await fetchPageSpeed(reqUrl);
 
     // PageSpeed's own request can succeed (HTTP 200 from Google) while still
     // reporting that it couldn't actually load the target site at all —
@@ -238,6 +277,11 @@ async function auditWebsite(url, apiKey, visionKeys) {
 
     const technicalIssues = deriveIssues(categories, audits, data.lighthouseResult?.finalUrl);
 
+    const staleCopyrightYear = await checkCopyrightStaleness(data.lighthouseResult?.finalUrl || url);
+    if (staleCopyrightYear && !technicalIssues.includes('Outdated Design')) {
+      technicalIssues.push('Outdated Design');
+    }
+
     // PageSpeed only measures technical stuff (speed, alt text, contrast) —
     // it can't judge whether a site actually looks dated or unbranded. Reuse
     // the screenshot PageSpeed already captured and have Gemini look at it
@@ -263,7 +307,7 @@ async function auditWebsite(url, apiKey, visionKeys) {
       for (const cat of ['performance', 'seo', 'accessibility', 'best-practices']) {
         desktopReqUrl.searchParams.append('category', cat);
       }
-      const { data: desktopData } = await axios.get(desktopReqUrl.toString(), { timeout: 170_000 });
+      const { data: desktopData } = await fetchPageSpeed(desktopReqUrl);
       const desktopScreenshot = pickScreenshot(desktopData.lighthouseResult);
       if (desktopScreenshot) {
         const desktopDesign = await assessDesign(desktopScreenshot, visionKeys);
@@ -317,6 +361,11 @@ async function auditWebsite(url, apiKey, visionKeys) {
           .join(' ')
           .trim() || null;
       }
+    }
+
+    if (staleCopyrightYear) {
+      const copyrightNote = `The footer copyright still reads ${staleCopyrightYear} — the site hasn't been touched in a while.`;
+      designImpression = designImpression ? `${designImpression} ${copyrightNote}` : copyrightNote;
     }
 
     const issuesChecklist = [...new Set([...technicalIssues, ...designIssues])];

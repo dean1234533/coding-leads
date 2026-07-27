@@ -110,6 +110,52 @@ export default function CrmInsights() {
             </div>
           )}
 
+          {(insights.commsStatsByTone?.length > 0 || insights.commsStatsByPurpose?.length > 0) && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {insights.commsStatsByTone?.length > 0 && (
+                <div className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">Reply Rate by Tone</p>
+                  <div className="mt-2 space-y-1.5">
+                    {insights.commsStatsByTone.map((t) => (
+                      <div key={t.value} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-300">{t.value}</span>
+                        <span className="text-gray-500">{t.replyRate}% ({t.repliedCount}/{t.sentCount})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {insights.commsStatsByPurpose?.length > 0 && (
+                <div className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">Reply Rate by Purpose</p>
+                  <div className="mt-2 space-y-1.5">
+                    {insights.commsStatsByPurpose.map((p) => (
+                      <div key={p.value} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-300">{p.value.replace(/_/g, ' ')}</span>
+                        <span className="text-gray-500">{p.replyRate}% ({p.repliedCount}/{p.sentCount})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {insights.commsStatsByChannel?.length > 0 && (
+            <div className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">AI Drafts Sent by Channel</p>
+              <div className="mt-2 space-y-1.5">
+                {insights.commsStatsByChannel.map((c) => (
+                  <div key={c.value} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-300">{c.value}</span>
+                    <span className="text-gray-500">{c.sentCount} sent</span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-gray-600">Only email has a reply rate above — there's no way to detect replies on WhatsApp, Instagram, or Facebook.</p>
+            </div>
+          )}
+
           <p className="text-xs text-gray-600">
             Appointment/booking statistics aren't tracked yet — the booking calendar creates a Google Calendar event but nothing is saved to the CRM to report on.
           </p>

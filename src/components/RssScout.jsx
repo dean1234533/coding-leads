@@ -28,6 +28,7 @@ const BUSINESS_TYPES = [
   { value: 'barber',             label: 'Barbers'                  },
   { value: 'nail_salon',         label: 'Nail Salons'              },
   { value: 'spa',                label: 'Spas & Massage'           },
+  { value: 'tattoo_shop',        label: 'Tattoo Shops'             },
   { value: 'gym',                label: 'Gyms & Fitness'           },
   { value: 'personal_trainer',   label: 'Personal Trainers'        },
   { value: 'yoga_studio',        label: 'Yoga Studios'             },
@@ -90,6 +91,7 @@ const TYPE_LABELS = {
   car_repair:          'auto repair garage',
   dentist:             'dental or medical practice',
   store:               'retail shop',
+  tattoo_shop:         'tattoo studio',
 };
 
 const TYPE_COLOURS = {
@@ -104,6 +106,7 @@ const TYPE_COLOURS = {
   car_repair:          'industrial palette — charcoal, red, and white',
   dentist:             'clean clinical palette — white, soft blue, and mint green',
   store:               'clean modern palette — white, grey, and a bold accent',
+  tattoo_shop:         'bold statement palette — matte black, deep red, and white',
 };
 
 function generateFigmaPrompt(lead, businessType) {
@@ -203,6 +206,23 @@ function HasWebBadge() {
   );
 }
 
+function IntentBadge({ intent, reason }) {
+  if (!intent) return null;
+  const styles = {
+    High:   'bg-rose-500/15 text-rose-400 ring-rose-500/30',
+    Medium: 'bg-amber-500/15 text-amber-400 ring-amber-500/30',
+    Low:    'bg-gray-700/40 text-gray-400 ring-gray-600/30',
+  };
+  return (
+    <span
+      title={reason || undefined}
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1 ring-inset ${styles[intent] ?? styles.Low}`}
+    >
+      {intent} Intent
+    </span>
+  );
+}
+
 function StarRating({ rating, count }) {
   if (!rating) return null;
   return (
@@ -231,6 +251,7 @@ function LeadCard({ lead, onFigmaCopy, isFigmaCopied, businessType, onAddToCrm, 
       <div>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           {isPrime ? <PrimeBadge /> : isWeak ? <WeakWebBadge /> : <HasWebBadge />}
+          <IntentBadge intent={lead.buyingIntent} reason={lead.buyingIntentReason} />
           <StarRating rating={lead.rating} count={lead.reviewCount} />
         </div>
         <h3 className="font-semibold text-gray-100">{lead.name}</h3>
@@ -331,6 +352,17 @@ function LeadCard({ lead, onFigmaCopy, isFigmaCopied, businessType, onAddToCrm, 
           </svg>
           <a href={lead.instagramUrl} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:underline">
             {lead.instagramUrl.replace(/^https?:\/\/(www\.)?instagram\.com\//, '@').replace(/\/$/, '')}
+          </a>
+        </div>
+      )}
+
+      {lead.facebookUrl && (
+        <div className="flex items-center gap-1.5 text-xs">
+          <svg className="h-3 w-3 flex-shrink-0 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M22 12a10 10 0 10-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.5 1.49-3.89 3.78-3.89 1.1 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56V12h2.78l-.44 2.89h-2.34v6.99A10 10 0 0022 12z" />
+          </svg>
+          <a href={lead.facebookUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+            View page →
           </a>
         </div>
       )}
@@ -538,6 +570,7 @@ export default function RssScout() {
         contactName: lead.ownerName ?? null,
         instagramUrl: lead.instagramUrl ?? null,
         whatsappUrl: lead.whatsappUrl ?? null,
+        facebookUrl: lead.facebookUrl ?? null,
         competitorName: lead.competitorName ?? null,
         competitorRating: lead.competitorRating ?? null,
         competitorReviewCount: lead.competitorReviewCount ?? null,
@@ -546,13 +579,18 @@ export default function RssScout() {
         googleMapsUrl: lead.googleMapsUrl ?? null,
         overallImpression: audit?.auditFailed
           ? `Auto-audit failed (${audit.error}) — ${lead.opportunityLabel ?? 'try a manual Website Review instead.'}`
-          : audit?.overallImpression ?? lead.opportunityLabel ?? null,
+          : audit?.overallImpression ?? (!lead.website ? 'No website found for this business.' : null) ?? lead.opportunityLabel ?? null,
         websiteScore: audit?.websiteScore ?? null,
-        issuesChecklist: audit?.issuesChecklist ?? [],
+        // Same reasoning as the server-side equivalent (addBusinessLeadToCrm
+        // in functions/index.js) — no website means no audit ever ran,
+        // which used to leave this silently empty.
+        issuesChecklist: audit?.issuesChecklist ?? (!lead.website ? ['No Website'] : []),
         speedNotes: audit?.speedNotes ?? null,
         mobileNotes: audit?.mobileNotes ?? null,
         seoNotes: audit?.seoNotes ?? null,
         aiDesignNote: audit?.aiDesignNote ?? null,
+        buyingIntent: lead.buyingIntent ?? null,
+        buyingIntentReason: lead.buyingIntentReason ?? null,
         status: 'New',
         priority: 'Medium',
         source: 'Google Maps',

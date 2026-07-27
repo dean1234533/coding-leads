@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { app, db } from '../../firebase';
 import Modal from '../Modal';
-import { STATUSES, PRIORITIES, INDUSTRIES, STATUS_COLORS, applyTemplateVars, buildTemplateVars } from '../../utils/crmConstants';
+import { STATUSES, PRIORITIES, INDUSTRIES, STATUS_COLORS, applyTemplateVars, buildTemplateVars, sortTemplatesByRelevance } from '../../utils/crmConstants';
 import { computeNextFollowUp, followUpPatchForSend } from '../../utils/crmFollowUps';
 import CrmWebsiteReview from './CrmWebsiteReview';
 import CrmNotesTimeline from './CrmNotesTimeline';
@@ -24,14 +24,14 @@ function CrmInstagramOutreach({ lead }) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, 'crmTemplates'), where('category', '==', 'Instagram'));
-    return onSnapshot(q, (snap) => setTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setTemplates([]));
+    // Every template is offered here now, not just ones tagged Instagram —
+    // Dean's call which one actually fits a given lead/channel, not
+    // something to gate in code (e.g. "No Website" or an industry-specific
+    // pitch is just as valid to send as an Instagram DM as an email).
+    return onSnapshot(collection(db, 'crmTemplates'), (snap) => setTemplates(sortTemplatesByRelevance(snap.docs.map((d) => ({ id: d.id, ...d.data() })))), () => setTemplates([]));
   }, []);
 
   if (!templates || templates.length === 0) return null;
-  // More than one Instagram template exists (e.g. a general idea-offer vs a
-  // Bookrightly-specific pitch) — let Dean pick which fits this lead rather
-  // than silently always using whichever one the query happens to return first.
   const template = templates.find((t) => t.id === selectedId) ?? templates[0];
   const caption = applyTemplateVars(template.body, buildTemplateVars(lead, { myName: MY_NAME }));
 
@@ -91,34 +91,26 @@ function formatPhoneIntl(phone) {
 // copy-paste needed, the link opens the chat with the message already
 // typed in, just needs Dean to hit send himself (there's no send API for
 // either, same reason as Instagram).
-// A template belongs to a channel if its primary category matches, or its
-// optional `channels` array lists it — the latter lets one template (e.g.
-// the "Free Mockup" pitch) be offered on more than one channel without
-// duplicating the content.
-function templatesForChannel(templates, channel) {
-  return templates.filter((t) => t.category === channel || t.channels?.includes(channel));
-}
-
 function CrmPhoneOutreach({ lead }) {
   const [templates, setTemplates] = useState(null);
   const [whatsappId, setWhatsappId] = useState(null);
   const [smsId, setSmsId] = useState(null);
+  const [facebookId, setFacebookId] = useState(null);
 
   useEffect(() => {
-    // Fetches the whole (small) template library rather than a `category`
-    // filter — a `channels` array match can't be expressed as a simple
-    // Firestore `where` alongside the category check without a second query,
-    // and this collection is small enough that client-side filtering is fine.
-    return onSnapshot(collection(db, 'crmTemplates'), (snap) => setTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setTemplates([]));
+    return onSnapshot(collection(db, 'crmTemplates'), (snap) => setTemplates(sortTemplatesByRelevance(snap.docs.map((d) => ({ id: d.id, ...d.data() })))), () => setTemplates([]));
   }, []);
 
   if (!templates || templates.length === 0) return null;
-  const whatsappOptions = templatesForChannel(templates, 'WhatsApp');
-  // Same options as WhatsApp — texting the same short, personal pitch on
-  // whichever channel a lead actually has a working number for.
-  const smsOptions = whatsappOptions;
+  // Every template is offered on every channel — Dean picks whichever
+  // actually fits this lead and this channel, not something narrowed down
+  // in code first.
+  const whatsappOptions = templates;
+  const smsOptions = templates;
+  const facebookOptions = templates;
   const whatsapp = whatsappOptions.find((t) => t.id === whatsappId) ?? whatsappOptions[0];
   const sms = smsOptions.find((t) => t.id === smsId) ?? smsOptions[0];
+  const facebook = facebookOptions.find((t) => t.id === facebookId) ?? facebookOptions[0];
 
   // Prefer a WhatsApp number the business actually put on their own site
   // (scraped during the scan — see findWhatsAppLink in functions/index.js)
@@ -126,7 +118,11 @@ function CrmPhoneOutreach({ lead }) {
   // businesses run a dedicated WhatsApp line separate from their landline.
   const whatsappNumber = lead.whatsappUrl?.match(/wa\.me\/(\d+)/)?.[1] ?? formatPhoneIntl(lead.phone);
   const smsNumber = formatPhoneIntl(lead.phone);
-  if (!whatsappNumber && !smsNumber) return null;
+  // m.me/PAGE-NAME supports a pre-filled Messenger message via ?text=,
+  // confirmed against Meta's own m.me docs — same wa.me-style deep link,
+  // just needs the page name/id pulled out of whatever facebookUrl is.
+  const facebookPage = lead.facebookUrl?.match(/facebook\.com\/(?:pages\/)?([^/?]+)/)?.[1];
+  if (!whatsappNumber && !smsNumber && !facebookPage) return null;
 
   const vars = buildTemplateVars(lead, { myName: MY_NAME });
   const selectClasses = "rounded border border-gray-700 bg-gray-800/50 px-1.5 py-0.5 text-xs font-medium focus:outline-none";
@@ -142,11 +138,9 @@ function CrmPhoneOutreach({ lead }) {
           >
             Message on WhatsApp {lead.whatsappUrl ? '(number found on their site) ' : ''}→
           </a>
-          {whatsappOptions.length > 1 && (
-            <select value={whatsapp.id} onChange={(e) => setWhatsappId(e.target.value)} className={`${selectClasses} text-emerald-400 focus:border-emerald-500`}>
-              {whatsappOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          )}
+          <select value={whatsapp.id} onChange={(e) => setWhatsappId(e.target.value)} className={`${selectClasses} text-emerald-400 focus:border-emerald-500`}>
+            {whatsappOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
         </span>
       )}
       {sms && smsNumber && (
@@ -157,11 +151,23 @@ function CrmPhoneOutreach({ lead }) {
           >
             Send Text →
           </a>
-          {smsOptions.length > 1 && (
-            <select value={sms.id} onChange={(e) => setSmsId(e.target.value)} className={`${selectClasses} text-blue-400 focus:border-blue-500`}>
-              {smsOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          )}
+          <select value={sms.id} onChange={(e) => setSmsId(e.target.value)} className={`${selectClasses} text-blue-400 focus:border-blue-500`}>
+            {smsOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </span>
+      )}
+      {facebook && facebookPage && (
+        <span className="flex items-center gap-1.5">
+          <a
+            href={`https://m.me/${facebookPage}?text=${encodeURIComponent(applyTemplateVars(facebook.body, vars))}`}
+            target="_blank" rel="noopener noreferrer"
+            className="text-xs font-medium text-indigo-400 hover:text-indigo-300"
+          >
+            Message on Facebook →
+          </a>
+          <select value={facebook.id} onChange={(e) => setFacebookId(e.target.value)} className={`${selectClasses} text-indigo-400 focus:border-indigo-500`}>
+            {facebookOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
         </span>
       )}
     </div>
@@ -335,9 +341,32 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
           <div className="col-span-2 sm:col-span-3">
             <EditableField label="WhatsApp Link (auto-detected from their site, if found)" value={lead.whatsappUrl} onSave={(v) => onUpdate({ whatsappUrl: v })} />
           </div>
+          <div className="col-span-2 sm:col-span-3">
+            <EditableField label="Facebook Page (auto-detected from their site, if found)" value={lead.facebookUrl} onSave={(v) => onUpdate({ facebookUrl: v })} />
+            {lead.facebookUrl && (
+              <a href={lead.facebookUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs text-blue-400 hover:text-blue-300">
+                Open Facebook →
+              </a>
+            )}
+          </div>
           <EditableField label="Address" value={lead.address} onSave={(v) => onUpdate({ address: v })} />
           <EditableSelect label="Industry" value={lead.industry} options={INDUSTRIES} onSave={(v) => onUpdate({ industry: v })} />
           <EditableField label="Lead Score" type="number" value={lead.leadScore} onSave={(v) => onUpdate({ leadScore: v ? Number(v) : null })} />
+          {lead.buyingIntent && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">Buying Intent</span>
+              <span
+                title={lead.buyingIntentReason || undefined}
+                className={`w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${
+                  lead.buyingIntent === 'High' ? 'bg-rose-500/15 text-rose-400 ring-rose-500/30'
+                  : lead.buyingIntent === 'Medium' ? 'bg-amber-500/15 text-amber-400 ring-amber-500/30'
+                  : 'bg-gray-700/40 text-gray-400 ring-gray-600/30'
+                }`}
+              >
+                {lead.buyingIntent}
+              </span>
+            </div>
+          )}
           <EditableField label="Estimated Value (£)" type="number" value={lead.estimatedProjectValue} onSave={(v) => onUpdate({ estimatedProjectValue: v ? Number(v) : null })} />
           <EditableField label="Source" value={lead.source} onSave={(v) => onUpdate({ source: v })} />
           <EditableField label="Next Action" value={lead.nextAction} onSave={(v) => onUpdate({ nextAction: v })} />

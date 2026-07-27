@@ -46,7 +46,11 @@ const ACTIVE_STATUSES = new Set(['Won', 'Lost', 'Archive']);
  * than resetting back to stage 0. Leaves closed-out leads alone.
  */
 export function followUpPatchForSend(lead, sentDate = new Date()) {
-  if (ACTIVE_STATUSES.has(lead.status)) {
+  // Backlink prospects (category: 'Backlink') are a one-shot "submit and
+  // wait" ask (a tool mention/guest post pitch), not an ongoing sales
+  // conversation — they shouldn't get pulled into a multi-touch follow-up
+  // ladder just because a message was sent to them.
+  if (ACTIVE_STATUSES.has(lead.status) || lead.category === 'Backlink') {
     return { lastContactDate: sentDate };
   }
   const stage = (lead.followUpStage ?? -1) + 1;

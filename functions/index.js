@@ -92,6 +92,7 @@ const BUSINESS_TYPES = [
   { value: 'barber',            label: 'Barbers',                   keyword: 'barber shop' },
   { value: 'nail_salon',        label: 'Nail Salons',               keyword: 'nail salon' },
   { value: 'spa',               label: 'Spas & Massage',            keyword: 'spa' },
+  { value: 'tattoo_shop',       label: 'Tattoo Shops',              keyword: 'tattoo shop' },
   { value: 'gym',               label: 'Gyms & Fitness',            keyword: 'gym' },
   { value: 'personal_trainer',  label: 'Personal Trainers',         keyword: 'personal trainer' },
   { value: 'yoga_studio',       label: 'Yoga Studios',              keyword: 'yoga studio' },
@@ -167,6 +168,30 @@ function opportunityLabel(place) {
     return 'Weak Website — Redesign Opportunity';
   }
   return 'Has Website — App / Upgrade Opportunity';
+}
+
+/**
+ * Buying-readiness signal, separate from opportunityScore (which only says
+ * *how bad* their web presence is). This asks whether the business looks
+ * like it's actually in a position to act on outreach right now — a
+ * beautiful pitch to a temporarily-closed business is still a dead end.
+ * Uses only fields already fetched in the Places call, so it costs nothing
+ * extra to compute.
+ */
+function computeBuyingIntent(place, opportunityScore) {
+  if (place.business_status === 'CLOSED_TEMPORARILY') {
+    return { label: 'Low', reason: 'Marked temporarily closed on Google — probably not the right time to reach out.' };
+  }
+  const reviewCount = place.user_ratings_total ?? 0;
+  if (opportunityScore === 5) {
+    return reviewCount >= 5
+      ? { label: 'High', reason: 'Established business (real review history) with no website at all — a clear, concrete pitch.' }
+      : { label: 'Medium', reason: 'No website and very few reviews — may be brand new or barely active, worth a quick check before investing much time.' };
+  }
+  if (opportunityScore === 3) {
+    return { label: 'High', reason: 'Live business with a visibly outdated or insecure website — an easy, visible problem to open with.' };
+  }
+  return { label: 'Low', reason: 'Already has a proper working website — needs a specific angle (e.g. a real issue found on audit) to be worth pitching.' };
 }
 
 /** Title-cases a word ("SMITH" → "Smith") */
@@ -349,13 +374,20 @@ async function findOwnerFromCompaniesHouse(rawName) {
 }
 
 const IGNORED_EMAIL_PREFIXES = ['noreply', 'no-reply', 'donotreply', 'privacy', 'legal', 'abuse', 'webmaster', 'postmaster', 'unsubscribe', 'bounce', 'hello@wix', 'support@'];
+// The prefix filter above catches junk by local-part (noreply@, support@ on
+// their own domain); this catches a different class — a third-party
+// analytics/CDN/library's own address embedded in an SDK config or script
+// tag (a Sentry DSN comment, a Google/Cloudflare service reference), which
+// has no suspicious prefix but is never the business's own contact address.
+const NON_BUSINESS_EMAIL_DOMAINS = ['sentry.io', 'sentry-next.io', 'wixpress.com', 'example.com', 'godaddy.com', 'cloudflare.com', 'w3.org', 'schema.org', 'google.com', 'googleapis.com', 'gstatic.com', 'domain.com'];
 const EMAIL_REGEX = /\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/g;
 
 function pickBestEmail(emails, domain) {
   if (!emails.length) return null;
-  // Filter out ignored prefixes and emails not on the business domain
-  const onDomain  = emails.filter(e => e.includes(`@${domain}`) && !IGNORED_EMAIL_PREFIXES.some(p => e.startsWith(p)));
-  const anyGood   = emails.filter(e => !IGNORED_EMAIL_PREFIXES.some(p => e.startsWith(p)));
+  // Filter out ignored prefixes, known non-business domains, and emails not on the business domain
+  const isJunk = (e) => IGNORED_EMAIL_PREFIXES.some(p => e.startsWith(p)) || NON_BUSINESS_EMAIL_DOMAINS.some(d => e.endsWith(`@${d}`) || e.includes(`.${d}`));
+  const onDomain  = emails.filter(e => e.includes(`@${domain}`) && !isJunk(e));
+  const anyGood   = emails.filter(e => !isJunk(e));
   return onDomain[0] ?? anyGood[0] ?? emails[0];
 }
 
@@ -887,6 +919,7 @@ async function scrapeWebsiteContacts(website) {
     return {
       email: row.emails?.[0]?.value?.toLowerCase() ?? null,
       instagramUrl: row.instagram ?? null,
+      facebookUrl: row.facebook ?? null,
     };
   } catch (err) {
     console.warn('[scrapeWebsiteContacts] failed:', err.response?.data?.error?.message ?? err.message);
@@ -980,6 +1013,9 @@ async function runBusinessScan({
       }
       for (const p of (r.value.data.results ?? []).slice(0, maxResults)) {
         if (seenPlaceIds.has(p.place_id)) continue;
+        // Permanently closed businesses have zero buying readiness — no
+        // point scoring or surfacing a lead nobody can actually reach.
+        if (p.business_status === 'CLOSED_PERMANENTLY') continue;
         seenPlaceIds.add(p.place_id);
         // Which selected category's search actually found this place —
         // used below so each lead's industry reflects its own category
@@ -1021,6 +1057,7 @@ async function runBusinessScan({
       if (r.status === 'rejected') {
         console.warn('[scanBusinessLeads] detail fetch failed:', r.reason.message);
         const p = places[i];
+        const intent = computeBuyingIntent(p, 5);
         return {
           id:               p.place_id,
           name:             p.name,
@@ -1034,9 +1071,12 @@ async function runBusinessScan({
           hasWebsite:       false,
           opportunityScore: 5,
           opportunityLabel: 'No Website — Prime Lead',
+          buyingIntent:       intent.label,
+          buyingIntentReason: intent.reason,
           ownerName:        null,
           instagramUrl:     null,
           whatsappUrl:      null,
+          facebookUrl:      null,
           industryLabel:    p.__industryLabel ?? null,
           competitorName:       null,
           competitorRating:     null,
@@ -1045,6 +1085,8 @@ async function runBusinessScan({
       }
       const d = r.value.data.result ?? {};
       const hasWebsite = !!d.website;
+      const opportunityScoreValue = scoreOpportunity(d);
+      const intent = computeBuyingIntent(d, opportunityScoreValue);
       return {
         id:               places[i].place_id,
         name:             d.name ?? places[i].name,
@@ -1056,12 +1098,15 @@ async function runBusinessScan({
         reviewCount:      d.user_ratings_total ?? 0,
         types:            d.types ?? [],
         hasWebsite,
-        opportunityScore: scoreOpportunity(d),
+        opportunityScore: opportunityScoreValue,
         opportunityLabel: opportunityLabel(d),
+        buyingIntent:       intent.label,
+        buyingIntentReason: intent.reason,
         ownerName:        null,
         contactEmail:     null,
         instagramUrl:     null,
         whatsappUrl:      null,
+        facebookUrl:      null,
         industryLabel:    places[i].__industryLabel ?? null,
         competitorName:       null,
         competitorRating:     null,
@@ -1116,7 +1161,8 @@ async function runBusinessScan({
           lead.contactEmail    = cached.email ?? null;
           lead.instagramUrl    = cached.instagramUrl ?? null;
           lead.whatsappUrl     = cached.whatsappUrl ?? null;
-          console.log(`[owner] "${lead.name}" → cached: ${cached.ownerName ?? 'null'} | email: ${cached.email ?? 'none'} | instagram: ${cached.instagramUrl ?? 'none'} | whatsapp: ${cached.whatsappUrl ?? 'none'}`);
+          lead.facebookUrl     = cached.facebookUrl ?? null;
+          console.log(`[owner] "${lead.name}" → cached: ${cached.ownerName ?? 'null'} | email: ${cached.email ?? 'none'} | instagram: ${cached.instagramUrl ?? 'none'} | whatsapp: ${cached.whatsappUrl ?? 'none'} | facebook: ${cached.facebookUrl ?? 'none'}`);
           return;
         }
 
@@ -1139,6 +1185,7 @@ async function runBusinessScan({
           ]);
           if (!lead.contactEmail && contacts?.email) lead.contactEmail = contacts.email;
           lead.instagramUrl = contacts?.instagramUrl ?? null;
+          lead.facebookUrl = contacts?.facebookUrl ?? null;
           lead.whatsappUrl = whatsappUrl;
         } else if (!lead.contactEmail) {
           // No website and no email to fall back on — plenty of small
@@ -1150,7 +1197,7 @@ async function runBusinessScan({
           lead.whatsappUrl = null;
         }
 
-        console.log(`[owner] "${lead.name}" → ${ownerResult ? `${ownerResult.name} (${ownerResult.source})` : 'null'} | email: ${email ?? 'none'} | instagram: ${lead.instagramUrl ?? 'none'} | whatsapp: ${lead.whatsappUrl ?? 'none'}`);
+        console.log(`[owner] "${lead.name}" → ${ownerResult ? `${ownerResult.name} (${ownerResult.source})` : 'null'} | email: ${email ?? 'none'} | instagram: ${lead.instagramUrl ?? 'none'} | whatsapp: ${lead.whatsappUrl ?? 'none'} | facebook: ${lead.facebookUrl ?? 'none'}`);
 
         // Cache the result either way — a confirmed "no email found" is just
         // as worth remembering as a hit, so a dead end isn't re-queried
@@ -1161,6 +1208,7 @@ async function runBusinessScan({
           ownerNameSource: lead.ownerNameSource,
           instagramUrl: lead.instagramUrl,
           whatsappUrl: lead.whatsappUrl,
+          facebookUrl: lead.facebookUrl,
           checkedAt: FieldValue.serverTimestamp(),
         }).catch((err) => console.warn(`[owner] cache write failed for ${lead.id}:`, err.message));
       })
@@ -1298,6 +1346,7 @@ exports.getBusinessContactByPlaceId = onCall(
     let finalEmail = contactEmail ?? null;
     let instagramUrl = null;
     let whatsappUrl = null;
+    let facebookUrl = null;
     if (d.website) {
       const [contacts, whatsapp] = await Promise.all([
         scrapeWebsiteContacts(d.website),
@@ -1305,6 +1354,7 @@ exports.getBusinessContactByPlaceId = onCall(
       ]);
       if (!finalEmail && contacts?.email) finalEmail = contacts.email;
       instagramUrl = contacts?.instagramUrl ?? null;
+      facebookUrl = contacts?.facebookUrl ?? null;
       whatsappUrl = whatsapp;
     }
     // No website, or the website exists but never actually links to
@@ -1328,11 +1378,15 @@ exports.getBusinessContactByPlaceId = onCall(
       contactEmail:    finalEmail,
       instagramUrl,
       whatsappUrl,
+      facebookUrl,
       websiteScore:      audit?.websiteScore ?? null,
-      issuesChecklist:   audit?.issuesChecklist ?? [],
+      // Same reasoning as addBusinessLeadToCrm — no website means no audit
+      // ever ran, which used to leave this silently empty instead of
+      // flagging the one thing actually worth leading outreach with.
+      issuesChecklist:   audit?.issuesChecklist ?? (!d.website ? ['No Website'] : []),
       overallImpression: audit?.auditFailed
         ? `Auto-audit failed (${audit.error})`
-        : audit?.overallImpression ?? null,
+        : audit?.overallImpression ?? (!d.website ? 'No website found for this business.' : null),
       speedNotes:        audit?.speedNotes ?? null,
       mobileNotes:       audit?.mobileNotes ?? null,
       seoNotes:          audit?.seoNotes ?? null,
@@ -1619,7 +1673,16 @@ exports.scheduledBacklinkScan = onSchedule(
  * Runs audits in small parallel batches — PageSpeed takes 10-20s per site,
  * so auditing many leads sequentially would be far too slow.
  */
-const PAGESPEED_CONCURRENCY = 4;
+// Was 4 — halved when auditWebsite started making a second (desktop)
+// PageSpeed + Gemini vision call per site. That doubled the concurrent
+// Google API load without this changing, which was tripping real rate
+// limits in production (confirmed live: repeated Gemini "exceeded your
+// current quota" errors and PageSpeed "Unable to process request. Please
+// wait a while and try again" failures — the latter caused some audits to
+// fail outright with no result at all, not just a degraded one). Halving
+// concurrency brings total simultaneous PageSpeed/Gemini calls back down to
+// roughly what it was before the desktop pass was added.
+const PAGESPEED_CONCURRENCY = 2;
 
 const AUDIT_SECRETS = ['GOOGLE_PAGESPEED_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY', 'CLOUDFLARE_AI_KEY', 'HUGGINGFACE_API_KEY', 'SAMBANOVA_API_KEY', 'GITHUB_MODELS_TOKEN'];
 
@@ -1719,6 +1782,7 @@ async function addBusinessLeadToCrm(lead, fallbackIndustryLabel, pagespeedKey, v
     contactName: lead.ownerName ?? null,
     instagramUrl: lead.instagramUrl ?? null,
     whatsappUrl: lead.whatsappUrl ?? null,
+    facebookUrl: lead.facebookUrl ?? null,
     competitorName: lead.competitorName ?? null,
     competitorRating: lead.competitorRating ?? null,
     competitorReviewCount: lead.competitorReviewCount ?? null,
@@ -1730,13 +1794,19 @@ async function addBusinessLeadToCrm(lead, fallbackIndustryLabel, pagespeedKey, v
     googleMapsUrl: lead.googleMapsUrl ?? null,
     overallImpression: audit?.auditFailed
       ? `Auto-audit failed (${audit.error}) — ${lead.opportunityLabel ?? 'try a manual Website Review instead.'}`
-      : audit?.overallImpression ?? lead.opportunityLabel ?? null,
+      : audit?.overallImpression ?? (!lead.website ? 'No website found for this business.' : null) ?? lead.opportunityLabel ?? null,
     websiteScore: audit?.websiteScore ?? null,
-    issuesChecklist: audit?.issuesChecklist ?? [],
+    // A business with no website at all never gets an audit run (there's
+    // nothing to visit) — without this, issuesChecklist silently came back
+    // empty instead of flagging the single most obvious, highest-value
+    // thing to lead an outreach message with.
+    issuesChecklist: audit?.issuesChecklist ?? (!lead.website ? ['No Website'] : []),
     speedNotes: audit?.speedNotes ?? null,
     mobileNotes: audit?.mobileNotes ?? null,
     seoNotes: audit?.seoNotes ?? null,
     aiDesignNote: audit?.aiDesignNote ?? null,
+    buyingIntent: lead.buyingIntent ?? null,
+    buyingIntentReason: lead.buyingIntentReason ?? null,
     status: 'New',
     priority: 'Medium',
     source: 'Google Maps (Auto)',

@@ -5,7 +5,7 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { requireOwner } = require('./authGuard');
 const { withErrorAlert } = require('./errorAlert');
-const { generateMessage, aiKeysFromEnv, previousConversationFor, COMMS_SECRETS } = require('./aiCommsAssistant');
+const { generateMessage, aiKeysFromEnv, previousConversationFor, describeLead, COMMS_SECRETS } = require('./aiCommsAssistant');
 const { notifyOwner } = require('./pushNotifications');
 
 const TRIGGER_TYPES = ['NEW_CRM_LEAD', 'NEW_CODING_LEAD', 'LEAD_WON', 'LEAD_INACTIVE_DAYS'];
@@ -63,14 +63,52 @@ function interpolate(template, vars) {
   return String(template ?? '').replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');
 }
 
-async function runAction(db, keys, action, { leadId, leadCollection, leadName, leadContext }) {
+const CONDITION_OPERATORS = ['equals', 'not_equals', 'greater_than', 'less_than', 'contains'];
+
+// Optional extra filter beyond the trigger itself — e.g. "only if
+// industry equals Salon" or "only if intentScore greater_than 70". A
+// workflow with no conditions (the common case, and every DEFAULT_WORKFLOWS
+// entry) always passes. Field values come from buildFieldsContext below.
+function evaluateCondition(condition, fields) {
+  const actual = fields[condition.field];
+  switch (condition.operator) {
+    case 'equals': return actual === condition.value;
+    case 'not_equals': return actual !== condition.value;
+    case 'greater_than': return typeof actual === 'number' && actual > Number(condition.value);
+    case 'less_than': return typeof actual === 'number' && actual < Number(condition.value);
+    case 'contains': return typeof actual === 'string' && actual.includes(String(condition.value));
+    default: return false;
+  }
+}
+
+// A flat, condition-evaluable view of whatever's actually on the lead doc —
+// deliberately permissive (undefined fields just make that condition false
+// rather than throwing) since not every lead has every field set.
+function buildFieldsContext(data, leadCollection) {
+  if (leadCollection === 'codingLeads') {
+    return {
+      status: data.status ?? null, source: data.source ?? null, leadType: data.leadType ?? null,
+      intentScore: typeof data.intentScore === 'number' ? data.intentScore : null,
+      location: data.location ?? null, budget: data.budget ?? null,
+    };
+  }
+  return {
+    status: data.status ?? null, source: data.source ?? null, industry: data.industry ?? null,
+    priority: data.priority ?? null, leadScore: typeof data.leadScore === 'number' ? data.leadScore : null,
+    estimatedProjectValue: typeof data.estimatedProjectValue === 'number' ? data.estimatedProjectValue : null,
+  };
+}
+
+async function runAction(db, keys, action, { leadId, leadCollection, leadName, leadContext, leadData }) {
   if (action.type === 'DRAFT_MESSAGE') {
     const previousConversation = await previousConversationFor(db, leadCollection, leadId);
     const result = await generateMessage({
       purpose: action.config.purpose,
       tone: action.config.tone,
+      channel: action.config.channel || 'email',
       customerName: leadName,
       customerMessage: leadContext,
+      businessContext: describeLead(leadData, leadCollection),
       previousConversation,
       extraContext: action.config.extraContext,
     }, keys);
@@ -155,10 +193,27 @@ async function runWorkflows(db, keys) {
       const leadCollection = type === 'NEW_CODING_LEAD' ? 'codingLeads' : 'crmLeads';
       const leadName = data.businessName || data.title || data.contactName || '';
       const leadContext = data.notes || data.snippet || data.aiDesignNote || '';
+      const fields = buildFieldsContext(data, leadCollection);
 
       for (const workflow of matching) {
+        const conditionsPass = (workflow.conditions ?? []).every((c) => evaluateCondition(c, fields));
+        if (!conditionsPass) continue;
+
         for (const action of workflow.actions ?? []) {
-          const result = await runAction(db, keys, action, { leadId: docSnap.id, leadCollection, leadName, leadContext });
+          // One action throwing (an AI provider erroring unexpectedly, a
+          // malformed action config, etc.) used to propagate all the way up
+          // through withErrorAlert's outer catch, aborting the whole batch
+          // mid-loop — every lead after the failing one silently never got
+          // processed, with no record of what happened. Isolated per-action
+          // so the rest of the batch keeps going and the failure is visible
+          // in the run's own result instead of only in an error-alert email.
+          let result;
+          try {
+            result = await runAction(db, keys, action, { leadId: docSnap.id, leadCollection, leadName, leadContext, leadData: data });
+          } catch (err) {
+            result = { type: action.type, ok: false, reason: err.message };
+            console.error(`[workflowEngine] action failed for "${leadName}" (${workflow.name}):`, err.message);
+          }
           actionResults.push({ workflow: workflow.name, lead: leadName, ...result });
         }
       }
@@ -187,14 +242,17 @@ const saveWorkflow = onCall(
   { cors: true, timeoutSeconds: 15, memory: '256MiB' },
   async (request) => {
     requireOwner(request);
-    const { id, name, enabled, trigger, actions } = request.data ?? {};
+    const { id, name, enabled, trigger, actions, conditions } = request.data ?? {};
     if (!name?.trim()) throw new HttpsError('invalid-argument', 'name is required.');
     if (!TRIGGER_TYPES.includes(trigger?.type)) throw new HttpsError('invalid-argument', 'invalid trigger type.');
     for (const a of actions ?? []) {
       if (!ACTION_TYPES.includes(a.type)) throw new HttpsError('invalid-argument', `invalid action type: ${a.type}`);
     }
+    for (const c of conditions ?? []) {
+      if (!c.field || !CONDITION_OPERATORS.includes(c.operator)) throw new HttpsError('invalid-argument', `invalid condition: ${JSON.stringify(c)}`);
+    }
     const db = getFirestore();
-    const payload = { name, enabled: !!enabled, trigger, actions: actions ?? [], updatedAt: FieldValue.serverTimestamp() };
+    const payload = { name, enabled: !!enabled, trigger, actions: actions ?? [], conditions: conditions ?? [], updatedAt: FieldValue.serverTimestamp() };
     if (id) {
       await db.collection('workflows').doc(id).update(payload);
       return { id };
@@ -204,4 +262,4 @@ const saveWorkflow = onCall(
   }
 );
 
-module.exports = { scheduledWorkflowEngine, runWorkflowsNow, saveWorkflow, TRIGGER_TYPES, ACTION_TYPES };
+module.exports = { scheduledWorkflowEngine, runWorkflowsNow, saveWorkflow, TRIGGER_TYPES, ACTION_TYPES, CONDITION_OPERATORS, evaluateCondition };

@@ -73,11 +73,16 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
       const fn = httpsCallable(getFunctions(app), 'generateAuditEmailNow', { timeout: 30000 });
       const { data } = await fn({ lead, myName: MY_NAME });
       if (!subject.trim()) setSubject(applyTemplateVars(`A quick audit of {{business}}'s website`, vars));
-      const html = data.body.replace(/\n/g, '<br>');
+      // generateAuditEmail deliberately returns body only, no sign-off (see
+      // aiEmailWriter.js) — without appending it here, every AI-generated
+      // draft went out missing the website, since nothing else in this flow
+      // adds it automatically.
+      const html = data.body.replace(/\n/g, '<br>') + SIGNATURE;
       if (richMode && editorRef.current) {
         editorRef.current.innerHTML = html;
       } else {
-        setPlainText(data.body);
+        const signaturePlain = SIGNATURE.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n\n').replace(/<[^>]+>/g, '').trim();
+        setPlainText(`${data.body}\n\n${signaturePlain}`);
       }
     } catch (err) {
       console.error('[CrmComposer] AI generation failed:', err);

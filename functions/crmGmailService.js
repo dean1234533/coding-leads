@@ -15,6 +15,7 @@ const { classifyReply } = require('./aiReplyClassifier');
 const { requireOwner } = require('./authGuard');
 const { withErrorAlert } = require('./errorAlert');
 const { notifyOwner } = require('./pushNotifications');
+const { incrementCommsStat } = require('./aiCommsAssistant');
 
 // Mirrors slugify() in src/utils/crmConstants.js — same deterministic-ID
 // purpose (one doc per issue name in issueAnalytics), duplicated rather than
@@ -467,6 +468,18 @@ async function runReplySync() {
             .catch((err) => console.warn(`[syncGmailReplies] issueAnalytics update failed for "${issue}":`, err.message));
         }
 
+        // Attributes this reply back to whichever tone/purpose the last
+        // AI-drafted-and-approved email actually used (stamped on the lead
+        // by markApprovalSent in aiCommsAssistant.js) — the only way to
+        // answer "does Professional tone actually get more replies than
+        // Casual" with real data instead of a guess.
+        if (lead.lastCommsTone || lead.lastCommsPurpose) {
+          await Promise.all([
+            incrementCommsStat(db, 'tone', lead.lastCommsTone, 'repliedCount'),
+            incrementCommsStat(db, 'purpose', lead.lastCommsPurpose, 'repliedCount'),
+          ]);
+        }
+
         updated += 1;
       }
     } catch (err) {
@@ -619,11 +632,16 @@ async function runAutoFollowUp({ skipEnabledCheck = false } = {}) {
     .get();
   console.log(`[autoFollowUp] query matched ${snap.size} lead(s) with followUpDate <= now.`);
 
+  // Backlink prospects (category: 'Backlink') are a one-shot "submit and
+  // wait" ask (a tool mention/guest post pitch), not an ongoing sales
+  // conversation — they were never meant to get pulled into the same
+  // multi-touch follow-up ladder as a real lead, but nothing here actually
+  // excluded them from the query.
   const due = snap.docs.filter((d) => {
     const lead = d.data();
-    return lead.email?.trim() && !FOLLOW_UP_EXCLUDED_STATUSES.has(lead.status);
+    return lead.email?.trim() && !FOLLOW_UP_EXCLUDED_STATUSES.has(lead.status) && lead.category !== 'Backlink';
   });
-  console.log(`[autoFollowUp] ${due.length}/${snap.size} have an email and aren't Won/Lost/Archive/Replied.`);
+  console.log(`[autoFollowUp] ${due.length}/${snap.size} have an email, aren't Won/Lost/Archive/Replied, and aren't a Backlink prospect.`);
   if (!due.length) return { ran: true, sent: 0, matched: snap.size };
 
   const gmail = await getGmailClient();

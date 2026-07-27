@@ -14,11 +14,12 @@ function daysAgo(n) {
 }
 
 async function computeStats(db) {
-  const [crmSnap, codingSnap, issueAnalyticsSnap, templatesSnap] = await Promise.all([
+  const [crmSnap, codingSnap, issueAnalyticsSnap, templatesSnap, commsStatsSnap] = await Promise.all([
     db.collection('crmLeads').get(),
     db.collection('codingLeads').get(),
     db.collection('issueAnalytics').get(),
     db.collection('crmTemplates').get(),
+    db.collection('commsStats').get(),
   ]);
 
   const crmLeads = crmSnap.docs.map((d) => d.data());
@@ -75,6 +76,22 @@ async function computeStats(db) {
     .map((t) => ({ name: t.name, sentCount: t.sentCount, repliedCount: t.repliedCount ?? 0, replyRate: Math.round(((t.repliedCount ?? 0) / t.sentCount) * 100) }))
     .sort((a, b) => b.replyRate - a.replyRate);
 
+  // AI comms reply-rate breakdown (see markApprovalSent/runReplySync) —
+  // channel only ever gets a sent count since only email replies are
+  // detectable at all (no API reads WhatsApp/Instagram/Facebook for
+  // replies), so channel rows never carry a replyRate, only volume.
+  const commsStatsByDimension = { tone: [], purpose: [], channel: [] };
+  for (const doc of commsStatsSnap.docs) {
+    const d = doc.data();
+    if (!d.dimension || !d.value || !(d.sentCount > 0)) continue;
+    const row = { value: d.value, sentCount: d.sentCount, repliedCount: d.repliedCount ?? 0 };
+    if (d.dimension !== 'channel') row.replyRate = Math.round(((d.repliedCount ?? 0) / d.sentCount) * 100);
+    commsStatsByDimension[d.dimension]?.push(row);
+  }
+  commsStatsByDimension.tone.sort((a, b) => b.replyRate - a.replyRate);
+  commsStatsByDimension.purpose.sort((a, b) => b.replyRate - a.replyRate);
+  commsStatsByDimension.channel.sort((a, b) => b.sentCount - a.sentCount);
+
   return {
     leadsGenerated30d, codingLeadsGenerated30d,
     totalCrmLeads: crmLeads.length,
@@ -82,6 +99,9 @@ async function computeStats(db) {
     wonCount: won.length, lostCount: lost.length,
     bestSources, staleWonClients,
     issueAnalytics, templatePerformance,
+    commsStatsByTone: commsStatsByDimension.tone,
+    commsStatsByPurpose: commsStatsByDimension.purpose,
+    commsStatsByChannel: commsStatsByDimension.channel,
     appointmentStats: null, // no booking-history collection exists — confirmBooking only creates a calendar event, nothing persisted to query
   };
 }
@@ -150,6 +170,77 @@ async function generateRecommendations(stats, keys) {
   return [];
 }
 
+function buildAdAdvicePrompt(stats) {
+  return `You are a marketing advisor for a solo UK web developer (Dean, dean-da-dev.co.uk — builds websites/apps for local businesses, runs a booking-platform product called Bookrightly, has an Instagram business account @deandadev123, and has a set of free browser-based tools on his site like an image compressor, QR code generator, and website cost calculator). He wants advice on Facebook/Instagram (Meta) ads AND organic Instagram growth to find more local-business clients.
+
+IMPORTANT CONTEXT: his audience is local BUSINESS OWNERS deciding whether to hire a developer or try a new tool — not general consumers buying a product. Timing and content advice should reflect that (e.g. business owners often browse during work hours/lunch breaks, not just evenings like consumer retail audiences).
+
+Here's what his CRM actually shows about where his best leads/clients have come from so far:
+${JSON.stringify({ bestSources: stats.bestSources, leadsGenerated30d: stats.leadsGenerated30d, conversionRate: stats.conversionRate }, null, 2)}
+
+For the Instagram section specifically: recommend a realistic posting frequency for a solo developer (not an agency with a content team — don't recommend more than he could realistically sustain alone), and suggest content types that fit what he actually has to show (real before/after website rebuilds, short build-process clips, client results, quick tips using his own free tools, Bookrightly feature highlights) rather than generic "post reels" advice.
+
+Respond with ONLY a JSON object in exactly this shape, no other text:
+{"bestTimes": "2-3 sentences on when to run/schedule PAID ads for reaching local business owners specifically, referencing real reasoning not just generic e-commerce advice", "tips": ["3-5 short, specific, actionable tips for growing this specific business beyond just ad timing — can reference the CRM data above where relevant, e.g. doubling down on a source that's converting well"], "instagram": {"bestTimes": "2-3 sentences on when to post organically on Instagram to reach local business owners", "postFrequency": "one sentence recommending a realistic posting cadence for a solo developer", "contentIdeas": ["4-6 specific content ideas that fit what Dean actually has to show, not generic advice"]}}`;
+}
+
+function parseAdAdvice(text) {
+  if (!text) return null;
+  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  const parsed = JSON.parse(cleaned);
+  if (typeof parsed.bestTimes !== 'string' || !Array.isArray(parsed.tips)) return null;
+  const instagram = parsed.instagram && typeof parsed.instagram === 'object'
+    ? {
+        bestTimes: typeof parsed.instagram.bestTimes === 'string' ? parsed.instagram.bestTimes : '',
+        postFrequency: typeof parsed.instagram.postFrequency === 'string' ? parsed.instagram.postFrequency : '',
+        contentIdeas: Array.isArray(parsed.instagram.contentIdeas) ? parsed.instagram.contentIdeas.filter((s) => typeof s === 'string' && s.trim()) : [],
+      }
+    : null;
+  return {
+    bestTimes: parsed.bestTimes,
+    tips: parsed.tips.filter((s) => typeof s === 'string' && s.trim()),
+    instagram,
+  };
+}
+
+async function generateAdAdvice(stats, keys) {
+  const prompt = buildAdAdvicePrompt(stats);
+  const providers = [
+    {
+      key: keys?.gemini,
+      run: async () => {
+        const { data } = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${keys.gemini}`,
+          { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } },
+          { timeout: 20_000 }
+        );
+        return parseAdAdvice(data.candidates?.[0]?.content?.parts?.[0]?.text);
+      },
+    },
+    {
+      key: keys?.groq,
+      run: async () => {
+        const { data } = await axios.post(
+          'https://api.groq.com/openai/v1/chat/completions',
+          { model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' } },
+          { timeout: 20_000, headers: { Authorization: `Bearer ${keys.groq}` } }
+        );
+        return parseAdAdvice(data.choices?.[0]?.message?.content);
+      },
+    },
+  ];
+  for (const provider of providers) {
+    if (!provider.key) continue;
+    try {
+      const result = await provider.run();
+      if (result) return result;
+    } catch (err) {
+      console.warn(`[businessInsights] ad-advice provider failed: ${err.response?.data?.error?.message ?? err.message}`);
+    }
+  }
+  return null;
+}
+
 const getBusinessInsights = onCall(
   { cors: true, timeoutSeconds: 60, memory: '256MiB', secrets: COMMS_SECRETS },
   async (request) => {
@@ -168,8 +259,12 @@ const getBusinessInsights = onCall(
     }
 
     const stats = await computeStats(db);
-    const recommendations = await generateRecommendations(stats, aiKeysFromEnv());
-    const result = { ...stats, recommendations, computedAt: FieldValue.serverTimestamp() };
+    const keys = aiKeysFromEnv();
+    const [recommendations, adAdvice] = await Promise.all([
+      generateRecommendations(stats, keys),
+      generateAdAdvice(stats, keys),
+    ]);
+    const result = { ...stats, recommendations, adAdvice, computedAt: FieldValue.serverTimestamp() };
     await db.collection('businessInsightsCache').doc('latest').set(result);
     return result;
   }

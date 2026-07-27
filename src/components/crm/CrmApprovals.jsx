@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, orderBy, query, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase';
+import { followUpPatchForSend } from '../../utils/crmFollowUps';
+
+const CODING_LEAD_CONTACTED_FROM = new Set(['New', 'Saved']);
+const CHANNELS = ['email', 'whatsapp', 'sms', 'instagram', 'facebook'];
 
 const STATUS_FILTERS = ['pending', 'approved', 'sent', 'rejected', 'all'];
 
@@ -26,8 +30,28 @@ function formatPhoneIntl(phone) {
 function ApprovalCard({ item, onChanged }) {
   const [body, setBody] = useState(item.body);
   const [subject, setSubject] = useState(item.subject ?? '');
+  const [channel, setChannel] = useState(item.channel);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [lead, setLead] = useState(null);
+
+  // Prefetched on mount (not inside the click handler) — window.open and
+  // navigator.clipboard.writeText only work when called synchronously, as
+  // the direct, immediate result of a user click. Any `await` in between
+  // (a Firestore lookup, a callable function) breaks that "real user
+  // gesture" chain in most browsers (Safari especially), which is exactly
+  // why WhatsApp/Facebook silently never opened and Instagram's clipboard
+  // write came back "permission denied" — both were being called several
+  // awaits deep into the click handler. Having the lead's contact info
+  // already in state means the open/copy can happen as the very first,
+  // fully synchronous thing the click does.
+  useEffect(() => {
+    let cancelled = false;
+    getDoc(doc(db, item.leadCollection, item.leadId)).then((snap) => {
+      if (!cancelled) setLead(snap.exists() ? snap.data() : {});
+    });
+    return () => { cancelled = true; };
+  }, [item.leadCollection, item.leadId]);
 
   const dirty = body !== item.body || subject !== (item.subject ?? '');
 
@@ -46,32 +70,72 @@ function ApprovalCard({ item, onChanged }) {
   }
 
   async function handleApproveAndSend() {
-    setBusy(true);
     setError(null);
+    if (!lead) { setError('Still loading this lead\'s contact details — try again in a moment.'); return; }
+
+    // Everything that needs a live user gesture happens FIRST, before any
+    // await, for every non-email channel — validation errors (no number
+    // found) surface immediately, and window.open/clipboard calls fire
+    // synchronously inside the click rather than after network round-trips.
+    if (channel === 'whatsapp') {
+      const number = lead.whatsappUrl?.match(/wa\.me\/(\d+)/)?.[1] ?? formatPhoneIntl(lead.phone);
+      if (!number) { setError('No WhatsApp number found for this lead.'); return; }
+      const win = window.open(`https://wa.me/${number}?text=${encodeURIComponent(body)}`, '_blank', 'noopener,noreferrer');
+      // window.open returns null (not a throw) when a popup blocker steps
+      // in — without this check, the approval still got marked "sent" even
+      // though nothing actually opened, which is exactly why it looked like
+      // the message "just disappeared".
+      if (!win) { setError('Your browser blocked the WhatsApp popup — allow popups for this site and try again.'); return; }
+    } else if (channel === 'sms') {
+      const number = formatPhoneIntl(lead.phone);
+      if (!number) { setError('No phone number found for this lead.'); return; }
+      window.location.href = `sms:${number}&body=${encodeURIComponent(body)}`;
+    } else if (channel === 'instagram') {
+      // Instagram has no send API or pre-filled-DM deep link (unlike
+      // wa.me/sms:) — same reasoning as CrmInstagramOutreach's "Copy
+      // caption" flow. Approving just copies the text so Dean can paste
+      // it into the DM himself.
+      try {
+        await navigator.clipboard.writeText(body);
+      } catch {
+        setError('Could not copy automatically — select and copy the message text manually below.');
+        return;
+      }
+    } else if (channel === 'facebook') {
+      // m.me/PAGE-NAME?text=... does support a pre-filled Messenger
+      // message (confirmed against Meta's own m.me docs), unlike
+      // Instagram — same wa.me-style deep link, just needs the page's
+      // username/id pulled out of whatever facebookUrl actually is.
+      const page = lead.facebookUrl?.match(/facebook\.com\/(?:pages\/)?([^/?]+)/)?.[1];
+      if (!page) { setError('No Facebook page found for this lead.'); return; }
+      const win = window.open(`https://m.me/${page}?text=${encodeURIComponent(body)}`, '_blank', 'noopener,noreferrer');
+      if (!win) { setError('Your browser blocked the Messenger popup — allow popups for this site and try again.'); return; }
+    }
+
+    setBusy(true);
     try {
       const approve = httpsCallable(getFunctions(app), 'approveApproval');
-      await approve({ approvalId: item.id, body, subject });
+      await approve({ approvalId: item.id, body, subject, channel });
 
-      const leadSnap = await getDoc(doc(db, item.leadCollection, item.leadId));
-      const lead = leadSnap.exists() ? leadSnap.data() : {};
-
-      if (item.channel === 'email') {
+      if (channel === 'email') {
         const email = lead.email;
         if (!email) throw new Error('This lead has no email address on file — add one first.');
         const send = httpsCallable(getFunctions(app), 'gmailSendEmail');
         await send({ to: email, subject: subject || '(no subject)', bodyText: body });
-      } else if (item.channel === 'whatsapp') {
-        const number = lead.whatsappUrl?.match(/wa\.me\/(\d+)/)?.[1] ?? formatPhoneIntl(lead.phone);
-        if (!number) throw new Error('No WhatsApp number found for this lead.');
-        window.open(`https://wa.me/${number}?text=${encodeURIComponent(body)}`, '_blank', 'noopener,noreferrer');
-      } else if (item.channel === 'sms') {
-        const number = formatPhoneIntl(lead.phone);
-        if (!number) throw new Error('No phone number found for this lead.');
-        window.location.href = `sms:${number}&body=${encodeURIComponent(body)}`;
       }
 
       const markSent = httpsCallable(getFunctions(app), 'markApprovalSent');
       await markSent({ approvalId: item.id });
+
+      // Sending from here used to leave the lead's follow-up ladder
+      // untouched — same gap CrmComposer.jsx already closed for its own
+      // send path (see followUpPatchForSend), just never applied here too.
+      if (item.leadCollection === 'crmLeads') {
+        await updateDoc(doc(db, 'crmLeads', item.leadId), { ...followUpPatchForSend(lead, new Date()), updatedAt: serverTimestamp() }).catch(() => {});
+      } else if (item.leadCollection === 'codingLeads' && CODING_LEAD_CONTACTED_FROM.has(lead.status)) {
+        await updateDoc(doc(db, 'codingLeads', item.leadId), { status: 'Contacted', updatedAt: serverTimestamp() }).catch(() => {});
+      }
+
       onChanged?.();
     } catch (err) {
       setError(err?.message ?? 'Failed to send.');
@@ -87,17 +151,29 @@ function ApprovalCard({ item, onChanged }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-gray-100">{item.leadName || 'Unknown lead'}</p>
-          <p className="text-xs text-gray-500">
-            {item.channel} · {item.purpose?.replace(/_/g, ' ')} · {item.tone} tone
-            {item.source === 'workflow' && <span className="ml-1 text-gray-600">· from workflow</span>}
-          </p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-gray-500">
+            {isActionable ? (
+              <select
+                value={channel}
+                onChange={(e) => setChannel(e.target.value)}
+                disabled={busy}
+                className="rounded border border-gray-700 bg-gray-800/50 px-1.5 py-0.5 text-xs text-gray-300 focus:border-blue-500 focus:outline-none disabled:opacity-60"
+              >
+                {CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            ) : (
+              <span>{item.channel}</span>
+            )}
+            <span>· {item.purpose?.replace(/_/g, ' ')} · {item.tone} tone</span>
+            {item.source === 'workflow' && <span className="text-gray-600">· from workflow</span>}
+          </div>
         </div>
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${STATUS_COLORS[item.status] ?? ''}`}>
           {item.status}
         </span>
       </div>
 
-      {item.channel === 'email' && (
+      {channel === 'email' && (
         <input
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
@@ -120,10 +196,10 @@ function ApprovalCard({ item, onChanged }) {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             onClick={handleApproveAndSend}
-            disabled={busy}
+            disabled={busy || !lead}
             className="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400 disabled:opacity-50"
           >
-            {busy ? 'Working…' : item.channel === 'email' ? 'Approve & Send' : 'Approve & Open'}
+            {busy ? 'Working…' : !lead ? 'Loading…' : channel === 'email' ? 'Approve & Send' : channel === 'instagram' ? 'Approve & Copy' : 'Approve & Open'}
           </button>
           <button
             onClick={handleReject}

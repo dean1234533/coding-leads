@@ -40,6 +40,7 @@ export const SOURCES = ['Google Maps', 'Referral', 'RSS Scout', 'Cold Search', '
 
 // ─── Website issues checklist ──────────────────────────────────────────────
 export const WEBSITE_ISSUES = [
+  'No Website',
   'Outdated Design',
   'Slow Loading',
   'Not Mobile Friendly',
@@ -70,6 +71,7 @@ export const WEBSITE_ISSUES = [
 // actually changes what the email says, instead of just repeating the issue
 // name back ("Missing SSL stood out to me").
 export const ISSUE_DETAILS = {
+  'No Website': "there's no website at all, so anyone searching online can't find you and is likely finding a competitor instead",
   'Outdated Design': 'the design looks dated next to competitors, which can make people question how established the business is',
   'Slow Loading': "it takes too long to load, and most visitors leave before it even finishes",
   'Not Mobile Friendly': "it doesn't work properly on mobile, where most visitors are browsing from",
@@ -791,7 +793,7 @@ If you'd like me to create a booking page for your business, just reply "book" a
   {
     name: 'Instagram DM — Free Ideas',
     category: 'Instagram',
-    channels: ['Instagram', 'WhatsApp'],
+    channels: ['Instagram', 'WhatsApp', 'Facebook'],
     subject: 'Instagram DM (not sent by email — send as a direct message)',
     // Uses {{issue_highlight}} for a real, specific observation instead of
     // a vague "a few quick changes" line — same reasoning as the WhatsApp
@@ -812,11 +814,11 @@ If you're interested, I'd be happy to put together 3 quick ideas specifically fo
   {
     name: 'Instagram DM — Free Mockup',
     category: 'Instagram',
-    // Also usable on WhatsApp — the pitch itself isn't Instagram-specific,
-    // just the "book in under 60 seconds from Instagram" line, which still
-    // reads fine there since it's talking about where their customers come
-    // from, not which app this message is arriving through.
-    channels: ['Instagram', 'WhatsApp'],
+    // Also usable on WhatsApp/Facebook — the pitch itself isn't Instagram-
+    // specific, just the "book in under 60 seconds from Instagram" line,
+    // which still reads fine there since it's talking about where their
+    // customers come from, not which app this message is arriving through.
+    channels: ['Instagram', 'WhatsApp', 'Facebook'],
     subject: 'Instagram DM (not sent by email — send as a direct message)',
     body: `Hey 👋 I came across {{business}} and your work looks really strong.
 
@@ -838,6 +840,7 @@ I can mock up a version using your current branding so you can see what it would
   {
     name: 'WhatsApp — Quick Intro',
     category: 'WhatsApp',
+    channels: ['WhatsApp', 'Facebook'],
     subject: 'WhatsApp message (not sent by email — opens a pre-filled WhatsApp chat instead)',
     // Rewritten after real feedback: the old version opened with an
     // unprompted critique of their site ("an easy win or two") — fine in an
@@ -855,6 +858,20 @@ I can mock up a version using your current branding so you can see what it would
     // after "here's who I am, here's proof," a specific detail instead
     // reads as "I actually looked," same as the email templates.
     body: `Hi, I'm Dean — a web developer/designer at dean-da-dev.co.uk (that's got my work on it if you want to have a look). I came across {{business}} and had a quick look at your site{{issue_highlight}}. Think I could help you pick up more bookings/enquiries online — happy to put a few ideas together if you're interested, no pressure either way.
+
+— Dean`,
+  },
+  {
+    name: 'WhatsApp — No Website',
+    category: 'WhatsApp',
+    channels: ['WhatsApp', 'Facebook'],
+    subject: 'WhatsApp message (not sent by email — opens a pre-filled WhatsApp chat instead)',
+    // Distinct from "Quick Intro" above (which leans on {{issue_highlight}}
+    // — a specific problem found on an existing site) since "no website at
+    // all" isn't a website issue to reference, it's a different pitch
+    // entirely — this one exists for real, not just to have every scenario
+    // covered.
+    body: `Hi, I'm Dean — a web developer/designer at dean-da-dev.co.uk (that's got my work on it if you want to have a look). I noticed {{business}} doesn't have a website up yet — happy to put a few quick ideas together for what one could look like, no pressure either way.
 
 — Dean`,
   },

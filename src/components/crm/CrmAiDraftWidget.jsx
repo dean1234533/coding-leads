@@ -11,7 +11,7 @@ const PURPOSES = [
   { value: 'review_request', label: 'Review Request' },
   { value: 'general', label: 'General' },
 ];
-const CHANNELS = ['email', 'whatsapp', 'sms'];
+const CHANNELS = ['email', 'whatsapp', 'sms', 'instagram', 'facebook'];
 
 export default function CrmAiDraftWidget({ lead }) {
   const [tone, setTone] = useState('Professional');
