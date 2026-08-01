@@ -1,5 +1,17 @@
 'use strict';
 
+// Every 2nd-gen function is its own Cloud Run service, and Cloud Run
+// reserves quota per-service based on maxInstances × cpu — left at the
+// default (effectively ~100 instances/service), ~30 functions add up to far
+// more reserved CPU than this project's regional quota allows, so even a
+// single-function deploy fails its healthcheck with "Quota exceeded for
+// total allowable CPU per project per region" before it ever runs real
+// traffic. This is a single-owner app with no concurrent-user load, so a
+// small per-function cap costs nothing functionally and must be set before
+// any function is defined (all requires below).
+const { setGlobalOptions } = require('firebase-functions/v2');
+setGlobalOptions({ maxInstances: 3 });
+
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule }         = require('firebase-functions/v2/scheduler');
 const { initializeApp }      = require('firebase-admin/app');
@@ -1847,7 +1859,13 @@ exports.runGrowthAuditForLead = onCall(
  * through with a banned phrase, an aggressive CTA, or an unsupported claim.
  */
 exports.generateGrowthAuditOutreachNow = onCall(
-  { cors: true, timeoutSeconds: 30, memory: '256MiB', secrets: GROWTH_AUDIT_OUTREACH_SECRETS },
+  // us-central1's Cloud Run CPU quota for this project is already saturated
+  // by the ~30 other functions living there (see setGlobalOptions note at
+  // the top of this file) — a different region has its own untouched quota
+  // pool, so this (and the other newly-changed functions below) deploy here
+  // instead rather than fighting for headroom in us-central1. The client
+  // must call getFunctions(app, 'europe-west1') for this one.
+  { region: 'europe-west1', cors: true, timeoutSeconds: 30, memory: '256MiB', secrets: GROWTH_AUDIT_OUTREACH_SECRETS },
   async (request) => {
     requireOwner(request);
     const {

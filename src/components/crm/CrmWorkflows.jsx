@@ -80,7 +80,7 @@ function WorkflowCard({ workflow, onSaved }) {
   async function save(patch) {
     setSaving(true);
     try {
-      const fn = httpsCallable(getFunctions(app), 'saveWorkflow');
+      const fn = httpsCallable(getFunctions(app, 'europe-west1'), 'saveWorkflow');
       await fn({
         id: workflow.id, name: workflow.name, enabled: workflow.enabled,
         trigger: workflow.trigger, actions: workflow.actions, conditions: workflow.conditions ?? [],
@@ -159,7 +159,7 @@ export default function CrmWorkflows() {
     setError(null);
     setRunResult(null);
     try {
-      const fn = httpsCallable(getFunctions(app), 'runWorkflowsNow', { timeout: 300000 });
+      const fn = httpsCallable(getFunctions(app, 'europe-west1'), 'runWorkflowsNow', { timeout: 300000 });
       const { data } = await fn();
       setRunResult(data);
     } catch (err) {

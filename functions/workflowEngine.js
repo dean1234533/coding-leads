@@ -203,13 +203,16 @@ async function runWorkflows(db) {
   return { leadsProcessed, actionsRun: actionResults.length, actionResults };
 }
 
+// Deployed in europe-west1, not the default us-central1 — see the
+// setGlobalOptions note in index.js. Clients calling runWorkflowsNow/
+// saveWorkflow must use getFunctions(app, 'europe-west1').
 const scheduledWorkflowEngine = onSchedule(
-  { schedule: 'every 15 minutes', timeoutSeconds: 300, memory: '256MiB', secrets: ['APP_URL'] },
+  { region: 'europe-west1', schedule: 'every 15 minutes', timeoutSeconds: 300, memory: '256MiB', secrets: ['APP_URL'] },
   withErrorAlert('scheduledWorkflowEngine', async () => { await runWorkflows(getFirestore()); })
 );
 
 const runWorkflowsNow = onCall(
-  { cors: true, timeoutSeconds: 300, memory: '256MiB', secrets: ['APP_URL'] },
+  { region: 'europe-west1', cors: true, timeoutSeconds: 300, memory: '256MiB', secrets: ['APP_URL'] },
   async (request) => {
     requireOwner(request);
     return runWorkflows(getFirestore());
@@ -217,7 +220,7 @@ const runWorkflowsNow = onCall(
 );
 
 const saveWorkflow = onCall(
-  { cors: true, timeoutSeconds: 15, memory: '256MiB' },
+  { region: 'europe-west1', cors: true, timeoutSeconds: 15, memory: '256MiB' },
   async (request) => {
     requireOwner(request);
     const { id, name, enabled, trigger, actions, conditions } = request.data ?? {};

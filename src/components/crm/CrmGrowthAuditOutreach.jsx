@@ -64,7 +64,7 @@ export default function CrmGrowthAuditOutreach({ lead }) {
     setGenerating(true);
     setGenError(null);
     try {
-      const fn = httpsCallable(getFunctions(app), 'generateGrowthAuditOutreachNow', { timeout: 30000 });
+      const fn = httpsCallable(getFunctions(app, 'europe-west1'), 'generateGrowthAuditOutreachNow', { timeout: 30000 });
       const { data } = await fn({
         leadId: lead.id,
         leadCollection: 'crmLeads',
