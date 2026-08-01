@@ -4,19 +4,15 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { app, db } from '../../firebase';
 import Modal from '../Modal';
 import { STATUSES, PRIORITIES, INDUSTRIES, STATUS_COLORS, applyTemplateVars, buildTemplateVars, sortTemplatesByRelevance } from '../../utils/crmConstants';
-import { computeNextFollowUp, followUpPatchForSend } from '../../utils/crmFollowUps';
-import CrmNotesTimeline from './CrmNotesTimeline';
-import CrmTasksList from './CrmTasksList';
-import CrmComposer from './CrmComposer';
-import CrmCallScript from './CrmCallScript';
+import { computeNextFollowUp } from '../../utils/crmFollowUps';
 import CrmGrowthAuditOutreach from './CrmGrowthAuditOutreach';
 
-const TABS = ['Overview', 'Growth Audit Outreach', 'Notes', 'Tasks', 'Emails', 'Call Script'];
+const TABS = ['Overview', 'Growth Audit Outreach'];
 const MY_NAME = 'Dean Burt';
 
 // Instagram has no send API, so this is a copy-the-caption /
 // download-the-flyer-and-attach-it-by-hand workflow rather than an
-// automated send like the Emails tab's CrmComposer.
+// automated send.
 function CrmInstagramOutreach({ lead }) {
   const [templates, setTemplates] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -255,13 +251,6 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
     });
   }
 
-  async function handleThreadLinked(threadId) {
-    if (!threadId) return;
-    // Sending an email should advance the follow-up ladder on its own —
-    // no more manually flipping the status dropdown after every send.
-    await onUpdate({ gmailThreadId: threadId, ...followUpPatchForSend(lead) });
-  }
-
   return (
     <Modal
       title={lead.businessName || 'Lead'}
@@ -390,25 +379,7 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
         </div>
       )}
 
-      {tab === 'Growth Audit Outreach' && <CrmGrowthAuditOutreach lead={lead} />}
-      {tab === 'Notes' && <CrmNotesTimeline leadId={lead.id} />}
-      {tab === 'Tasks' && <CrmTasksList leadId={lead.id} />}
-      {tab === 'Emails' && (
-        <div className="space-y-3">
-          {lead.gmailThreadId && (
-            <p className="text-xs text-gray-500">Linked to Gmail thread <code className="text-gray-400">{lead.gmailThreadId}</code></p>
-          )}
-          <CrmComposer
-            lead={lead}
-            defaultTo={lead.email}
-            defaultSubject={lead.businessName ? `Regarding ${lead.businessName}` : ''}
-            threadId={lead.gmailThreadId}
-            onSent={handleThreadLinked}
-            onSaved={() => {}}
-          />
-        </div>
-      )}
-      {tab === 'Call Script' && <CrmCallScript lead={lead} />}
+      {tab === 'Growth Audit Outreach' && <CrmGrowthAuditOutreach lead={lead} onUpdate={onUpdate} />}
     </Modal>
   );
 }

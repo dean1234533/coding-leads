@@ -380,6 +380,14 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
     expect(liPrompt).toContain('This is a LINKEDIN message');
   });
 
+  it('gives the email prompt real high-converting subject-line guidance, not just "no fluff"', () => {
+    const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
+    const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
+    expect(prompt).toContain('SUBJECT LINE');
+    expect(prompt).toContain('30-50 characters');
+    expect(prompt).toContain('No spam-trigger words');
+  });
+
   it('does NOT include a numeric score by default, and only mentions it when includeScore is true', () => {
     const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
     const withoutScore = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });

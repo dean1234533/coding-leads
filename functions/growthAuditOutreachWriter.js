@@ -23,8 +23,20 @@ const CONFIDENCE_LANGUAGE = {
 
 // Word-count ranges, not hard maxima to always hit — shorter is usually
 // better (spec: "Do NOT force every message to the maximum length").
+// Subject-line guidance kept separate from CHANNEL_GUIDANCE.email so it's
+// easy to find/tune on its own — this is the single biggest lever on
+// whether the email gets opened at all, so it gets real instruction rather
+// than just "no fluff".
+const SUBJECT_LINE_GUIDANCE = `SUBJECT LINE — this decides whether the email gets opened at all, so treat it as seriously as the body:
+- Specific and curiosity-driving, grounded in something real (the business name, or a genuine finding) — never generic ("Quick question", "Following up", "Hello").
+- Short: aim for 30-50 characters, definitely under 60 — long subjects get cut off in the inbox preview.
+- Sounds like a real person wrote it, not a marketing team — lowercase-ish, conversational, no title case ("A Quick Idea For Your Business" is wrong).
+- No spam-trigger words or punctuation: no "free" as the first word, no ALL CAPS, no exclamation marks, no emoji.
+- Personalise with the business name where it fits naturally, but don't force it into every subject.
+- Vary the phrasing each time rather than reusing the same template — a few shapes that work: naming the specific thing you noticed, a direct question, or a short benefit-led statement.`;
+
 const CHANNEL_GUIDANCE = {
-  email: 'This is an EMAIL. 150-250 words. No "Dear [Business]," corporate opener, no subject-line fluff. A real subject line is still needed (return it separately).',
+  email: `This is an EMAIL. 150-250 words. No "Dear [Business]," corporate opener, no subject-line fluff. A real subject line is still needed (return it separately).\n\n${SUBJECT_LINE_GUIDANCE}`,
   whatsapp: 'This is a WHATSAPP message. 80-150 words, conversational, reads like a text from a real person. No formal sign-off — just "Dean" at the end.',
   instagram: 'This is an INSTAGRAM DM. 60-120 words, casual and short. A relaxed "Hey" or "Hi" opener is fine. No formal sign-off — just "Dean".',
   facebook: 'This is a FACEBOOK MESSENGER DM. 80-150 words, casual "Hi" opener. No formal sign-off — just "Dean".',
