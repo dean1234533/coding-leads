@@ -778,8 +778,12 @@ async function runAutoAuditEmail() {
   return { drafted, candidates: due.length };
 }
 
+// Deployed in europe-west1, not the default us-central1 — that region's
+// Cloud Run CPU quota is saturated for this project (see the same fix
+// applied to generateGrowthAuditOutreachNow etc. in index.js). This is a
+// cron with no client caller, so no frontend region change is needed.
 const scheduledAutoAuditEmail = onSchedule(
-  { schedule: '15 9 * * *', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: [...CRM_GMAIL_SECRETS, ...AUDIT_EMAIL_AI_SECRETS] },
+  { region: 'europe-west1', schedule: '15 9 * * *', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: [...CRM_GMAIL_SECRETS, ...AUDIT_EMAIL_AI_SECRETS] },
   withErrorAlert('scheduledAutoAuditEmail', async () => {
     const db = getFirestore();
     const configSnap = await db.collection('autoAuditEmailConfig').doc('settings').get();
