@@ -831,7 +831,7 @@ export function buildTemplateVars(lead, { myName } = {}) {
     website: lead?.website ?? '',
     industry: lead?.industry ?? '',
     tool_pitch: `\n\n${pickRelevantTools(lead).map((t) => `  • ${t.name} — https://www.dean-da-dev.co.uk/${t.slug}`).join('\n')}`,
-    audit_link: `${AUDIT_TOOL_URL}?ref=outreach-template`,
+    audit_link: AUDIT_TOOL_URL,
     myname: myName ?? '',
     signature: myName ? `Kind regards,\n\n${myName}\ndean-da-dev\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}` : '',
   };
