@@ -96,54 +96,34 @@ export const ISSUE_DETAILS = {
   'Too Much Scrolling': "the homepage is packed with images and takes a long time to scroll through on both mobile and desktop, which can make visitors give up before they reach what they came for",
 };
 
-// ─── Portfolio demos (seed data — Dean fills in real URLs) ────────────────
-export const DEFAULT_PORTFOLIO = [
-  { name: 'Beauty Studio', url: 'https://dean1234533.github.io/The-Beauty-Studio-Premium-Booking-Website-Demo/' },
-  { name: 'Gym',           url: 'https://dean1234533.github.io/Da-Gym-Premium-Fitness-Website-Mockup/' },
-  { name: 'Law Firm',      url: 'https://dean1234533.github.io/Da-Law-Firm-Premium-Law-Firm-Website-Mockup/' },
-  { name: 'Boxing Club',   url: 'https://dean1234533.github.io/Apex-boxing-club-Premium-Website-Mockup/' },
-];
-
 // ─── Email templates ────────────────────────────────────────────────────
-// Variables: {{business}} {{contact}} {{website}} {{industry}} {{issue}} {{portfolio}} {{myname}}
+// Variables: {{business}} {{contact}} {{website}} {{industry}} {{myname}}
 // Plus computed fallback-safe variables built from the above (see
 // buildTemplateVars() below, used by CrmComposer.jsx / CrmBulkSendModal.jsx):
-//   {{portfolio_line}} — a "Portfolio: <MY_PORTFOLIO>" block (with its own
-//     leading blank line). An "Example project: <demo url>" line is added
-//     once a demo's been picked. The main website isn't repeated here since
-//     it's already in {{signature}}.
-//   {{issue_note}} / {{issue_highlight}} — parenthetical/dash clauses built
-//     from {{issue}} (the first checked issue only) so the surrounding
-//     sentence still reads as a complete thought when no website issue has
-//     been logged. Prefers the AI auto-audit's own observation when present.
-//   {{issue_list}} — every checked issue as its own bullet line (not just
-//     the first), each with its ISSUE_DETAILS consequence — for templates
-//     that present the full audit rather than folding one issue into a
-//     sentence.
-//   {{website_score_note}} — " It scored N/100 on page speed." when the
-//     lead's been through the auto-audit, else empty.
-//   {{competitor_line}} — a sentence naming a genuinely stronger-rated
-//     nearby competitor found in the same scan batch, only when the
-//     comparison is real and meaningful (see runBusinessScan), else empty.
+//   {{audit_link}} — the free Growth Audit tool link. This is the primary
+//     CTA across every outreach template — "here's a free tool, check it
+//     yourself" — not a claim about specific findings, since a static
+//     template can't safely reference real per-lead audit data (that's what
+//     the Growth Audit Outreach generator on the lead page is for).
 //   {{signature}} — the full sign-off block (name, dean-da-dev, email, site).
 export const DEFAULT_TEMPLATES = [
   {
     name: 'General Outreach',
     category: 'Outreach',
-    subject: 'A quick idea for {{business}}',
+    subject: 'A free website check for {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local businesses I had a look at {{business}}'s website{{issue_highlight}}.
+I'm Dean, a web developer, and I've just built a free tool that lets businesses check their website for SEO, performance, mobile and conversion issues.
 
-That means anyone finding you through Google, social media, or a recommendation could be leaving within seconds instead of getting in touch — which can result in missed enquiries and bookings without you even realising it.
+I thought you might find it useful for {{business}}.
 
-The good news is that this is usually a straightforward fix.
+You can run your website through it here — completely free:
 
-I specialise in building and improving websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
+{{audit_link}}
 
-{{portfolio_line}}
+It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
@@ -155,11 +135,9 @@ I also built a free website audit tool if you want to check things yourself: {{a
 
 I've been following {{business}}'s work and love the quality of your digital projects — it's clear a lot of care goes into what you put out.
 
-I'm a full-stack developer specialising in mobile apps and websites, handling the full development lifecycle from design and code through to store submission. I'm looking to partner with a small number of agencies that occasionally need reliable, back-office technical capacity for projects that fall outside their current bandwidth — the kind of overflow work you can hand off with confidence and not worry about.{{portfolio_line}}
+I'm a full-stack developer specialising in mobile apps and websites, handling the full development lifecycle from design and code through to store submission. I'm looking to partner with a small number of agencies that occasionally need reliable, back-office technical capacity for projects that fall outside their current bandwidth — the kind of overflow work you can hand off with confidence and not worry about.
 
 If you'd be interested in a no-obligation chat about how this could work, just reply to this email and I'd be happy to help.
-
-Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
@@ -169,8 +147,6 @@ Thank you for your time, and I hope to hear from you.
     subject: `Built something I think you'd find useful — {{business}}`,
     body: `Hi {{contact}},
 
-I hope you're doing well.
-
 I've been building a platform called Bookrightly, and having looked at {{business}}, I think it could genuinely be useful to you.
 
 It gives businesses like yours everything needed to run day-to-day operations properly in one place — your own booking site, online card payments, automated reminders, invoices, and a dashboard to manage all of it. There's trade-specific functionality built in too, like a quote generator with a shareable client link, or workout plans if you train clients.
@@ -179,8 +155,6 @@ It's 90 days free to try, no card required, and takes about 10 minutes to set up
 
 If you'd be interested in a no-obligation chat about whether it's a good fit for {{business}}, just reply to this email and I'd be happy to help.
 
-Thank you for your time, and I hope to hear from you.
-
 {{signature}}`,
   },
   {
@@ -188,8 +162,6 @@ Thank you for your time, and I hope to hear from you.
     category: 'Bookrightly',
     subject: 'Get online with a website and booking system — {{business}}',
     body: `Hi {{contact}},
-
-I hope you're doing well.
 
 I came across {{business}} and noticed you don't currently have a website. Without one, you're likely missing out on customers who search online before booking — and that can be a significant chunk of new business going elsewhere to a competitor who does show up.
 
@@ -202,171 +174,169 @@ I run a platform called Bookrightly (https://bookrightly.co.uk), built specifica
   ✓ Calendar sync with Google Calendar
   ✓ No setup fees — up and running within days
 
-Most customers tell us it pays for itself with just one or two extra bookings a month.{{portfolio_line}}
+Most customers tell us it pays for itself with just one or two extra bookings a month.
 
 If you'd be interested in a no-obligation chat about whether it could work for {{business}}, just reply to this email and I'd be happy to help.
-
-Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
   {
     name: 'Salon',
     category: 'Industry',
-    subject: 'Helping {{business}} book more appointments online',
+    subject: 'A free website check for {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local salons I had a look at {{business}}'s website — there isn't currently an easy way for clients to book online{{issue_highlight}}.
+I'm Dean, a web developer, and I've just built a free tool that lets salons check their website for online booking, mobile experience and local search issues.
 
-That usually means missed bookings from people browsing outside your opening hours, who end up booking somewhere that lets them book instantly instead.
+I thought you might find it useful for {{business}}.
 
-The good news is that this is usually a straightforward fix.
+You can run your website through it here — completely free:
 
-I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
+{{audit_link}}
 
-{{portfolio_line}}
+It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
   {
     name: 'Gym',
     category: 'Industry',
-    subject: 'A modern website + booking system for {{business}}',
+    subject: 'A free website check for {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local gyms I had a look at {{business}}'s website — it doesn't currently make it easy to see class times or sign up for a membership online{{issue_highlight}}.
+I'm Dean, a web developer, and I've just built a free tool that lets gyms and studios check their website for online sign-ups, mobile experience and conversion issues.
 
-That's often enough to make someone try a different gym instead, without ever getting in touch to ask.
+I thought you might find it useful for {{business}}.
 
-The good news is that this is usually a straightforward fix.
+You can run your website through it here — completely free:
 
-I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
+{{audit_link}}
 
-{{portfolio_line}}
+It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
   {
     name: 'Law Firm',
     category: 'Industry',
-    subject: 'A more professional online presence for {{business}}',
+    subject: 'A free website check for {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local law firms I had a look at {{business}}'s website — it could do more to build trust with new visitors before they ever pick up the phone{{issue_highlight}}.
+I'm Dean, a web developer, and I've just built a free tool that lets local firms check their website for trust signals, SEO and conversion issues.
 
-First impressions matter a great deal when someone's choosing who to trust with a legal matter, and a weak website can quietly cost you enquiries before you're even aware of it.
+I thought you might find it useful for {{business}}.
 
-The good news is that this is usually a straightforward fix.
+You can run your website through it here — completely free:
 
-I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
+{{audit_link}}
 
-{{portfolio_line}}
+It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
   {
     name: 'Restaurant',
     category: 'Industry',
-    subject: 'Getting {{business}} more online orders/bookings',
+    subject: 'A free website check for {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local restaurants I had a look at {{business}}'s website — it isn't easy to see the menu or book a table online{{issue_highlight}}.
+I'm Dean, a web developer, and I've just built a free tool that lets restaurants check their website for menu visibility, table bookings and mobile issues.
 
-That's often enough for someone to choose a different restaurant instead, especially when they're deciding in the moment.
+I thought you might find it useful for {{business}}.
 
-The good news is that this is usually a straightforward fix.
+You can run your website through it here — completely free:
 
-I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
+{{audit_link}}
 
-{{portfolio_line}}
+It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
   {
     name: 'Trades',
     category: 'Industry',
-    subject: 'A website that brings {{business}} more enquiries',
+    subject: 'A free website check for {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local tradespeople I had a look at {{business}} online — the website could do more to build trust with potential customers before they decide who to call{{issue_highlight}}.
+I'm Dean, a web developer, and I've just built a free tool that lets tradespeople check their website for local search, quote enquiries and mobile issues.
 
-That can mean enquiries quietly going to a competitor instead, without you ever knowing they existed.
+I thought you might find it useful for {{business}}.
 
-The good news is that this is usually a straightforward fix.
+You can run your website through it here — completely free:
 
-I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
+{{audit_link}}
 
-{{portfolio_line}}
+It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
   {
     name: 'Dentist',
     category: 'Industry',
-    subject: 'Helping {{business}} book more patients online',
+    subject: 'A free website check for {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local dental practices I had a look at {{business}}'s website — there isn't an easy way for new patients to book online{{issue_highlight}}.
+I'm Dean, a web developer, and I've just built a free tool that lets dental practices check their website for patient trust, booking and mobile issues.
 
-That extra step of having to call can be enough to put some people off, especially anyone looking outside opening hours.
+I thought you might find it useful for {{business}}.
 
-The good news is that this is usually a straightforward fix.
+You can run your website through it here — completely free:
 
-I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
+{{audit_link}}
 
-{{portfolio_line}}
+It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
   {
     name: 'Electrician',
     category: 'Industry',
-    subject: 'More enquiries for {{business}} online',
+    subject: 'A free website check for {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local electricians I had a look at {{business}} online — the website could do more to help customers request a quote quickly{{issue_highlight}}.
+I'm Dean, a web developer, and I've just built a free tool that lets electricians check their website for local search, quote enquiries and mobile issues.
 
-That can mean urgent jobs go to whoever responds fastest online — not necessarily whoever'd actually do the best job.
+I thought you might find it useful for {{business}}.
 
-The good news is that this is usually a straightforward fix.
+You can run your website through it here — completely free:
 
-I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
+{{audit_link}}
 
-{{portfolio_line}}
+It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
   {
     name: 'Plumber',
     category: 'Industry',
-    subject: 'Getting {{business}} found online',
+    subject: 'A free website check for {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local plumbers I had a look at {{business}} online — the website could do more to help customers find you and get in touch quickly, especially for more urgent jobs{{issue_highlight}}.
+I'm Dean, a web developer, and I've just built a free tool that lets plumbers check their website for local search, quote enquiries and mobile issues.
 
-That can mean the job goes to whoever answers first — not necessarily whoever'd actually do it properly.
+I thought you might find it useful for {{business}}.
 
-The good news is that this is usually a straightforward fix.
+You can run your website through it here — completely free:
 
-I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
+{{audit_link}}
 
-{{portfolio_line}}
+It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
@@ -376,17 +346,11 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'Getting {{business}} online',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local businesses I noticed {{business}} doesn't currently have a website.
+I'm Dean, a web developer, and I noticed {{business}} doesn't currently have a website — which means anyone searching Google or asking for a recommendation has no way to find or check you out online.
 
-That means anyone searching Google, checking social media, or asking for a recommendation has no way to find or check you out online — which usually means they end up going with a competitor who does show up.
+I've also just built a free tool that checks a website for SEO, performance, mobile and conversion issues, so once you're ready to get one built it's an easy way to keep it in good shape.
 
-The good news is that this is usually a straightforward fix.
-
-I specialise in building websites for local businesses, and I'd be happy to put a few ideas together and give you a clear recommendation, with no obligation.
-
-{{portfolio_line}}
-
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+Happy to put a few quick ideas together for what a site could look like for {{business}}, completely free and no obligation.
 
 {{signature}}`,
   },
@@ -396,17 +360,15 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'Noticed an issue on {{website}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local businesses I tried visiting your website. Unfortunately, it didn't load properly on my end{{issue_note}}.
+I'm Dean, a web developer, and I tried visiting {{business}}'s website — unfortunately it didn't load properly on my end.
 
-That means anyone finding you through Google, social media, or a recommendation could be hitting the same problem and leaving within seconds — which can result in missed enquiries and bookings without you even realising it.
+Anyone finding you through Google or a recommendation could be hitting the same problem and leaving within seconds, which can mean missed enquiries without you even realising it.
 
-The good news is that this is usually a straightforward fix.
+I've also just built a free tool that checks a website for SEO, performance, mobile and conversion issues — worth running once it's back up:
 
-I specialise in building and repairing websites for local businesses, and I'd be happy to check what's causing the issue and give you a clear recommendation, with no obligation.
+{{audit_link}}
 
-{{portfolio_line}}
-
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+Happy to take a look at what's causing the issue too, completely free and no obligation.
 
 {{signature}}`,
   },
@@ -416,37 +378,33 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: '{{website}} is loading slowly — quick fix ideas',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local businesses I ran a quick check on {{business}}'s website — it's loading slower than it should{{issue_highlight}}.
+I'm Dean, a web developer, and I ran a quick check on {{business}}'s website — it's loading slower than it should, which affects both visitor experience and where it ranks in Google.
 
-That affects both how visitors experience the site and where it ranks in Google, which can mean fewer people ever find you in the first place.
+I've just built a free tool that checks a website for SEO, performance, mobile and conversion issues in more detail. You can run it here — completely free:
 
-The good news is that this is usually a straightforward fix.
+{{audit_link}}
 
-I specialise in building and repairing websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
+It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
-{{portfolio_line}}
-
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
   {
     name: 'Outdated Website',
     category: 'Issue-based',
-    subject: 'A modern refresh for {{business}}',
+    subject: 'A free website check for {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local businesses I had a look at {{business}}'s website — it could use a modern refresh{{issue_highlight}}.
+I'm Dean, a web developer, and I had a look at {{business}}'s website — it could use a modern refresh, which can quietly cost enquiries even when the work itself is great.
 
-An outdated design can make people question how established a business is, even when the work itself is great — which can quietly cost you enquiries before anyone even reads what you offer.
+I've also just built a free tool that checks a website for SEO, performance, mobile and conversion issues. You can run it here — completely free:
 
-The good news is that this is usually a straightforward fix.
+{{audit_link}}
 
-I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
+It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
-{{portfolio_line}}
-
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
@@ -456,39 +414,33 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'Add online booking to {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local businesses I had a look at {{business}}'s website — there isn't currently a way for customers to book online{{issue_highlight}}.
+I'm Dean, a web developer, and I had a look at {{business}}'s website — there isn't currently a way for customers to book online, which likely means missed bookings from people browsing outside your opening hours.
 
-That likely means missed bookings from people browsing outside your opening hours, who end up booking somewhere that lets them book instantly instead.
+I've also just built a free tool that checks a website for SEO, performance, mobile and conversion issues. You can run it here — completely free:
 
-The good news is that this is usually a straightforward fix.
+{{audit_link}}
 
-I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
-
-{{portfolio_line}}
-
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
   {
     name: 'Website Audit Findings',
     category: 'Issue-based',
-    subject: `A quick audit of {{business}}'s website`,
+    subject: `A free website check for {{business}}`,
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local businesses I ran {{business}}'s website through a quick audit — a few things stood out that are worth knowing about.{{website_score_note}}{{competitor_line}}
+I'm Dean, a web developer, and I've just built a free tool that lets businesses check their website for SEO, performance, mobile and conversion issues.
 
-{{issue_list}}
+I thought you might find it useful for {{business}}.
 
-That means anyone finding you through Google, social media, or a recommendation could be leaving without getting in touch — which can result in missed enquiries and bookings without you even realising it.
+You can run your website through it here — completely free:
 
-The good news is that none of this is a huge job to fix.
+{{audit_link}}
 
-I specialise in building and improving websites for local businesses, and I'd be happy to walk through the findings and give you a clear recommendation, with no obligation.
+It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
-{{portfolio_line}}
-
-I also built a free website audit tool if you want to check things yourself: {{audit_link}}
+No obligation — I just thought it might be useful.
 
 {{signature}}`,
   },
@@ -498,9 +450,11 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'Following up — {{business}}',
     body: `Hi {{contact}},
 
-Just following up in case my last email got buried — I noticed a few things on {{business}}'s website that are likely costing you enquiries{{issue_highlight}}.{{portfolio_line}}
+Just following up on this — if you want to see what the free audit tool picks up on {{business}}'s website, you can run it here:
 
-Worth a quick chat this week to see if I can help?
+{{audit_link}}
+
+No pressure at all — thought it might be useful.
 
 {{myname}}
 dean-da-dev.co.uk`,
@@ -511,13 +465,9 @@ dean-da-dev.co.uk`,
     subject: 'Checking in on the quote for {{business}}',
     body: `Hi {{contact}},
 
-I hope you're doing well.
+Just wanted to check in and see if you had any questions about the quote I sent over for {{business}}. I know these things can sit in a busy inbox, so no worries at all if you haven't had a chance to look yet.
 
-I just wanted to check in and see if you had any questions about the quote I sent over for {{business}}. I know these things can sit in a busy inbox, so no worries at all if you haven't had a chance to look yet.
-
-I'm happy to jump on a call if that's easier than going back and forth over email, or to adjust the scope if anything needs revisiting.
-
-Thank you for your time, and I hope to hear from you.
+Happy to jump on a call if that's easier than going back and forth over email, or to adjust the scope if anything needs revisiting.
 
 {{signature}}`,
   },
@@ -541,47 +491,39 @@ Thank you again.
     subject: 'Quick favour, {{contact}}?',
     body: `Hi {{contact}},
 
-I hope you're doing well, and that {{business}}'s new site has been working out well for you.
+Hope things are going well with {{business}}'s new site.
 
 If you know anyone else who could use a similar website — another local business owner, a friend, a supplier you work with — I'd really appreciate the introduction. Referrals like that mean a lot to a small business like mine.
-
-Thank you for your time, and I hope to hear from you.
 
 {{signature}}`,
   },
   {
     name: 'Two-Path Offer',
     category: 'Bookrightly',
-    subject: 'Quick idea for {{business}}',
+    subject: 'A free website check for {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local businesses I had a look at {{business}}'s website{{issue_highlight}}.
+I'm Dean, a web developer, and I've just built a free tool that lets businesses check their website for SEO, performance, mobile and conversion issues. You can run {{business}} through it here — completely free:
 
-That means anyone finding you through Google, social media, or a recommendation could be leaving without getting in touch — which can result in missed enquiries and bookings without you even realising it.
+{{audit_link}}
 
-The good news is that this is usually a straightforward fix, and there are two ways to go about it. I build custom websites through Dean Da Dev from £249, or if a full rebuild is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform that gets clients booking and paying online in about ten minutes, for £10–20/month with a 90-day free trial.
+If it turns up things worth fixing, there are two ways I can help: I build custom websites through Dean Da Dev from £249, or if a full rebuild is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform live in about ten minutes, from £10–20/month with a 90-day free trial.
 
-{{portfolio_line}}
-
-I also built a free website audit tool if you want to check things yourself: {{audit_link}} — or let me know which of the two paths sounds more like a fit and we'll take it from there.
+No obligation either way — let me know if either sounds like a fit.
 
 {{signature}}`,
   },
   {
     name: 'Two-Path Offer (No Website)',
     category: 'Bookrightly',
-    subject: 'Quick idea for {{business}}',
+    subject: 'A quick idea for {{business}}',
     body: `Hi {{greeting}},
 
-I'm {{myname}}, a web developer and designer, and while looking at local businesses I noticed {{business}} doesn't currently have a website.
+I'm Dean, a web developer, and I noticed {{business}} doesn't currently have a website — which means anyone searching Google or asking for a recommendation has no way to find or check you out online.
 
-That means anyone searching Google, checking social media, or asking for a recommendation has no way to find or check you out online — which usually means they end up going with a competitor who does show up.
+There are two ways I can help: I build custom websites through Dean Da Dev from £249, or if a full site is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a professional booking page live in about ten minutes, from £10–20/month with a 90-day free trial.
 
-The good news is that this is usually a straightforward fix, and there are two ways to go about it. I build custom websites through Dean Da Dev from £249, or if a full site is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform that gets you a professional online presence plus bookings and payments live in about ten minutes, for £10–20/month with a 90-day free trial.
-
-{{portfolio_line}}
-
-I also built a free website audit tool if you want to check things yourself: {{audit_link}} — or let me know which of the two paths sounds more like a fit and we'll take it from there.
+No obligation either way — let me know if either sounds like a fit.
 
 {{signature}}`,
   },
@@ -628,7 +570,7 @@ Let me know if that's of interest and I'll send over a draft outline first, so y
 
 I'm {{myname}}, a web developer, and each year I set aside some free work for local churches, charities, and community organisations — I wanted to reach out to {{business}} directly rather than wait to be asked.
 
-To be upfront about exactly what's on offer: I'd build or improve your website for free, no strings attached. The only thing I'd ask in return is that, if you're happy with the result, you'd be willing to recommend me to anyone else you know who might need a website built — that's the whole ask, nothing more, and no hidden costs later.{{portfolio_line}}
+To be upfront about exactly what's on offer: I'd build or improve your website for free, no strings attached. The only thing I'd ask in return is that, if you're happy with the result, you'd be willing to recommend me to anyone else you know who might need a website built — that's the whole ask, nothing more, and no hidden costs later.
 
 If that's of interest, just reply and let me know a bit about what you're looking for and I'll take it from there.
 
@@ -659,19 +601,15 @@ If you'd like me to create a booking page for your business, just reply "book" a
     category: 'Instagram',
     channels: ['Instagram', 'WhatsApp', 'Facebook'],
     subject: 'Instagram DM (not sent by email — send as a direct message)',
-    // Uses {{issue_highlight}} for a real, specific observation instead of
-    // a vague "a few quick changes" line — same reasoning as the WhatsApp
-    // template: a genuine specific detail reads as "I actually looked."
     body: `Hi, I'm {{myname}} from dean-da-dev.co.uk 👋
 
-I came across {{business}} and had a quick look at the website{{issue_highlight}}.
+I came across {{business}} and had a quick look at the website.
 
-I think a few relatively small changes could make the site feel much more modern and help turn more visitors into bookings and enquiries.
+I've also just built a free tool that checks a website for SEO, performance, mobile and conversion issues — you can run {{business}} through it here, completely free:
 
-You can see some of my recent work here:
-https://www.dean-da-dev.co.uk/portfolio
+{{audit_link}}
 
-If you're interested, I'd be happy to put together 3 quick ideas specifically for {{business}} and send them over — completely free and with no obligation.
+If you're interested, I'd also be happy to put together 3 quick ideas specifically for {{business}} — no obligation.
 
 — {{myname}}`,
   },
@@ -686,7 +624,7 @@ If you're interested, I'd be happy to put together 3 quick ideas specifically fo
     subject: 'Instagram DM (not sent by email — send as a direct message)',
     body: `Hey 👋 I came across {{business}} and your work looks really strong.
 
-I had a quick look at your website too{{issue_highlight}}. On top of that, most customers are probably coming through Instagram/Facebook, which is great for showing your work, but people still have to message or search around for pricing and availability.
+Most customers are probably coming through Instagram/Facebook, which is great for showing your work, but people still have to message or search around for pricing and availability.
 
 I build simple booking pages for local businesses that let clients:
 
@@ -715,13 +653,9 @@ I can mock up a version using your current branding so you can see what it would
     // Leads with identity + a link instead of a critique. Signs off with
     // the name, not the link again — it's already in the first line, no
     // need to repeat it.
-    //
-    // {{issue_highlight}} was later added back in, but only AFTER identity
-    // is established (not as the opening line) — that's what made the
-    // original version read as rude, not the observation itself. Coming
-    // after "here's who I am, here's proof," a specific detail instead
-    // reads as "I actually looked," same as the email templates.
-    body: `Hi, I'm Dean — a web developer/designer at dean-da-dev.co.uk (that's got my work on it if you want to have a look). I came across {{business}} and had a quick look at your site{{issue_highlight}}. Think I could help you pick up more bookings/enquiries online — happy to put a few ideas together if you're interested, no pressure either way.
+    body: `Hi, I'm Dean — a web developer at dean-da-dev.co.uk. I've just built a free tool that checks a website for SEO, performance, mobile and conversion issues — you can run {{business}} through it here, completely free: {{audit_link}}
+
+No pressure either way — just thought it might be useful.
 
 — Dean`,
   },
@@ -873,49 +807,16 @@ export function applyTemplateVars(text, vars) {
 }
 
 /**
- * Builds the full variable set used to render a template for a lead,
- * including computed fallback-safe clauses (portfolio_line, issue_note,
- * issue_highlight) so templates never end up with a dangling "Example: "
- * or a broken sentence when a demo/issue hasn't been picked/logged.
+ * Builds the full variable set used to render a template for a lead.
  */
 const MY_WEBSITE = 'https://www.dean-da-dev.co.uk';
-const MY_PORTFOLIO = 'https://www.dean-da-dev.co.uk/portfolio';
 const MY_EMAIL = 'dean@dean-da-dev.co.uk';
 // Mirrors functions/growthAuditConfig.js's AUDIT_TOOL_URL — kept as its own
 // constant here too since this template library is a separate (manual,
 // non-AI) outreach surface that isn't bundled with functions/.
 const AUDIT_TOOL_URL = 'https://app.dean-da-dev.co.uk/';
 
-export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
-  const issue = (lead?.issuesChecklist ?? [])[0] ?? '';
-  // A real AI-written observation from the auto-audit ("small, illegible
-  // logo, cookie banner blocking the mobile layout") is far more specific
-  // and convincing than the generic per-checkbox text in ISSUE_DETAILS —
-  // prefer it whenever the lead was auto-audited.
-  const aiNote = lead?.aiDesignNote?.trim().replace(/\.+$/, '');
-  const issueDetail = aiNote || (issue ? (ISSUE_DETAILS[issue] ?? `${issue} stood out to me`) : '');
-
-  // {{issue_highlight}} only ever surfaces ONE finding — for a lead that's
-  // been through the website auto-audit (or a full manual review with
-  // several boxes ticked), that throws away everything else it found.
-  // issue_list gives templates access to the whole set.
-  const allIssues = lead?.issuesChecklist ?? [];
-  const issueListText = allIssues.length > 0
-    ? allIssues.map((iss) => `  • ${iss}${ISSUE_DETAILS[iss] ? ` — ${ISSUE_DETAILS[iss]}` : ''}`).join('\n')
-    : "  • Nothing major stood out, but there's usually still room to sharpen things up";
-  const websiteScoreNote = typeof lead?.websiteScore === 'number' ? ` It scored ${lead.websiteScore}/100 on page speed.` : '';
-
-  // Only ever set when the scan found a genuinely stronger nearby
-  // competitor (see runBusinessScan's Step 4b) — empty otherwise, so this
-  // never forces a weak or invented comparison into a template. Also
-  // suppressed when the site doesn't even work — "your site isn't loading"
-  // is a strong enough hook on its own, and immediately following it with a
-  // competitor's star rating reads as tone-deaf rather than persuasive.
-  const siteIsBroken = allIssues.includes("Site Doesn't Load") || allIssues.includes('Broken Links');
-  const competitorLine = lead?.competitorName && !siteIsBroken
-    ? ` For comparison, ${lead.competitorName} nearby is rated ${lead.competitorRating}★ from ${lead.competitorReviewCount} reviews — worth knowing what's working for them.`
-    : '';
-
+export function buildTemplateVars(lead, { myName } = {}) {
   const contactTrimmed = lead?.contactName?.trim() ?? '';
   const business = lead?.businessName ?? '';
 
@@ -929,16 +830,8 @@ export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
     greeting: contactTrimmed || (business ? `${business} team` : 'there'),
     website: lead?.website ?? '',
     industry: lead?.industry ?? '',
-    issue,
-    portfolio: demoUrl,
-    portfolio_line: `\n\nYou can view my portfolio and live demos here:\n\nPortfolio: ${MY_PORTFOLIO}${demoUrl ? `\nExample project: ${demoUrl}` : ''}`,
-    issue_note: issue ? ` (${issue})` : '',
-    issue_highlight: issueDetail ? ` — ${issueDetail}` : '',
-    issue_list: issueListText,
-    website_score_note: websiteScoreNote,
-    competitor_line: competitorLine,
     tool_pitch: `\n\n${pickRelevantTools(lead).map((t) => `  • ${t.name} — https://www.dean-da-dev.co.uk/${t.slug}`).join('\n')}`,
-    audit_link: AUDIT_TOOL_URL,
+    audit_link: `${AUDIT_TOOL_URL}?ref=outreach-template`,
     myname: myName ?? '',
     signature: myName ? `Kind regards,\n\n${myName}\ndean-da-dev\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}` : '',
   };

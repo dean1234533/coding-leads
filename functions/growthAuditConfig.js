@@ -9,30 +9,19 @@ const AUDIT_TOOL_URL = 'https://app.dean-da-dev.co.uk/';
 // per spec) — the audit link is the primary CTA, not this.
 const PORTFOLIO_URL = 'https://www.dean-da-dev.co.uk/portfolio';
 
-const UTM_MEDIUM_BY_CHANNEL = {
-  email: 'email',
-  whatsapp: 'whatsapp',
-  instagram: 'instagram_dm',
-  facebook: 'facebook_messenger',
-  linkedin: 'linkedin',
-};
-
 /**
- * Builds the audit tool link a prospect gets sent, with UTM params so
- * traffic from outreach is distinguishable in analytics — plain query
- * string params, no new tracking infrastructure required (the Growth Audit
- * app doesn't need to do anything special to "support" them).
+ * Builds the audit tool link a prospect gets sent. A single short `ref` param
+ * (rather than the old utm_source/utm_medium/utm_campaign trio) keeps the
+ * link readable when it's pasted into a plain-text message, while still
+ * being distinguishable per channel in analytics — no new tracking
+ * infrastructure required (the Growth Audit app doesn't need to do anything
+ * special to "support" it).
  *
  * @param {string} [channel]
  * @returns {string}
  */
 function buildAuditToolUrl(channel) {
-  const medium = UTM_MEDIUM_BY_CHANNEL[channel] ?? 'outreach';
-  const params = new URLSearchParams({
-    utm_source: 'outreach',
-    utm_medium: medium,
-    utm_campaign: 'website_audit',
-  });
+  const params = new URLSearchParams({ ref: `outreach-${channel || 'general'}` });
   return `${AUDIT_TOOL_URL}?${params.toString()}`;
 }
 

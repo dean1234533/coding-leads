@@ -86,8 +86,7 @@ export default function CrmCharityScan() {
   async function auditLeadWebsite(website) {
     if (!website) return null;
     try {
-      // Kept above auditWebsitesNow's own timeoutSeconds (540s) — see the
-      // comment on the equivalent call in CrmWebsiteReview.jsx.
+      // Kept above auditWebsitesNow's own timeoutSeconds (540s).
       const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 500000 });
       const { data } = await fn({ urls: [website] });
       return data.results?.[website] ?? null;

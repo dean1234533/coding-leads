@@ -7,11 +7,13 @@ const axios = require('axios');
 // findings used in outreach. It's a public, anonymous, unauthenticated
 // endpoint (no API key needed) that does real browser rendering, real
 // PageSpeed measurement, and returns structured checks per category, each
-// with a passed/severity/weight/measurementType/status. This app's own
-// in-house websiteAudit.js stays as-is for the automatic/scheduled path
-// (see aiEmailWriter.js) — deliberately NOT wired into anything scheduled
-// or bulk, since every call here spends real budget on shared Cloudflare
-// infrastructure this app doesn't own or control.
+// with a passed/severity/weight/measurementType/status. This function
+// itself is only ever called manually/on-demand (runGrowthAuditForLead) —
+// never from a scheduled or bulk job, since every call here spends real
+// budget on shared Cloudflare infrastructure this app doesn't own or
+// control. The scheduled auto-audit-email job (crmGmailService.js) only
+// drafts for leads that already have findings stored from a prior manual
+// run; it never triggers a fresh scan itself.
 const GROWTH_AUDIT_URL = 'https://app.dean-da-dev.co.uk/api/audit';
 const TIMEOUT_MS = 45_000; // real browser rendering can take 20-30s
 

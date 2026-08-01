@@ -5,15 +5,13 @@ import { app, db } from '../../firebase';
 import Modal from '../Modal';
 import { STATUSES, PRIORITIES, INDUSTRIES, STATUS_COLORS, applyTemplateVars, buildTemplateVars, sortTemplatesByRelevance } from '../../utils/crmConstants';
 import { computeNextFollowUp, followUpPatchForSend } from '../../utils/crmFollowUps';
-import CrmWebsiteReview from './CrmWebsiteReview';
 import CrmNotesTimeline from './CrmNotesTimeline';
 import CrmTasksList from './CrmTasksList';
 import CrmComposer from './CrmComposer';
 import CrmCallScript from './CrmCallScript';
-import CrmAiDraftWidget from './CrmAiDraftWidget';
 import CrmGrowthAuditOutreach from './CrmGrowthAuditOutreach';
 
-const TABS = ['Overview', 'Growth Audit Outreach', 'Website Review', 'Notes', 'Tasks', 'Emails', 'Call Script'];
+const TABS = ['Overview', 'Growth Audit Outreach', 'Notes', 'Tasks', 'Emails', 'Call Script'];
 const MY_NAME = 'Dean Burt';
 
 // Instagram has no send API, so this is a copy-the-caption /
@@ -389,14 +387,10 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
               />
             </label>
           </div>
-          <div className="col-span-2 sm:col-span-3">
-            <CrmAiDraftWidget lead={lead} />
-          </div>
         </div>
       )}
 
       {tab === 'Growth Audit Outreach' && <CrmGrowthAuditOutreach lead={lead} />}
-      {tab === 'Website Review' && <CrmWebsiteReview lead={lead} onUpdate={onUpdate} />}
       {tab === 'Notes' && <CrmNotesTimeline leadId={lead.id} />}
       {tab === 'Tasks' && <CrmTasksList leadId={lead.id} />}
       {tab === 'Emails' && (

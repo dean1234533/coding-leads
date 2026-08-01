@@ -12,7 +12,7 @@ const TRIGGER_TYPES = ['NEW_CRM_LEAD', 'NEW_CODING_LEAD', 'LEAD_WON', 'LEAD_INAC
 // queue reviewed from an Approvals tab. That tab is gone (outreach is now
 // self-serve via the Growth Audit tool, not an approve-then-send queue), so
 // the only automated action left is a notification — draft on demand from a
-// lead's detail page instead (see CrmAiDraftWidget.jsx).
+// lead's Growth Audit Outreach tab instead.
 const ACTION_TYPES = ['NOTIFY_OWNER'];
 
 const TERMINAL_STATUSES = ['Won', 'Lost', 'Archive'];

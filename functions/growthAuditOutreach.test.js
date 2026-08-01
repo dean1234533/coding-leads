@@ -200,16 +200,14 @@ describe('growthAuditConfig', () => {
     expect(AUDIT_TOOL_URL).toBe('https://app.dean-da-dev.co.uk/');
   });
 
-  it('buildAuditToolUrl adds UTM params identifying the channel', () => {
+  it('buildAuditToolUrl adds a short, readable ref param identifying the channel', () => {
     const url = buildAuditToolUrl('whatsapp');
-    expect(url).toContain('utm_source=outreach');
-    expect(url).toContain('utm_medium=whatsapp');
-    expect(url).toContain('utm_campaign=website_audit');
+    expect(url).toBe('https://app.dean-da-dev.co.uk/?ref=outreach-whatsapp');
   });
 
-  it('falls back to a generic medium for an unrecognised/missing channel', () => {
+  it('falls back to a generic ref for an unrecognised/missing channel', () => {
     const url = buildAuditToolUrl(undefined);
-    expect(url).toContain('utm_medium=outreach');
+    expect(url).toContain('ref=outreach-general');
   });
 
   it('PORTFOLIO_URL is a single configured value', () => {

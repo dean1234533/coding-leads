@@ -8,15 +8,13 @@ import CrmDashboard from '../components/crm/CrmDashboard';
 import CrmLeadsPage from '../components/crm/CrmLeadsPage';
 import CrmCharityScan from '../components/crm/CrmCharityScan';
 import CrmGmailInbox from '../components/crm/CrmGmailInbox';
-import CrmTemplateLibrary from '../components/crm/CrmTemplateLibrary';
-import CrmPortfolioSelector from '../components/crm/CrmPortfolioSelector';
 import RssScout from '../components/RssScout';
 import QuickLookup from '../components/QuickLookup';
 import InstallBanner from '../components/InstallBanner';
 import CrmAutoSeed from '../components/crm/CrmAutoSeed';
-import CrmWorkflows from '../components/crm/CrmWorkflows';
 import CrmInsights from '../components/crm/CrmInsights';
 import CrmAdAdvice from '../components/crm/CrmAdAdvice';
+import CrmRedditPostGenerator from '../components/crm/CrmRedditPostGenerator';
 import { enablePushNotifications, onForegroundPush } from '../utils/pushNotifications';
 import Modal from '../components/Modal';
 
@@ -27,103 +25,11 @@ const SUB_TABS = [
   { key: 'charity',    label: 'Charity'    },
   { key: 'inbox',      label: 'Inbox'      },
   { key: 'scanner',    label: 'Scanner'    },
-  { key: 'templates',  label: 'Templates'  },
-  { key: 'workflows',  label: 'Workflows'  },
   { key: 'insights',   label: 'Insights'   },
   { key: 'adAdvice',   label: 'Ad Advice'  },
+  { key: 'reddit',     label: 'Reddit Post'},
   { key: 'settings',   label: 'Settings'   },
 ];
-
-function MigrateLegacyLeads() {
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-
-  async function handleMigrate() {
-    setRunning(true);
-    setError(null);
-    setResult(null);
-    try {
-      const fn = httpsCallable(getFunctions(app), 'migrateLegacyLeads');
-      const { data } = await fn();
-      setResult(data);
-    } catch (err) {
-      setError(err?.message ?? 'Migration failed.');
-    } finally {
-      setRunning(false);
-    }
-  }
-
-  return (
-    <section className="rounded-xl border border-gray-800 bg-gray-900 p-4 sm:p-6">
-      <h2 className="text-sm font-semibold text-gray-200">Migrate Legacy Leads</h2>
-      <p className="mt-1 text-xs text-gray-500">
-        One-time import of any leads still sitting in the old Lead Pipeline into this CRM. Safe to run more than once — already-migrated leads are skipped.
-      </p>
-      <button
-        onClick={handleMigrate}
-        disabled={running}
-        className="mt-4 rounded-lg bg-gray-800 px-3.5 py-2 text-xs font-semibold text-gray-200 transition hover:bg-gray-700 disabled:opacity-50"
-      >
-        {running ? 'Migrating…' : 'Migrate Legacy Leads'}
-      </button>
-      {result && (
-        <p className="mt-3 text-xs text-emerald-400">Migrated {result.migrated}, skipped {result.skipped} (already in CRM).</p>
-      )}
-      {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
-    </section>
-  );
-}
-
-function RecoverBacklinkPageTitles() {
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-
-  async function handleRun() {
-    setRunning(true);
-    setError(null);
-    setResult(null);
-    try {
-      const fn = httpsCallable(getFunctions(app), 'recoverBacklinkPageTitles', { timeout: 300000 });
-      let totals = { updated: 0, failed: 0, remaining: 1 };
-      // Processes 40 leads per call to stay under the function timeout —
-      // keep calling until nothing's left, capped so a bug can't loop forever.
-      for (let i = 0; i < 10 && totals.remaining > 0; i++) {
-        const { data } = await fn();
-        totals = { updated: totals.updated + data.updated, failed: totals.failed + data.failed, remaining: data.remaining };
-        setResult({ ...totals });
-      }
-    } catch (err) {
-      setError(err?.message ?? 'Recovery failed.');
-    } finally {
-      setRunning(false);
-    }
-  }
-
-  return (
-    <section className="rounded-xl border border-gray-800 bg-gray-900 p-4 sm:p-6">
-      <h2 className="text-sm font-semibold text-gray-200">Recover Backlink Page Titles</h2>
-      <p className="mt-1 text-xs text-gray-500">
-        One-time recovery for backlink prospects whose article title was lost when business names were fixed (see above) — re-fetches each live page and saves its title into Notes. Runs in batches automatically; may take a minute for a large list. Safe to run more than once.
-      </p>
-      <button
-        onClick={handleRun}
-        disabled={running}
-        className="mt-4 rounded-lg bg-gray-800 px-3.5 py-2 text-xs font-semibold text-gray-200 transition hover:bg-gray-700 disabled:opacity-50"
-      >
-        {running ? 'Recovering…' : 'Recover Page Titles'}
-      </button>
-      {result && (
-        <p className="mt-3 text-xs text-emerald-400">
-          Recovered {result.updated}, failed {result.failed}{result.remaining > 0 ? `, ${result.remaining} remaining (click again)` : ''}.
-        </p>
-      )}
-      {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
-    </section>
-  );
-}
-
 
 const AUTO_SCAN_BUSINESS_TYPES = [
   { value: 'restaurant',         label: 'Restaurants & Cafés'      },
@@ -353,7 +259,7 @@ function CrmAutoAuditEmail() {
         </button>
       </div>
       <p className="mt-1 text-xs text-gray-500">
-        Every morning at 9:15am, writes a personalized email (via AI, from the lead's real audit findings — same as the "Generate with AI" button in the composer) for any new lead that has an email address, is still "New", hasn't been contacted yet, and whose website audit found issues — covers leads from Auto Scan, Quick Lookup, or a manual audit alike. It saves each one as a Gmail draft rather than sending it — nothing goes out until you open the draft in Gmail, check it, and send it yourself. Turned {enabled ? 'on' : 'off'} right now.
+        Every morning at 9:15am, writes a personalized email (via AI, from the lead's real Growth Audit findings — same generator as the "Generate with AI" button in the Growth Audit Outreach tab) for any new lead that has an email address, is still "New", hasn't been contacted yet, and has already had a Growth Audit run against it with enough real findings to build outreach around. It never runs a fresh audit itself — run "Run Growth Audit" on a lead first, from its Growth Audit Outreach tab, and it'll be picked up here. Saves each one as a Gmail draft rather than sending it — nothing goes out until you open the draft in Gmail, check it, and send it yourself. Turned {enabled ? 'on' : 'off'} right now.
       </p>
       <button
         onClick={handleSendNow}
@@ -915,10 +821,9 @@ export default function OutreachCrmPage() {
             <RssScout />
           </div>
         )}
-        {subTab === 'templates' && <CrmTemplateLibrary />}
-        {subTab === 'workflows' && <CrmWorkflows />}
         {subTab === 'insights' && <CrmInsights />}
         {subTab === 'adAdvice' && <CrmAdAdvice />}
+        {subTab === 'reddit' && <CrmRedditPostGenerator />}
         {subTab === 'settings' && (
           <div className="space-y-6">
             <section className="rounded-xl border border-gray-800 bg-gray-900 p-4 sm:p-6">
@@ -935,14 +840,11 @@ export default function OutreachCrmPage() {
                 </p>
               )}
             </section>
-            <CrmPortfolioSelector managing />
             <CrmAutoFollowUp />
             <CrmAutoAuditEmail />
             <CrmAutoScan />
             <CrmBacklinkProspecting />
             <CrmPushNotifications />
-            <RecoverBacklinkPageTitles />
-            <MigrateLegacyLeads />
           </div>
         )}
       </main>

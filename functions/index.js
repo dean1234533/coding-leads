@@ -34,11 +34,11 @@ const { requireOwner } = require('./authGuard');
 const { withErrorAlert } = require('./errorAlert');
 const { ensureBacklinkConfig, runBacklinkScan } = require('./backlinkScanner');
 const { auditWebsite } = require('./websiteAudit');
-const { generateAuditEmail } = require('./aiEmailWriter');
 const { fetchGrowthAudit } = require('./growthAuditClient');
 const { selectTopFindings } = require('./findingSelector');
 const { assessOutreachQuality } = require('./outreachQuality');
 const { generateGrowthAuditOutreach } = require('./growthAuditOutreachWriter');
+const { generateRedditPost } = require('./redditPostWriter');
 const { buildAuditToolUrl } = require('./growthAuditConfig');
 const { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow, notifyNewHotLeads } = require('./pushNotifications');
 const { generateCommsMessage, approveApproval, rejectApproval, markApprovalSent } = require('./aiCommsAssistant');
@@ -1744,36 +1744,6 @@ exports.auditWebsitesNow = onCall(
   }
 );
 
-/**
- * generateAuditEmailNow (authenticated) — writes a personalized 3-paragraph
- * outreach email body from a lead's real audit findings (page speed,
- * issuesChecklist, AI design note) via the "senior conversion-focused web
- * strategist" prompt, so cold outreach references what's actually wrong
- * with THIS lead's site instead of a generic template. Always shown to Dean
- * to review/edit before sending — never auto-sent.
- */
-exports.generateAuditEmailNow = onCall(
-  { cors: true, timeoutSeconds: 30, memory: '256MiB', secrets: AUDIT_SECRETS },
-  async (request) => {
-    requireOwner(request);
-    const { lead, myName } = request.data ?? {};
-    if (!lead?.businessName) throw new HttpsError('invalid-argument', 'lead.businessName is required.');
-
-    const keys = {
-      gemini: process.env.GEMINI_API_KEY,
-      groq: process.env.GROQ_API_KEY,
-      mistral: process.env.MISTRAL_API_KEY,
-      openrouter: process.env.OPENROUTER_API_KEY,
-      cerebras: process.env.CEREBRAS_API_KEY,
-      cloudflare: process.env.CLOUDFLARE_AI_KEY,
-      huggingface: process.env.HUGGINGFACE_API_KEY,
-    };
-    const body = await generateAuditEmail(lead, myName || 'Dean', keys);
-    if (!body) throw new HttpsError('internal', 'Every AI provider failed — try again in a moment.');
-    return { body };
-  }
-);
-
 const GROWTH_AUDIT_OUTREACH_SECRETS = ['GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY', 'HUGGINGFACE_API_KEY'];
 
 function growthAuditOutreachKeys() {
@@ -1942,6 +1912,29 @@ exports.generateGrowthAuditOutreachNow = onCall(
       auditUrl: buildAuditToolUrl(channel),
       notEnoughFindings: !hasEnough && resolvedMode !== 'followup1' && resolvedMode !== 'followup2',
     };
+  }
+);
+
+/**
+ * generateRedditPostNow — writes a genuine "success story / lessons
+ * learned" style Reddit post from real facts Dean supplies (never invented
+ * stats/claims), for manual copy-paste into a subreddit. Never includes a
+ * link or a pitch — see redditPostWriter.js for why. Manual/on-demand only.
+ */
+exports.generateRedditPostNow = onCall(
+  { region: 'europe-west1', cors: true, timeoutSeconds: 30, memory: '256MiB', secrets: GROWTH_AUDIT_OUTREACH_SECRETS },
+  async (request) => {
+    requireOwner(request);
+    const { topic, keyPoints, subreddit, myName } = request.data ?? {};
+    if (!topic?.trim()) throw new HttpsError('invalid-argument', 'topic is required.');
+
+    const result = await generateRedditPost(
+      { topic: topic.trim(), keyPoints: Array.isArray(keyPoints) ? keyPoints : [], subreddit, myName: myName || 'Dean' },
+      growthAuditOutreachKeys(),
+    );
+    if (!result) throw new HttpsError('internal', 'Every AI provider failed — try again in a moment.');
+
+    return result;
   }
 );
 

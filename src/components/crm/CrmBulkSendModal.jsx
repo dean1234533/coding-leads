@@ -10,8 +10,8 @@ import Modal from '../Modal';
 const MY_NAME = 'Dean Burt';
 const SEND_DELAY_MS = 1500; // throttle between sends — avoids Gmail rate/abuse limits
 
-function leadVars(lead, demoUrl) {
-  return buildTemplateVars(lead, { demoUrl: demoUrl ?? '', myName: MY_NAME });
+function leadVars(lead) {
+  return buildTemplateVars(lead, { myName: MY_NAME });
 }
 
 function sleep(ms) {
@@ -21,26 +21,21 @@ function sleep(ms) {
 export default function CrmBulkSendModal({ leads, onClose, onDone }) {
   const [templates, setTemplates] = useState([]);
   const [templateId, setTemplateId] = useState('');
-  const [portfolioDemos, setPortfolioDemos] = useState([]);
-  const [demoId, setDemoId] = useState('');
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState({}); // leadId -> 'pending' | 'sent' | 'failed' | 'skipped'
   const [errors, setErrors] = useState({}); // leadId -> error message
   const [finished, setFinished] = useState(false);
 
   useEffect(() => {
-    const unsubT = onSnapshot(query(collection(db, 'crmTemplates'), orderBy('name')), (snap) => {
+    return onSnapshot(query(collection(db, 'crmTemplates'), orderBy('name')), (snap) => {
       const list = sortTemplatesByRelevance(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setTemplates(list);
       if (!templateId && list.length) setTemplateId(list[0].id);
     });
-    const unsubP = onSnapshot(collection(db, 'crmPortfolio'), (snap) => setPortfolioDemos(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    return () => { unsubT(); unsubP(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const template = templates.find((t) => t.id === templateId);
-  const demoUrl = portfolioDemos.find((p) => p.id === demoId)?.url ?? '';
   // A reply already got AI-classified as "Not Interested" (declined, asked
   // to be removed/unsubscribed) — that classification was only ever shown
   // as a badge in the inbox, nothing actually stopped a bulk send from
@@ -63,7 +58,7 @@ export default function CrmBulkSendModal({ leads, onClose, onDone }) {
 
     for (const lead of withEmail) {
       try {
-        const vars = leadVars(lead, demoUrl);
+        const vars = leadVars(lead);
         const subject = applyTemplateVars(template.subject, vars);
         const bodyHtml = applyTemplateVars(template.body, vars).replace(/\n/g, '<br>');
 
@@ -111,27 +106,13 @@ export default function CrmBulkSendModal({ leads, onClose, onDone }) {
             </select>
           </label>
 
-          {portfolioDemos.length > 0 && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">Portfolio Demo (for {'{{portfolio}}'})</span>
-              <select
-                value={demoId}
-                onChange={(e) => setDemoId(e.target.value)}
-                className="w-full rounded-lg border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-gray-100 focus:border-blue-500 focus:outline-none"
-              >
-                <option value="">No demo (leave {'{{portfolio}}'} blank)</option>
-                {portfolioDemos.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </label>
-          )}
-
           {template && previewLead && (
             <div className="rounded-lg border border-gray-800 bg-gray-950/60 p-3 space-y-1.5">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-600">
                 Preview — {previewLead.businessName || 'first lead'}
               </p>
-              <p className="break-words text-sm font-medium text-gray-200">{applyTemplateVars(template.subject, leadVars(previewLead, demoUrl))}</p>
-              <p className="whitespace-pre-line break-words text-xs text-gray-400">{applyTemplateVars(template.body, leadVars(previewLead, demoUrl))}</p>
+              <p className="break-words text-sm font-medium text-gray-200">{applyTemplateVars(template.subject, leadVars(previewLead))}</p>
+              <p className="whitespace-pre-line break-words text-xs text-gray-400">{applyTemplateVars(template.body, leadVars(previewLead))}</p>
             </div>
           )}
 

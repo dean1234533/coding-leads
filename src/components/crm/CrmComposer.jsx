@@ -26,8 +26,6 @@ function fileToBase64(file) {
 
 export default function CrmComposer({ lead, threadId, inReplyTo, references, defaultTo = '', defaultSubject = '', onSent, onSaved }) {
   const [templates, setTemplates] = useState([]);
-  const [portfolioDemos, setPortfolioDemos] = useState([]);
-  const [selectedDemoId, setSelectedDemoId] = useState('');
   const [to, setTo] = useState(defaultTo || lead?.email || '');
   const [cc, setCc] = useState('');
   const [subject, setSubject] = useState(defaultSubject);
@@ -44,13 +42,10 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
   const editorRef = useRef(null);
 
   useEffect(() => {
-    const unsubT = onSnapshot(query(collection(db, 'crmTemplates'), orderBy('name')), (snap) => setTemplates(sortTemplatesByRelevance(snap.docs.map((d) => ({ id: d.id, ...d.data() })))));
-    const unsubP = onSnapshot(collection(db, 'crmPortfolio'), (snap) => setPortfolioDemos(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    return () => { unsubT(); unsubP(); };
+    return onSnapshot(query(collection(db, 'crmTemplates'), orderBy('name')), (snap) => setTemplates(sortTemplatesByRelevance(snap.docs.map((d) => ({ id: d.id, ...d.data() })))));
   }, []);
 
-  const selectedDemo = portfolioDemos.find((p) => p.id === selectedDemoId);
-  const vars = buildTemplateVars(lead, { demoUrl: selectedDemo?.url ?? '', myName: MY_NAME });
+  const vars = buildTemplateVars(lead, { myName: MY_NAME });
 
   function insertAtCursor(html) {
     if (richMode && editorRef.current) {
@@ -105,16 +100,6 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
     } else {
       setPlainText(body);
     }
-  }
-
-  // Selecting a demo both remembers it (so {{portfolio}} in any template
-  // applied afterward resolves to its URL) and inserts the link immediately,
-  // for when you're writing free-hand rather than starting from a template.
-  function insertPortfolio(demoId) {
-    setSelectedDemoId(demoId);
-    const demo = portfolioDemos.find((p) => p.id === demoId);
-    if (!demo?.url) return;
-    insertAtCursor(`<a href="${demo.url}">${demo.name} demo: ${demo.url}</a>`);
   }
 
   function insertWebsite() {
@@ -242,11 +227,6 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
           className="rounded bg-gray-800/50 px-2 py-1 text-xs text-gray-300 focus:outline-none">
           <option value="">Insert template…</option>
           {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
-        <select value={selectedDemoId} onChange={(e) => e.target.value && insertPortfolio(e.target.value)}
-          className="rounded bg-gray-800/50 px-2 py-1 text-xs text-gray-300 focus:outline-none">
-          <option value="">Insert demo…</option>
-          {portfolioDemos.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <button
           type="button"

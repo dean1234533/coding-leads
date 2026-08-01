@@ -535,8 +535,7 @@ export default function RssScout() {
     if (!website) return null;
     try {
       // Kept above auditWebsitesNow's own timeoutSeconds (900s, raised when a
-      // second desktop PageSpeed + vision pass was added to the audit) — see
-      // the comment on the equivalent call in CrmWebsiteReview.jsx.
+      // second desktop PageSpeed + vision pass was added to the audit).
       const fn = httpsCallable(getFunctions(app), 'auditWebsitesNow', { timeout: 950000 });
       const { data } = await fn({ urls: [website] });
       return data.results?.[website] ?? null;

@@ -23,8 +23,8 @@ describe('applyTemplateVars', () => {
   });
 
   it('preserves a leading "\\n\\n" in a computed clause instead of trimming it', () => {
-    const result = applyTemplateVars('End.{{portfolio_line}}', { portfolio_line: '\n\nSee: example.com' });
-    expect(result).toBe('End.\n\nSee: example.com');
+    const result = applyTemplateVars('End.{{signature}}', { signature: '\n\nKind regards,\nDean' });
+    expect(result).toBe('End.\n\nKind regards,\nDean');
   });
 
   it('returns an empty string for falsy input', () => {
@@ -42,46 +42,24 @@ describe('buildTemplateVars', () => {
     expect(vars.myname).toBe('Dean');
   });
 
-  it('prefers the real AI design note over the generic per-issue wording', () => {
-    const vars = buildTemplateVars({ issuesChecklist: ['Slow Loading'], aiDesignNote: 'the hero image takes 8 seconds to load.' });
-    expect(vars.issue_highlight).toContain('the hero image takes 8 seconds to load');
+  it('falls back to a business-team greeting when there is no contact name', () => {
+    const vars = buildTemplateVars({ businessName: 'Acme' });
+    expect(vars.greeting).toBe('Acme team');
   });
 
-  it('falls back to ISSUE_DETAILS when there is no AI design note', () => {
-    const vars = buildTemplateVars({ issuesChecklist: ['Missing SSL'] });
-    expect(vars.issue_highlight).toBe(` — ${ISSUE_DETAILS['Missing SSL']}`);
+  it('falls back to "there" when there is neither a contact name nor a business name', () => {
+    const vars = buildTemplateVars({});
+    expect(vars.greeting).toBe('there');
   });
 
-  it('lists every checked issue, not just the first one', () => {
-    const vars = buildTemplateVars({ issuesChecklist: ['Missing SSL', 'Slow Loading'] });
-    expect(vars.issue_list).toContain('Missing SSL');
-    expect(vars.issue_list).toContain('Slow Loading');
+  it('includes the free audit tool link', () => {
+    const vars = buildTemplateVars({ businessName: 'Acme' });
+    expect(vars.audit_link).toContain('https://app.dean-da-dev.co.uk');
   });
 
-  it('includes a competitor comparison when a stronger nearby competitor was found', () => {
-    const vars = buildTemplateVars({ competitorName: 'Rival Salon', competitorRating: 4.8, competitorReviewCount: 120 });
-    expect(vars.competitor_line).toContain('Rival Salon');
-    expect(vars.competitor_line).toContain('4.8');
-  });
-
-  // Regression test: the "Website Audit Findings" template used to mention a
-  // competitor's star rating even when the site was completely broken
-  // ("Site Doesn't Load"/"Broken Links") — a tonally mismatched thing to say
-  // right after "your site isn't working". See crmConstants.js buildTemplateVars.
-  it('suppresses the competitor comparison when the site does not load', () => {
-    const vars = buildTemplateVars({
-      issuesChecklist: ["Site Doesn't Load"],
-      competitorName: 'Rival Salon', competitorRating: 4.8, competitorReviewCount: 120,
-    });
-    expect(vars.competitor_line).toBe('');
-  });
-
-  it('suppresses the competitor comparison for a broken-links (404) site too', () => {
-    const vars = buildTemplateVars({
-      issuesChecklist: ['Broken Links'],
-      competitorName: 'Rival Salon', competitorRating: 4.8, competitorReviewCount: 120,
-    });
-    expect(vars.competitor_line).toBe('');
+  it('builds a full signature only when a name is given', () => {
+    expect(buildTemplateVars({}, { myName: 'Dean Burt' }).signature).toContain('Dean Burt');
+    expect(buildTemplateVars({}, {}).signature).toBe('');
   });
 });
 

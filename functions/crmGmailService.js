@@ -10,7 +10,7 @@ const { getGmailClient } = require('./gmailService');
 const { OAUTH_SECRETS } = require('./gmailOAuth');
 const { OUTREACH_FROM_ADDRESS } = require('./emailConfig');
 const { encodeMimeHeader } = require('./mimeHeader');
-const { generateAuditEmail } = require('./aiEmailWriter');
+const { generateGrowthAuditOutreach } = require('./growthAuditOutreachWriter');
 const { classifyReply } = require('./aiReplyClassifier');
 const { requireOwner } = require('./authGuard');
 const { withErrorAlert } = require('./errorAlert');
@@ -695,27 +695,34 @@ const sendAutoFollowUpNow = onCall(
 
 // ─────────────────────────────────────────────────────────────────────────────
 // scheduledAutoAuditEmail — writes a personalized outreach email (via the
-// same "senior conversion-focused web strategist" AI prompt used by the
-// manual "Generate with AI" button in the composer) for any new lead whose
-// website was auto-audited and came back with issues, and saves it as a
-// Gmail DRAFT rather than sending it. Dean still has to open the draft and
-// hit send himself — this only automates the writing, never the sending,
-// so a bad or off-tone AI output never reaches a real business unreviewed.
-// Off by default (gated on autoAuditEmailConfig/settings.enabled).
+// same Growth-Audit-driven generator used by the manual "Generate with AI"
+// button in the composer — see growthAuditOutreachWriter.js) for any new
+// lead that's already had a real Growth Audit run against it, and saves it
+// as a Gmail DRAFT rather than sending it. Dean still has to open the draft
+// and hit send himself — this only automates the writing, never the
+// sending, so a bad or off-tone AI output never reaches a real business
+// unreviewed.
+//
+// Deliberately does NOT trigger a fresh Growth Audit scan itself — each scan
+// spends real budget on shared infrastructure this app doesn't own (see
+// growthAuditClient.js) — it only drafts for leads someone has already run
+// "Run Growth Audit" against manually. A lead with no stored findings yet is
+// simply skipped until that's done. Off by default (gated on
+// autoAuditEmailConfig/settings.enabled).
 // ─────────────────────────────────────────────────────────────────────────────
-const AUDIT_EMAIL_AI_SECRETS = ['GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY', 'CLOUDFLARE_AI_KEY', 'HUGGINGFACE_API_KEY'];
+const AUDIT_EMAIL_AI_SECRETS = ['GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY', 'HUGGINGFACE_API_KEY'];
 
 // A lead is only a candidate if it's still fresh (never contacted, still
 // 'New'), has somewhere to send to, hasn't already had a draft written for
-// it, and the audit actually found something worth writing about — a clean
-// audit with no issues has nothing to pitch.
+// it, and already has a real Growth Audit on file with enough genuine
+// findings to build outreach around.
 function isAuditEmailCandidate(lead) {
   return lead.email?.trim()
     && lead.status === 'New'
     && !lead.lastContactDate
     && !lead.auditEmailDrafted
-    && Array.isArray(lead.issuesChecklist)
-    && lead.issuesChecklist.length > 0;
+    && Array.isArray(lead.growthAuditFindings)
+    && lead.growthAuditHasEnoughFindings === true;
 }
 
 async function runAutoAuditEmail() {
@@ -730,7 +737,6 @@ async function runAutoAuditEmail() {
     mistral: process.env.MISTRAL_API_KEY,
     openrouter: process.env.OPENROUTER_API_KEY,
     cerebras: process.env.CEREBRAS_API_KEY,
-    cloudflare: process.env.CLOUDFLARE_AI_KEY,
     huggingface: process.env.HUGGINGFACE_API_KEY,
   };
 
@@ -739,15 +745,23 @@ async function runAutoAuditEmail() {
   for (const doc of due) {
     const lead = doc.data();
     try {
-      const body = await generateAuditEmail(lead, MY_NAME, keys);
-      if (!body) { console.warn(`[autoAuditEmail] AI generation failed for "${lead.businessName}" — every provider unavailable.`); continue; }
+      const result = await generateGrowthAuditOutreach({
+        businessName: lead.businessName,
+        contactName: lead.contactName,
+        industry: lead.industry,
+        channel: 'email',
+        myName: MY_NAME,
+        findings: lead.growthAuditFindings,
+        mode: 'initial',
+      }, keys);
+      if (!result) { console.warn(`[autoAuditEmail] AI generation failed for "${lead.businessName}" — every provider unavailable.`); continue; }
 
-      const subject = `A quick audit of ${lead.businessName ?? 'your'} website`;
-      const greeting = lead.contactName?.trim() ? `Hi ${lead.contactName.trim()},` : 'Hi,';
-      const signOff = `Kind regards,\n\n${MY_NAME}\ndean-da-dev\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}`;
-      const fullBody = `${greeting}\n\n${body}\n\n${signOff}`;
-      const bodyHtml = fullBody.replace(/\n/g, '<br>');
-      const raw = buildRawMessage({ to: lead.email, subject, bodyHtml, bodyText: fullBody });
+      // result.body already comes back as a complete message (greeting +
+      // sign-off included, per growthAuditOutreachWriter.js's email prompt)
+      // so it's used as-is, unlike the old aiEmailWriter.js output which was
+      // body-only and needed wrapping.
+      const bodyHtml = result.body.replace(/\n/g, '<br>');
+      const raw = buildRawMessage({ to: lead.email, subject: result.subject, bodyHtml, bodyText: result.body });
 
       await gmail.users.drafts.create({ userId: 'me', requestBody: { message: { raw } } });
 
