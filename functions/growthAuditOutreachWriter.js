@@ -1,6 +1,7 @@
 'use strict';
 
 const axios = require('axios');
+const { buildAuditToolUrl } = require('./growthAuditConfig');
 
 const CHANNELS = ['email', 'whatsapp', 'instagram', 'facebook', 'linkedin'];
 
@@ -29,12 +30,12 @@ const CHANNEL_GUIDANCE = {
 };
 
 const BUSINESS_TYPE_FOCUS_HINT = {
-  personal_trainer: 'bookings, enquiries, trust signals and local visibility',
-  barber: 'bookings, mobile experience, local search and conversion',
-  salon: 'bookings, mobile experience, local search and conversion',
-  painter_decorator: 'local search, quote enquiries, gallery/trust signals and calls',
-  decorator: 'local search, quote enquiries, gallery/trust signals and calls',
-  painter: 'local search, quote enquiries, gallery/trust signals and calls',
+  personal_trainer: 'the booking/enquiry journey, trust signals and local visibility',
+  barber: 'the mobile booking experience, local search and conversion',
+  salon: 'the mobile booking experience, local search and conversion',
+  painter_decorator: 'local search, quote enquiries, and trust/gallery signals',
+  decorator: 'local search, quote enquiries, and trust/gallery signals',
+  painter: 'local search, quote enquiries, and trust/gallery signals',
   restaurant: 'mobile experience, menus, bookings and local visibility',
   clinic: 'trust, bookings, accessibility and local SEO',
   dentist: 'trust, bookings, accessibility and local SEO',
@@ -42,50 +43,87 @@ const BUSINESS_TYPE_FOCUS_HINT = {
   trades: 'calls, quote enquiries, local SEO and mobile usability',
   plumber: 'calls, quote enquiries, local SEO and mobile usability',
   electrician: 'calls, quote enquiries, local SEO and mobile usability',
+  tattoo: 'a clear booking call-to-action, trust signals and mobile experience',
 };
+
+// Every generated message must land on one of these CTA shapes, verbatim or
+// close to it — variety across generations, but always pointing at the
+// tool link as the next step, never "I'll send you the audit".
+const CTA_VARIATIONS = [
+  'Run your free audit here: {link}',
+  'Feel free to run it through here: {link}',
+  'You can check it yourself here: {link}',
+  'I made it free to use here: {link}',
+  'Have a look and see what it picks up: {link}',
+];
 
 function describeFindingForPrompt(finding) {
   const hedge = CONFIDENCE_LANGUAGE[finding.measurementType] ?? CONFIDENCE_LANGUAGE.detected;
   return `- [${finding.category}] ${finding.title}\n  What was actually found: ${finding.evidence || finding.description}\n  Confidence: ${finding.measurementType} — ${hedge}`;
 }
 
+// Shared context block every prompt gets — who the sender is and what the
+// tool actually does, kept factual and un-hyped per the "useful, not
+// gimmicky" instruction. Deliberately doesn't say "AI-powered" here; the
+// model already has the finding data, it doesn't need to be told to be
+// impressed by its own tech.
+function toolContextBlock(myName) {
+  return `${myName} is a freelance web developer who built Growth Audit, a free website auditing and monitoring tool. It checks websites for SEO, performance, accessibility, mobile usability, local SEO, conversion and trust-signal issues, and can render modern JavaScript websites properly (not just raw HTML) so it catches things a basic scanner would miss. The point of mentioning it is to hand the prospect something genuinely useful they can check for themselves — not to brag about the technology.`;
+}
+
 function buildInitialPrompt({ businessName, contactName, industry, channel, myName, findings }) {
   const findingsBlock = findings.map(describeFindingForPrompt).join('\n');
   const focusHint = BUSINESS_TYPE_FOCUS_HINT[String(industry ?? '').toLowerCase().replace(/[\s-]+/g, '_')];
+  const link = buildAuditToolUrl(channel);
+  const ctaExamples = CTA_VARIATIONS.map((c) => c.replace('{link}', link)).join('\n');
 
-  return `You are ${myName}, a freelance web developer. You are writing cold outreach to a local business after running their website through your Growth Audit tool — a real scanner that measures actual performance, SEO, mobile, accessibility and conversion signals. You are NOT positioning yourself primarily as "a web developer who builds websites" — you are positioning yourself as someone who FINDS real problems costing businesses potential customers online, and can fix them. The website/audit tool is the primary product; you personally can fix what it finds.
+  return `You are ${myName}. ${toolContextBlock(myName)}
+
+You are writing a first outreach message to a local business. This is NOT an advert for your SaaS and it is NOT primarily "I build websites" — it should read like: "I looked at your website, noticed a few things, and built a free tool that lets you check it yourself."
 
 BUSINESS: ${businessName || 'the business'}${contactName ? ` (contact: ${contactName})` : ''}${industry ? `\nINDUSTRY: ${industry}${focusHint ? ` — for this type of business, ${focusHint} tend to matter most, but only lean on that if the findings below actually support it` : ''}` : ''}
 
-REAL FINDINGS FROM THE AUDIT (use ONLY these — never invent or assume anything beyond what's listed):
+REAL FINDINGS FROM THE AUDIT (use ONLY these — never invent or assume anything beyond what's listed, and never mention more than the strongest 1-3):
 ${findingsBlock}
+
+AUDIT TOOL LINK (use this EXACT link, do not modify it or invent a different one): ${link}
 
 CHANNEL: ${CHANNEL_GUIDANCE[channel] ?? CHANNEL_GUIDANCE.email}
 
-STRUCTURE to hit (in your own words each time — vary phrasing, don't reuse the same sentence patterns message to message):
-1. OPENING — mention the business naturally, no generic compliments ("I came across your amazing business" is banned), no "Hope you're well".
-2. OBSERVATION — mention 1-3 of the findings above, translated into plain English a non-technical business owner understands. Never use raw technical terms like "LCP" or "schema" — describe the real-world effect instead (e.g. instead of "LCP is above threshold" say the homepage takes a while to load, particularly on mobile, which can cause people to leave before it's even loaded).
-3. IMPACT — briefly say why this costs them real business (lost enquiries, visitors leaving, lower local visibility) — only claims the findings actually support.
-4. VALUE — mention you ran a quick audit and can send over the full findings and recommendations.
-5. CTA — low-pressure. The ask is "I can send you the full audit" — NOT "book a call", NOT "buy a website", NOT any payment ask. The goal of this message is just to get a reply.
+STRUCTURE to hit (in your own words each time — vary phrasing and sentence order, don't reuse the same patterns message to message):
+1. PERSONAL OPENING — mention the business naturally. No generic compliments ("I came across your amazing business" is banned), no "Hope you're well".
+2. REAL FINDINGS — reference 1-3 of the findings above, translated into plain English a non-technical business owner understands. Never lead with raw technical terms like "LCP", "DOM", "schema", "meta tag", "viewport" — describe the real-world effect instead. Examples of the translation expected: "Missing viewport meta tag" becomes "your mobile setup has an issue that can affect how the site displays on phones"; "Missing title tag" becomes "some important SEO information is missing from the page"; "Missing CTA" becomes "there isn't a clear next step for visitors who want to book".
+3. WHY THEY MATTER — briefly say why this matters in plain English (lost enquiries, visitors leaving, harder to find locally) — only claims the findings actually support. No exaggeration.
+4. TOOL INTRODUCTION — mention you built a free website audit tool that checks for things like this and shows the issues and recommended fixes. Don't oversell it or call it "AI-powered"/"revolutionary" — just useful.
+5. PRIMARY CTA — send them to the audit tool using the exact link above. Use a CTA in this style (vary which one, don't always pick the first):
+${ctaExamples}
 
-BANNED PHRASES: "Hope you're well", "I came across your amazing business", "I help businesses like yours", "Would you be interested in a website?", any generic compliment that could apply to any business, corporate transition words (Furthermore/Additionally/Moreover), fake urgency, exclamation marks, claims not supported by the findings above.
+BANNED — never do any of these:
+- Do not say "I can send you the audit", "would you like me to send the audit/report", or offer to send a PDF. The prospect runs the audit themselves via the link.
+- Do not ask "do you want me to build you a website", "can I redesign your site", "would you like a quote", or "book a call" — that offer comes later, not in this message.
+- No generic compliments, no "Hope you're well", no "I help businesses like yours".
+- No corporate transition words (Furthermore/Additionally/Moreover), no fake urgency, no exclamation marks.
+- No "AI-powered", "AI website audit", "revolutionary AI" — say what the tool does, not how impressive the tech is.
+- No claims not supported by the findings above.
 
 ${channel === 'email' ? 'Respond with ONLY a JSON object: {"subject": "...", "body": "..."}' : 'Respond with ONLY a JSON object: {"subject": "", "body": "..."} (no subject needed for this channel, leave it as an empty string)'}`;
 }
 
 function buildFollowUpPrompt({ businessName, channel, myName, stage }) {
+  const link = buildAuditToolUrl(channel);
   const stageGuidance = stage === 2
-    ? 'This is the FINAL follow-up. Very low-pressure — explicitly say no worries if it\'s not something they\'re looking at right now, and leave the door open for later. Do not push again after this.'
-    : 'This is the FIRST follow-up, sent a few days after the original message with no reply. Short, low-pressure, just a gentle nudge referencing that you found some things worth fixing and can send the audit over if useful.';
+    ? `This is the FINAL follow-up. Very low-pressure — explicitly say no worries if it's not something they're looking at right now, and leave the audit tool link (${link}) there for whenever they want it. Do not push again after this.`
+    : `This is the FIRST follow-up, sent a few days after the original message with no reply. Short, low-pressure nudge pointing back at the free audit tool (${link}) — NOT "just checking if you want me to send the audit".`;
 
-  return `You are ${myName}, a freelance web developer, writing a short follow-up to ${businessName || 'a business'} who hasn't replied to your earlier message about the website audit you ran on their site.
+  return `You are ${myName}, writing a short follow-up to ${businessName || 'a business'} who hasn't replied to your earlier message about the free website audit tool you mentioned.
 
 ${stageGuidance}
 
+AUDIT TOOL LINK (use this EXACT link): ${link}
+
 CHANNEL: ${CHANNEL_GUIDANCE[channel] ?? CHANNEL_GUIDANCE.email}
 
-Keep it very short (1-3 sentences). No pressure, no guilt-tripping, no fake urgency, no re-explaining the findings in detail — this is a nudge, not a new pitch. Vary the wording naturally each time rather than using a fixed template.
+Keep it very short (1-3 sentences). No pressure, no guilt-tripping, no fake urgency, no re-explaining the findings in detail — this is a nudge pointing back at the tool, not a new pitch. Never say "checking if you want me to send the audit" — the tool is self-serve, always point them to the link. Vary the wording naturally each time rather than using a fixed template.
 
 ${channel === 'email' ? 'Respond with ONLY a JSON object: {"subject": "...", "body": "..."}' : 'Respond with ONLY a JSON object: {"subject": "", "body": "..."}'}`;
 }
@@ -96,15 +134,20 @@ function buildSoftPrompt({ businessName, channel, myName, findings }) {
   // empty, the prompt below deliberately doesn't ask for any "problem"
   // framing at all.
   const findingsBlock = findings.length > 0 ? findings.map(describeFindingForPrompt).join('\n') : '(none of real significance — the site is in good shape)';
+  const link = buildAuditToolUrl(channel);
 
-  return `You are ${myName}, a freelance web developer, writing a light cold outreach message to ${businessName || 'a business'} after running their website through your Growth Audit tool. Their site actually came back healthy — do NOT manufacture problems or exaggerate minor findings into big issues.
+  return `You are ${myName}. ${toolContextBlock(myName)}
+
+You are writing a light first outreach message to ${businessName || 'a business'}. Their site actually came back healthy from a quick look — do NOT manufacture problems or exaggerate minor findings into big issues.
 
 MINOR FINDINGS (if any — do not oversell these):
 ${findingsBlock}
 
+AUDIT TOOL LINK (use this EXACT link): ${link}
+
 CHANNEL: ${CHANNEL_GUIDANCE[channel] ?? CHANNEL_GUIDANCE.email}
 
-Write a short, honest, low-key message: acknowledge the site is in decent shape, mention you ran it through your audit tool out of curiosity/as a courtesy, and if there are minor findings, mention them lightly as "a couple of small things" — otherwise just offer to send the full report if they're curious, with zero pressure. This should read as genuinely low-stakes, not a disguised sales pitch. No banned generic compliments, no fake urgency.
+Write a short, honest, low-key message: acknowledge the site looks in decent shape, mention you built a free website audit tool and thought they might find it useful to run their site through it (out of curiosity, not because you found something alarming), and if there are minor findings, mention them lightly as "a couple of small things" — otherwise just offer the tool link with zero pressure. Point them at the exact link above as the way to see for themselves. This should read as genuinely low-stakes, not a disguised sales pitch. No banned generic compliments, no fake urgency, no "AI-powered" language.
 
 ${channel === 'email' ? 'Respond with ONLY a JSON object: {"subject": "...", "body": "..."}' : 'Respond with ONLY a JSON object: {"subject": "", "body": "..."}'}`;
 }
@@ -157,7 +200,11 @@ async function runProviderChain(prompt, keys) {
 }
 
 /**
- * Generates one Growth-Audit-driven outreach message.
+ * Generates one Growth-Audit-driven outreach message. The primary CTA is
+ * always "run your free audit here: [link]" — this is a self-serve funnel
+ * (prospect -> outreach -> audit tool -> they see their own problems ->
+ * account if they want to save/monitor -> potential client), not a
+ * PDF-send-on-request flow.
  *
  * @param {object} input
  * @param {string} input.businessName
@@ -195,6 +242,7 @@ async function generateGrowthAuditOutreach(input, keys) {
 
 module.exports = {
   CHANNELS,
+  CTA_VARIATIONS,
   generateGrowthAuditOutreach,
   buildInitialPrompt,
   buildFollowUpPrompt,

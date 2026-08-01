@@ -149,9 +149,7 @@ A working, fast, mobile-friendly website can make a big difference because it al
   • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -240,9 +238,7 @@ A working, fast, mobile-friendly website with online booking can make a big diff
   • Book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -268,9 +264,7 @@ A working, fast, mobile-friendly website with online booking can make a big diff
   • Book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -296,9 +290,7 @@ A working, fast, professional website can make a big difference because it allow
   • Enquire even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -324,9 +316,7 @@ A working, fast, mobile-friendly website with online booking can make a big diff
   • Book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -352,9 +342,7 @@ A working, fast, mobile-friendly website can make a big difference because it al
   • Enquire or request a quote even when you're out on a job
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -380,9 +368,7 @@ A working, fast, mobile-friendly website with online booking can make a big diff
   • Book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -408,9 +394,7 @@ A working, fast, mobile-friendly website can make a big difference because it al
   • Request a quote even when you're out on a job
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -436,9 +420,7 @@ A working, fast, mobile-friendly website can make a big difference because it al
   • Get in touch even when you're out on a job
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -464,9 +446,7 @@ A fast, mobile-friendly website can make a big difference because it allows pote
   • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing what a difference this could make for {{business}}.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -492,9 +472,7 @@ A working, fast, mobile-friendly website can make a big difference because it al
   • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when trying to access the site.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -520,9 +498,7 @@ A working, fast, mobile-friendly website can make a big difference because it al
   • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when checking your site's speed.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -548,9 +524,7 @@ A modern, fast, mobile-friendly website can make a big difference because it all
   • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -576,9 +550,7 @@ A working, fast, mobile-friendly website with online booking can make a big diff
   • Book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -606,9 +578,7 @@ A working, fast, mobile-friendly website can make a big difference because it al
   • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording walking through exactly what I found.
-
-Just reply with "audit" and I'll send it over.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}}
 
 {{signature}}`,
   },
@@ -689,9 +659,7 @@ Either way, a working, fast, mobile-friendly site can make a big difference beca
   • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing exactly what I saw when reviewing your site.
-
-Just reply with "audit" and I'll send it over — or let me know which of the two paths sounds more like a fit and we'll take it from there.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}} — or let me know which of the two paths sounds more like a fit and we'll take it from there.
 
 {{signature}}`,
   },
@@ -715,9 +683,7 @@ Either way, a fast, mobile-friendly site can make a big difference because it al
   • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
-If you'd like, I can also send a free 2-minute screen recording showing what a difference this could make for {{business}}.
-
-Just reply with "audit" and I'll send it over — or let me know which of the two paths sounds more like a fit and we'll take it from there.
+I also built a free website audit tool if you want to check things yourself: {{audit_link}} — or let me know which of the two paths sounds more like a fit and we'll take it from there.
 
 {{signature}}`,
   },
@@ -1017,6 +983,10 @@ export function applyTemplateVars(text, vars) {
 const MY_WEBSITE = 'https://www.dean-da-dev.co.uk';
 const MY_PORTFOLIO = 'https://www.dean-da-dev.co.uk/portfolio';
 const MY_EMAIL = 'dean@dean-da-dev.co.uk';
+// Mirrors functions/growthAuditConfig.js's AUDIT_TOOL_URL — kept as its own
+// constant here too since this template library is a separate (manual,
+// non-AI) outreach surface that isn't bundled with functions/.
+const AUDIT_TOOL_URL = 'https://app.dean-da-dev.co.uk/';
 
 export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
   const issue = (lead?.issuesChecklist ?? [])[0] ?? '';
@@ -1070,6 +1040,7 @@ export function buildTemplateVars(lead, { demoUrl = '', myName } = {}) {
     website_score_note: websiteScoreNote,
     competitor_line: competitorLine,
     tool_pitch: `\n\n${pickRelevantTools(lead).map((t) => `  • ${t.name} — https://www.dean-da-dev.co.uk/${t.slug}`).join('\n')}`,
+    audit_link: AUDIT_TOOL_URL,
     myname: myName ?? '',
     signature: myName ? `Kind regards,\n\n${myName}\ndean-da-dev\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}` : '',
   };

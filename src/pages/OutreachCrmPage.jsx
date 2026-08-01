@@ -14,7 +14,6 @@ import RssScout from '../components/RssScout';
 import QuickLookup from '../components/QuickLookup';
 import InstallBanner from '../components/InstallBanner';
 import CrmAutoSeed from '../components/crm/CrmAutoSeed';
-import CrmApprovals from '../components/crm/CrmApprovals';
 import CrmWorkflows from '../components/crm/CrmWorkflows';
 import CrmInsights from '../components/crm/CrmInsights';
 import CrmAdAdvice from '../components/crm/CrmAdAdvice';
@@ -29,7 +28,6 @@ const SUB_TABS = [
   { key: 'inbox',      label: 'Inbox'      },
   { key: 'scanner',    label: 'Scanner'    },
   { key: 'templates',  label: 'Templates'  },
-  { key: 'approvals',  label: 'Approvals'  },
   { key: 'workflows',  label: 'Workflows'  },
   { key: 'insights',   label: 'Insights'   },
   { key: 'adAdvice',   label: 'Ad Advice'  },
@@ -918,7 +916,6 @@ export default function OutreachCrmPage() {
           </div>
         )}
         {subTab === 'templates' && <CrmTemplateLibrary />}
-        {subTab === 'approvals' && <CrmApprovals />}
         {subTab === 'workflows' && <CrmWorkflows />}
         {subTab === 'insights' && <CrmInsights />}
         {subTab === 'adAdvice' && <CrmAdAdvice />}

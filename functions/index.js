@@ -27,6 +27,7 @@ const { fetchGrowthAudit } = require('./growthAuditClient');
 const { selectTopFindings } = require('./findingSelector');
 const { assessOutreachQuality } = require('./outreachQuality');
 const { generateGrowthAuditOutreach } = require('./growthAuditOutreachWriter');
+const { buildAuditToolUrl } = require('./growthAuditConfig');
 const { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow, notifyNewHotLeads } = require('./pushNotifications');
 const { generateCommsMessage, approveApproval, rejectApproval, markApprovalSent } = require('./aiCommsAssistant');
 const { scheduledWorkflowEngine, runWorkflowsNow, saveWorkflow } = require('./workflowEngine');
@@ -1860,6 +1861,7 @@ exports.generateGrowthAuditOutreachNow = onCall(
     let industry = directIndustry;
     let findings = directFindings;
     let hasEnough = Array.isArray(directFindings) && directFindings.length > 0;
+    let website = null;
 
     if (leadId && leadCollection) {
       const snap = await db.collection(leadCollection).doc(leadId).get();
@@ -1868,6 +1870,7 @@ exports.generateGrowthAuditOutreachNow = onCall(
       businessName = businessName || leadData.businessName || leadData.title;
       contactName = contactName || leadData.contactName;
       industry = industry || leadData.industry;
+      website = leadData.website ?? null;
       if (!findings) {
         findings = Array.isArray(leadData.growthAuditFindings) ? leadData.growthAuditFindings : [];
         hasEnough = !!leadData.growthAuditHasEnoughFindings;
@@ -1888,7 +1891,30 @@ exports.generateGrowthAuditOutreachNow = onCall(
 
     const quality = assessOutreachQuality(result.body, { businessName, channel: channel || 'email', findingsUsed: resolvedMode === 'initial' ? findings : [] });
 
-    return { ...result, mode: resolvedMode, findingsUsed: findings, quality, notEnoughFindings: !hasEnough && resolvedMode !== 'followup1' && resolvedMode !== 'followup2' };
+    // Lightweight outreach-funnel tracking (outreach -> audit click -> audit
+    // -> signup -> website added -> monitoring is the eventual goal; this is
+    // just the first step of it, using the same plain-Firestore-doc pattern
+    // as the rest of the app rather than a new analytics system). Best
+    // effort — never blocks returning the message to the user.
+    db.collection('outreachEvents').add({
+      type: 'auditLinkGenerated',
+      channel: channel || 'email',
+      leadId: leadId ?? null,
+      leadCollection: leadCollection ?? null,
+      business: businessName,
+      website,
+      mode: resolvedMode,
+      createdAt: FieldValue.serverTimestamp(),
+    }).catch((err) => console.warn('[generateGrowthAuditOutreachNow] failed to log outreachEvents:', err.message));
+
+    return {
+      ...result,
+      mode: resolvedMode,
+      findingsUsed: findings,
+      quality,
+      auditUrl: buildAuditToolUrl(channel),
+      notEnoughFindings: !hasEnough && resolvedMode !== 'followup1' && resolvedMode !== 'followup2',
+    };
   }
 );
 

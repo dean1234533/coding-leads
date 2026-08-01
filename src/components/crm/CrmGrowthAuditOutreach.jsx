@@ -83,10 +83,24 @@ export default function CrmGrowthAuditOutreach({ lead }) {
     }
   }
 
+  const [linkCopied, setLinkCopied] = useState(false);
+
   function handleCopy() {
     navigator.clipboard.writeText(editedBody);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleCopyLink() {
+    if (!message?.auditUrl) return;
+    navigator.clipboard.writeText(message.auditUrl);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }
+
+  function handleOpenAudit() {
+    if (!message?.auditUrl) return;
+    window.open(message.auditUrl, '_blank', 'noopener');
   }
 
   return (
@@ -185,21 +199,23 @@ export default function CrmGrowthAuditOutreach({ lead }) {
                 className="w-full resize-y rounded-md border border-gray-700 bg-gray-800/50 p-3 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
               />
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <button onClick={handleCopy} className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-semibold text-gray-200 hover:bg-gray-700">
-                  {copied ? 'Copied!' : 'Copy message'}
+                  {copied ? 'Copied!' : 'Copy Message'}
                 </button>
-                {message.quality && (
-                  <span className={`text-xs font-medium ${message.quality.passed ? 'text-green-400' : 'text-red-400'}`}>
-                    Quality: {message.quality.score}/100 {message.quality.passed ? '' : '— review before sending'}
-                  </span>
-                )}
-                {message.findingsUsed?.length > 0 && (
-                  <button onClick={() => setShowWhy((s) => !s)} className="text-xs text-blue-400 hover:text-blue-300">
-                    {showWhy ? 'Hide' : 'Why these findings were selected'}
-                  </button>
-                )}
+                <button onClick={handleCopyLink} disabled={!message.auditUrl} className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-semibold text-gray-200 hover:bg-gray-700 disabled:opacity-50">
+                  {linkCopied ? 'Copied!' : 'Copy Audit Link'}
+                </button>
+                <button onClick={handleOpenAudit} disabled={!message.auditUrl} className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-semibold text-gray-200 hover:bg-gray-700 disabled:opacity-50">
+                  Open Audit
+                </button>
               </div>
+
+              {message.quality && (
+                <span className={`inline-block text-xs font-medium ${message.quality.passed ? 'text-green-400' : 'text-red-400'}`}>
+                  Quality: {message.quality.score}/100 {message.quality.passed ? '' : '— review before sending'}
+                </span>
+              )}
 
               {message.quality && message.quality.issues.length > 0 && (
                 <ul className="list-inside list-disc text-xs text-yellow-500">
@@ -207,16 +223,23 @@ export default function CrmGrowthAuditOutreach({ lead }) {
                 </ul>
               )}
 
-              {showWhy && (
+              {message.findingsUsed?.length > 0 && (
                 <div className="rounded-md border border-gray-800 bg-gray-900 p-3">
-                  <ul className="space-y-2">
+                  <button onClick={() => setShowWhy((s) => !s)} className="text-xs font-semibold uppercase tracking-wide text-gray-400 hover:text-gray-200">
+                    Message based on {showWhy ? '▾' : '▸'}
+                  </button>
+                  <ul className="mt-2 space-y-1">
                     {message.findingsUsed.map((f) => (
                       <li key={f.id} className="text-xs text-gray-400">
-                        <span className="font-semibold text-gray-300">[{f.category}] {f.title}</span>
-                        <br />
-                        Evidence: {f.evidence}
-                        <br />
-                        Confidence: {f.measurementType}
+                        • {f.title}
+                        {showWhy && (
+                          <>
+                            <br />
+                            <span className="pl-3 text-gray-500">
+                              Evidence: {f.evidence} — Confidence: {f.measurementType}
+                            </span>
+                          </>
+                        )}
                       </li>
                     ))}
                   </ul>

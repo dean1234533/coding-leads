@@ -1,11 +1,25 @@
 'use strict';
 
+const { AUDIT_TOOL_URL } = require('./growthAuditConfig');
+
 // Deterministic (non-AI) quality gate for a generated outreach message —
 // checked in code rather than asking another AI call to grade its own
 // homework, since "does this contain an unsupported claim" and "did it use
 // a banned phrase" are things we can actually verify reliably by pattern
 // matching, and a second AI pass can't be trusted to enforce this any more
 // than the first one already tried to.
+//
+// Mirrors the 10-point checklist from the outreach spec:
+//  1. mentions genuine audit findings         -> evidence
+//  2. avoids unsupported claims                -> noUnsupportedClaims
+//  3. short enough for the channel             -> brevity
+//  4. sounds human                             -> naturalTone
+//  5. explains the benefit of using the audit  -> explainsBenefit
+//  6. includes the audit URL                   -> includesAuditUrl
+//  7. CTA is focused on trying the tool        -> ctaQuality
+//  8. avoids immediately selling web dev       -> ctaQuality (no hard sell)
+//  9. avoids asking to send a PDF              -> naturalTone (banned phrase)
+// 10. avoids generic AI language               -> naturalTone (banned phrase)
 
 const BANNED_PHRASES = [
   "hope you're well",
@@ -14,7 +28,7 @@ const BANNED_PHRASES = [
   'i came across your business',
   'i help businesses like yours',
   'would you be interested in a website',
-  'in today\'s digital age',
+  "in today's digital age",
   'i hope this message finds you',
   'i noticed the potential for enhancement',
   'comprehensive and engaging',
@@ -23,11 +37,42 @@ const BANNED_PHRASES = [
   'circle back',
   'touch base',
   'take your business to the next level',
+  // The old "I'll send you the audit" pattern this system used to use —
+  // now obsolete: the audit is self-serve via the tool link, never sent.
+  'send you the audit',
+  'send you the report',
+  'send you the pdf',
+  'send over the audit',
+  'send over the full audit',
+  'would you like me to send',
+  'i can send you',
+  // Generic AI hype — the tool should read as useful, not gimmicky.
+  'ai-powered',
+  'ai powered',
+  'ai website audit',
+  'revolutionary ai',
+  'cutting-edge ai',
+  'game-changing',
+  'game changing',
 ];
 
-// Aggressive/premature CTAs the spec explicitly bans as the FIRST ask — the
-// audit generator's job is to get a reply, not close a sale in message one.
-const AGGRESSIVE_CTA_PHRASES = ['book a call', 'buy a website', 'pay me', 'sign up today', 'purchase now', 'buy now'];
+// Premature/aggressive asks the spec bans as the FIRST message — getting
+// them to try the audit tool is the only objective here; selling web
+// development, or any other hard CTA, comes later once they've engaged.
+const AGGRESSIVE_CTA_PHRASES = [
+  'book a call',
+  'buy a website',
+  'pay me',
+  'sign up today',
+  'purchase now',
+  'buy now',
+  'build you a website',
+  'redesign your site',
+  'redesign your website',
+  'would you like a quote',
+  'can i build',
+  'can i redesign',
+];
 
 // Absolute-certainty language is a red flag regardless of source — even a
 // "measured" finding shouldn't be oversold as a guarantee of outcome.
@@ -41,6 +86,10 @@ const CHANNEL_WORD_LIMITS = {
   linkedin: 130,
   sms: 50,
 };
+
+// The exact domain from AUDIT_TOOL_URL, e.g. "dean-da-dev.co.uk" — checked
+// as a substring so it still matches with a trailing UTM query string.
+const AUDIT_URL_HOST = new URL(AUDIT_TOOL_URL).host;
 
 function wordCount(text) {
   return (text.trim().match(/\S+/g) ?? []).length;
@@ -64,45 +113,59 @@ function assessOutreachQuality(body, opts = {}) {
   const issues = [];
   const text = body || '';
 
-  // Personalisation — mentions the actual business, not a placeholder.
-  const mentionsBusiness = businessName && text.toLowerCase().includes(businessName.toLowerCase());
-  if (businessName && !mentionsBusiness) issues.push('Does not mention the business by name.');
-
-  // Evidence — references at least one real finding's own words, not just a
-  // vague "I noticed some issues". Checks for any distinctive word (4+
-  // chars) from each finding's evidence/description appearing in the body.
+  // 1. Mentions genuine audit findings — references at least one real
+  // finding's own words, not just a vague "I noticed some issues". Checks
+  // for any distinctive word (5+ chars) from each finding's evidence/
+  // description appearing in the body.
   const evidenceWords = findingsUsed
     .flatMap((f) => `${f.evidence ?? ''} ${f.description ?? ''}`.toLowerCase().split(/\W+/))
     .filter((w) => w.length >= 5);
   const hasEvidence = findingsUsed.length === 0 || evidenceWords.some((w) => text.toLowerCase().includes(w));
   if (findingsUsed.length > 0 && !hasEvidence) issues.push('Does not clearly reference any specific audit finding.');
 
-  // Brevity — channel-appropriate length.
+  // 2. Unsupported claims — absolute-certainty language.
+  const overclaimHits = containsAny(text, OVERCLAIM_PHRASES);
+  if (overclaimHits.length > 0) issues.push(`Contains overclaiming language: ${overclaimHits.join(', ')}.`);
+
+  // 3. Brevity — channel-appropriate length.
   const words = wordCount(text);
   const limit = CHANNEL_WORD_LIMITS[channel] ?? CHANNEL_WORD_LIMITS.email;
   const withinLength = words <= limit;
   if (!withinLength) issues.push(`Too long for ${channel} (${words} words, limit ~${limit}).`);
 
-  // Natural tone — no generic/AI-sounding boilerplate.
+  // 4/9/10. Natural tone — no generic/AI-sounding boilerplate, no obsolete
+  // "send you the audit" language, no AI hype.
   const bannedHits = containsAny(text, BANNED_PHRASES);
-  if (bannedHits.length > 0) issues.push(`Contains generic/AI-sounding phrase(s): ${bannedHits.join(', ')}.`);
+  if (bannedHits.length > 0) issues.push(`Contains a banned phrase: ${bannedHits.join(', ')}.`);
 
-  // CTA quality — low-pressure, offers to send the audit, not a hard sell.
+  // 5. Explains the benefit of using the audit — there's real substance
+  // beyond just a bare link (a message that's only a URL isn't "explaining"
+  // anything).
+  const explainsBenefit = findingsUsed.length === 0 || (hasEvidence && words >= 15);
+  if (findingsUsed.length > 0 && !explainsBenefit) issues.push('Does not explain why the findings matter before linking to the tool.');
+
+  // 6. Includes the audit URL.
+  const includesAuditUrl = text.includes(AUDIT_URL_HOST);
+  if (!includesAuditUrl) issues.push('Does not include the audit tool link.');
+
+  // 7/8. CTA quality — points at trying the tool, not an immediate hard
+  // sell (book a call / build a website / quote), and not the old
+  // "I'll send you the audit" pattern.
   const aggressiveHits = containsAny(text, AGGRESSIVE_CTA_PHRASES);
-  if (aggressiveHits.length > 0) issues.push(`Contains an aggressive/premature CTA: ${aggressiveHits.join(', ')}.`);
-  const offersAudit = /audit|findings|(what i (found|noticed|spotted))/i.test(text);
-  if (!offersAudit) issues.push('Does not offer to send the audit/findings as the next step.');
+  if (aggressiveHits.length > 0) issues.push(`Contains a premature hard-sell CTA: ${aggressiveHits.join(', ')}.`);
 
-  // Unsupported claims — absolute-certainty language.
-  const overclaimHits = containsAny(text, OVERCLAIM_PHRASES);
-  if (overclaimHits.length > 0) issues.push(`Contains overclaiming language: ${overclaimHits.join(', ')}.`);
+  // Personalisation — mentions the actual business, not a placeholder.
+  const mentionsBusiness = businessName && text.toLowerCase().includes(businessName.toLowerCase());
+  if (businessName && !mentionsBusiness) issues.push('Does not mention the business by name.');
 
   const checks = {
     personalisation: !!mentionsBusiness,
     evidence: hasEvidence,
+    explainsBenefit,
+    includesAuditUrl,
     brevity: withinLength,
     naturalTone: bannedHits.length === 0,
-    ctaQuality: aggressiveHits.length === 0 && offersAudit,
+    ctaQuality: aggressiveHits.length === 0,
     noUnsupportedClaims: overclaimHits.length === 0,
   };
 
@@ -110,12 +173,11 @@ function assessOutreachQuality(body, opts = {}) {
   const score = Math.round((passedChecks / Object.keys(checks).length) * 100);
 
   // A message only "passes" with zero hard-fail issues — no unsupported
-  // claims, no aggressive CTA, no banned phrases. Personalisation/evidence/
-  // brevity missing lowers the score but doesn't necessarily block sending
-  // (the human reviews it either way), those three are the ones the spec
-  // treats as non-negotiable ("do NOT show a message as high quality if it
-  // contains unsupported claims").
-  const passed = checks.naturalTone && checks.ctaQuality && checks.noUnsupportedClaims;
+  // claims, no banned/obsolete phrases, no premature hard-sell CTA, and it
+  // must actually include the audit link (the whole point of this system).
+  // Personalisation/evidence/benefit/brevity missing lowers the score but
+  // doesn't block sending — the human reviews it either way.
+  const passed = checks.naturalTone && checks.ctaQuality && checks.noUnsupportedClaims && checks.includesAuditUrl;
 
   return { score, passed, issues, checks };
 }

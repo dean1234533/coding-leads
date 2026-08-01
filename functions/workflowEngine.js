@@ -5,11 +5,15 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { requireOwner } = require('./authGuard');
 const { withErrorAlert } = require('./errorAlert');
-const { generateMessage, aiKeysFromEnv, previousConversationFor, describeLead, COMMS_SECRETS } = require('./aiCommsAssistant');
 const { notifyOwner } = require('./pushNotifications');
 
 const TRIGGER_TYPES = ['NEW_CRM_LEAD', 'NEW_CODING_LEAD', 'LEAD_WON', 'LEAD_INACTIVE_DAYS'];
-const ACTION_TYPES = ['DRAFT_MESSAGE', 'NOTIFY_OWNER'];
+// DRAFT_MESSAGE used to write AI-drafted messages to a pendingApprovals
+// queue reviewed from an Approvals tab. That tab is gone (outreach is now
+// self-serve via the Growth Audit tool, not an approve-then-send queue), so
+// the only automated action left is a notification — draft on demand from a
+// lead's detail page instead (see CrmAiDraftWidget.jsx).
+const ACTION_TYPES = ['NOTIFY_OWNER'];
 
 const TERMINAL_STATUSES = ['Won', 'Lost', 'Archive'];
 
@@ -22,29 +26,27 @@ const TERMINAL_STATUSES = ['Won', 'Lost', 'Archive'];
 // disabling happens from the Workflows tab, not by re-running this.
 const DEFAULT_WORKFLOWS = [
   {
-    name: 'New CRM Lead → Draft Reply + Notify',
+    name: 'New CRM Lead → Notify',
     enabled: true,
     trigger: { type: 'NEW_CRM_LEAD', config: {} },
     actions: [
-      { type: 'DRAFT_MESSAGE', config: { purpose: 'sales_reply', tone: 'Professional', channel: 'email' } },
-      { type: 'NOTIFY_OWNER', config: { title: 'New lead: {{name}}', body: 'A draft reply is waiting for approval.' } },
+      { type: 'NOTIFY_OWNER', config: { title: 'New lead: {{name}}', body: 'Open the lead to run a Growth Audit and generate outreach.' } },
     ],
   },
   {
-    name: 'Deal Won → Request Review + Follow-Up',
+    name: 'Deal Won → Notify',
     enabled: true,
     trigger: { type: 'LEAD_WON', config: {} },
     actions: [
-      { type: 'DRAFT_MESSAGE', config: { purpose: 'review_request', tone: 'Friendly', channel: 'email', extraContext: 'Also warmly mention you\'re happy to help again in future or take referrals — don\'t be pushy about it.' } },
-      { type: 'NOTIFY_OWNER', config: { title: '{{name}} marked Won', body: 'A review-request draft is waiting for approval.' } },
+      { type: 'NOTIFY_OWNER', config: { title: '{{name}} marked Won', body: 'Consider following up for a review or referral.' } },
     ],
   },
   {
-    name: 'Lead Inactive 60 Days → Reactivation Draft',
+    name: 'Lead Inactive 60 Days → Notify',
     enabled: true,
     trigger: { type: 'LEAD_INACTIVE_DAYS', config: { days: 60 } },
     actions: [
-      { type: 'DRAFT_MESSAGE', config: { purpose: 'reactivation', tone: 'Friendly', channel: 'email' } },
+      { type: 'NOTIFY_OWNER', config: { title: '{{name}} has gone quiet', body: 'No contact in 60+ days — worth a reactivation follow-up.' } },
     ],
   },
 ];
@@ -99,30 +101,7 @@ function buildFieldsContext(data, leadCollection) {
   };
 }
 
-async function runAction(db, keys, action, { leadId, leadCollection, leadName, leadContext, leadData }) {
-  if (action.type === 'DRAFT_MESSAGE') {
-    const previousConversation = await previousConversationFor(db, leadCollection, leadId);
-    const result = await generateMessage({
-      purpose: action.config.purpose,
-      tone: action.config.tone,
-      channel: action.config.channel || 'email',
-      customerName: leadName,
-      customerMessage: leadContext,
-      businessContext: describeLead(leadData, leadCollection),
-      previousConversation,
-      extraContext: action.config.extraContext,
-    }, keys);
-    if (!result) return { type: 'DRAFT_MESSAGE', ok: false, reason: 'all AI providers failed' };
-    await db.collection('pendingApprovals').add({
-      leadId, leadCollection, leadName: leadName ?? null,
-      channel: action.config.channel || 'email',
-      purpose: action.config.purpose, tone: action.config.tone,
-      subject: result.subject, body: result.body,
-      status: 'pending', source: 'workflow',
-      createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
-    });
-    return { type: 'DRAFT_MESSAGE', ok: true };
-  }
+async function runAction(action, { leadCollection, leadName }) {
   if (action.type === 'NOTIFY_OWNER') {
     await notifyOwner(interpolate(action.config.title, { name: leadName ?? 'a lead' }), action.config.body ?? '', leadCollection === 'codingLeads' ? '/coding-leads' : '/outreach-crm');
     return { type: 'NOTIFY_OWNER', ok: true };
@@ -169,7 +148,7 @@ async function findInactiveLeads(db, days, flagKey, limit = 100) {
   });
 }
 
-async function runWorkflows(db, keys) {
+async function runWorkflows(db) {
   await ensureDefaultWorkflows(db);
   const workflowsSnap = await db.collection('workflows').where('enabled', '==', true).get();
   const workflows = workflowsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -192,7 +171,6 @@ async function runWorkflows(db, keys) {
       const data = docSnap.data();
       const leadCollection = type === 'NEW_CODING_LEAD' ? 'codingLeads' : 'crmLeads';
       const leadName = data.businessName || data.title || data.contactName || '';
-      const leadContext = data.notes || data.snippet || data.aiDesignNote || '';
       const fields = buildFieldsContext(data, leadCollection);
 
       for (const workflow of matching) {
@@ -209,7 +187,7 @@ async function runWorkflows(db, keys) {
           // in the run's own result instead of only in an error-alert email.
           let result;
           try {
-            result = await runAction(db, keys, action, { leadId: docSnap.id, leadCollection, leadName, leadContext, leadData: data });
+            result = await runAction(action, { leadCollection, leadName });
           } catch (err) {
             result = { type: action.type, ok: false, reason: err.message };
             console.error(`[workflowEngine] action failed for "${leadName}" (${workflow.name}):`, err.message);
@@ -226,15 +204,15 @@ async function runWorkflows(db, keys) {
 }
 
 const scheduledWorkflowEngine = onSchedule(
-  { schedule: 'every 15 minutes', timeoutSeconds: 300, memory: '256MiB', secrets: [...COMMS_SECRETS, 'APP_URL'] },
-  withErrorAlert('scheduledWorkflowEngine', async () => { await runWorkflows(getFirestore(), aiKeysFromEnv()); })
+  { schedule: 'every 15 minutes', timeoutSeconds: 300, memory: '256MiB', secrets: ['APP_URL'] },
+  withErrorAlert('scheduledWorkflowEngine', async () => { await runWorkflows(getFirestore()); })
 );
 
 const runWorkflowsNow = onCall(
-  { cors: true, timeoutSeconds: 300, memory: '256MiB', secrets: [...COMMS_SECRETS, 'APP_URL'] },
+  { cors: true, timeoutSeconds: 300, memory: '256MiB', secrets: ['APP_URL'] },
   async (request) => {
     requireOwner(request);
-    return runWorkflows(getFirestore(), aiKeysFromEnv());
+    return runWorkflows(getFirestore());
   }
 );
 

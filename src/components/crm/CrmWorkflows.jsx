@@ -11,7 +11,6 @@ const TRIGGER_LABELS = {
 };
 
 const ACTION_LABELS = {
-  DRAFT_MESSAGE: (a) => `Draft a ${a.config?.purpose?.replace(/_/g, ' ')} message (${a.config?.tone} tone) → sent to Approvals`,
   NOTIFY_OWNER: () => 'Notify you with a push notification',
 };
 
@@ -176,7 +175,7 @@ export default function CrmWorkflows() {
         <div>
           <h2 className="text-sm font-semibold text-gray-100">Workflows</h2>
           <p className="mt-1 text-xs text-gray-500">
-            Runs automatically every 15 minutes. Drafts always go to Approvals — nothing here can send a message on its own.
+            Runs automatically every 15 minutes and notifies you — nothing here can send a message on its own.
             Add conditions to a workflow to narrow when it fires (e.g. only when industry equals Salon).
           </p>
         </div>

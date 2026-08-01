@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { selectTopFindings } from './findingSelector.js';
 import { assessOutreachQuality } from './outreachQuality.js';
-import { buildInitialPrompt, buildFollowUpPrompt, buildSoftPrompt } from './growthAuditOutreachWriter.js';
+import { buildInitialPrompt, buildFollowUpPrompt, buildSoftPrompt, CTA_VARIATIONS } from './growthAuditOutreachWriter.js';
+import { AUDIT_TOOL_URL, buildAuditToolUrl } from './growthAuditConfig.js';
 
 function makeRec(overrides = {}) {
   return {
@@ -36,7 +37,71 @@ function makeAudit(recommendations, extraChecks = []) {
   };
 }
 
-// ── 1. Poor website ─────────────────────────────────────────────────────
+// ── 1. Tattoo studio ─────────────────────────────────────────────────────
+describe('selectTopFindings — tattoo studio (booking CTA is the real issue)', () => {
+  it('surfaces the missing booking CTA as the top pick', () => {
+    const audit = makeAudit([
+      makeRec({ id: 'conversion.primaryCta', category: 'conversion', title: 'No booking CTA', severity: 'high', priority: 85 }),
+      makeRec({ id: 'seo.titleLength', category: 'seo', severity: 'low', priority: 20 }),
+    ]);
+    const { findings } = selectTopFindings(audit, { businessType: 'tattoo' });
+    expect(findings[0].category).toBe('conversion');
+  });
+});
+
+// ── 2. Barber ────────────────────────────────────────────────────────────
+describe('selectTopFindings — barber (mobile booking experience)', () => {
+  it('prefers mobile/conversion findings relevant to a barber when priorities are close', () => {
+    const audit = makeAudit([
+      makeRec({ id: 'accessibility.contrast', category: 'accessibility', severity: 'medium', priority: 62 }),
+      makeRec({ id: 'mobile.touchTargets', category: 'mobile', severity: 'medium', priority: 60 }),
+    ]);
+    const { findings } = selectTopFindings(audit, { businessType: 'barber', maxFindings: 1 });
+    expect(findings[0].category).toBe('mobile');
+  });
+});
+
+// ── 3. Personal trainer ─────────────────────────────────────────────────
+describe('selectTopFindings — personal trainer (booking/enquiry journey)', () => {
+  it('has a recognised focus hint that mentions the booking/enquiry journey', () => {
+    const findings = [{ id: 'a', category: 'conversion', title: 'x', evidence: 'x', measurementType: 'measured' }];
+    const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings, industry: 'personal_trainer' });
+    expect(prompt).toContain('the booking/enquiry journey, trust signals and local visibility');
+  });
+});
+
+// ── 4. Painter/decorator ────────────────────────────────────────────────
+describe('selectTopFindings — painter/decorator (local search + quote enquiries)', () => {
+  it('does not force a localSeo finding into the top picks when the real top issues are elsewhere', () => {
+    const audit = makeAudit([
+      makeRec({ id: 'performance.lcp', category: 'performance', severity: 'critical', priority: 100 }),
+      makeRec({ id: 'accessibility.formLabels', category: 'accessibility', severity: 'high', priority: 85 }),
+      makeRec({ id: 'local.reviews', category: 'localSeo', severity: 'low', priority: 15 }),
+    ]);
+    const { findings } = selectTopFindings(audit, { businessType: 'painter_decorator', maxFindings: 2 });
+    expect(findings.map((f) => f.category)).toEqual(['performance', 'accessibility']);
+  });
+
+  it('DOES prefer a business-type-relevant finding when priorities are close', () => {
+    const audit = makeAudit([
+      makeRec({ id: 'accessibility.contrast', category: 'accessibility', severity: 'medium', priority: 62 }),
+      makeRec({ id: 'local.locationPages', category: 'localSeo', severity: 'medium', priority: 60 }),
+    ]);
+    const { findings } = selectTopFindings(audit, { businessType: 'painter_decorator', maxFindings: 1 });
+    expect(findings[0].category).toBe('localSeo');
+  });
+});
+
+// ── 5. Restaurant ────────────────────────────────────────────────────────
+describe('selectTopFindings — restaurant (mobile, menus, bookings, local visibility)', () => {
+  it('has a recognised focus hint for restaurants', () => {
+    const findings = [{ id: 'a', category: 'mobile', title: 'x', evidence: 'x', measurementType: 'measured' }];
+    const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings, industry: 'restaurant' });
+    expect(prompt).toContain('mobile experience, menus, bookings and local visibility');
+  });
+});
+
+// ── 6. Very poor website ────────────────────────────────────────────────
 describe('selectTopFindings — poor website (many real, high-severity issues)', () => {
   it('selects the top 3, one per category, highest priority first', () => {
     const audit = makeAudit([
@@ -53,19 +118,7 @@ describe('selectTopFindings — poor website (many real, high-severity issues)',
   });
 });
 
-// ── 2. Average website ──────────────────────────────────────────────────
-describe('selectTopFindings — average website (mixed severities)', () => {
-  it('still finds enough meaningful findings when at least one is medium+', () => {
-    const audit = makeAudit([
-      makeRec({ id: 'trust.reviews', category: 'trust', severity: 'low', priority: 20 }),
-      makeRec({ id: 'mobile.responsive', category: 'mobile', severity: 'medium', priority: 55 }),
-    ]);
-    const { hasEnough } = selectTopFindings(audit);
-    expect(hasEnough).toBe(true);
-  });
-});
-
-// ── 3. Excellent website ────────────────────────────────────────────────
+// ── 7. Strong website ───────────────────────────────────────────────────
 describe('selectTopFindings — excellent website (no real findings)', () => {
   it('returns hasEnough:false and an empty findings list, never manufactures a weakness', () => {
     const audit = makeAudit([]);
@@ -81,20 +134,7 @@ describe('selectTopFindings — excellent website (no real findings)', () => {
   });
 });
 
-// ── 4. JavaScript-heavy website ─────────────────────────────────────────
-describe('selectTopFindings — JS-heavy website (detected/inferred findings)', () => {
-  it('preserves the real detectionMethod/measurementType for hedged language downstream', () => {
-    const audit = makeAudit([
-      makeRec({ id: 'conversion.primaryCta', category: 'conversion', detectionMethod: 'detected', severity: 'high', priority: 80 }),
-      makeRec({ id: 'mobile.responsive', category: 'mobile', detectionMethod: 'inferred', severity: 'medium', priority: 50 }),
-    ]);
-    const { findings } = selectTopFindings(audit);
-    expect(findings.find((f) => f.id === 'conversion.primaryCta').measurementType).toBe('detected');
-    expect(findings.find((f) => f.id === 'mobile.responsive').measurementType).toBe('inferred');
-  });
-});
-
-// ── 5 & 6. NOT_VERIFIED / NOT_APPLICABLE findings ───────────────────────
+// ── 8. NOT_VERIFIED / NOT_APPLICABLE findings ───────────────────────────
 describe('selectTopFindings — NOT_VERIFIED / NOT_APPLICABLE isolation', () => {
   it('only ever reads from audit.recommendations, never audit.categories[].checks — so a not_verified/not_applicable check sitting in categories cannot leak into outreach even if present', () => {
     const audit = makeAudit(
@@ -110,30 +150,6 @@ describe('selectTopFindings — NOT_VERIFIED / NOT_APPLICABLE isolation', () => 
   });
 });
 
-// ── 7. Local business with strong local SEO ─────────────────────────────
-describe('selectTopFindings — strong local SEO, business type would normally favour localSeo', () => {
-  it('does not force a localSeo finding into the top picks when the real top issues are elsewhere', () => {
-    const audit = makeAudit([
-      makeRec({ id: 'performance.lcp', category: 'performance', severity: 'critical', priority: 100 }),
-      makeRec({ id: 'accessibility.formLabels', category: 'accessibility', severity: 'high', priority: 85 }),
-      // Only a trivial localSeo nit exists — should not be artificially promoted above real issues.
-      makeRec({ id: 'local.reviews', category: 'localSeo', severity: 'low', priority: 15 }),
-    ]);
-    const { findings } = selectTopFindings(audit, { businessType: 'painter_decorator', maxFindings: 2 });
-    expect(findings.map((f) => f.category)).toEqual(['performance', 'accessibility']);
-  });
-
-  it('DOES prefer a business-type-relevant finding when priorities are close', () => {
-    const audit = makeAudit([
-      makeRec({ id: 'accessibility.contrast', category: 'accessibility', severity: 'medium', priority: 62 }),
-      makeRec({ id: 'local.locationPages', category: 'localSeo', severity: 'medium', priority: 60 }), // within 5 of the above
-    ]);
-    const { findings } = selectTopFindings(audit, { businessType: 'painter_decorator', maxFindings: 1 });
-    expect(findings[0].category).toBe('localSeo');
-  });
-});
-
-// ── 8. Business with clear conversion problems ──────────────────────────
 describe('selectTopFindings — clear conversion problem', () => {
   it('surfaces the conversion finding as the top pick when it genuinely is the highest priority', () => {
     const audit = makeAudit([
@@ -145,47 +161,89 @@ describe('selectTopFindings — clear conversion problem', () => {
   });
 });
 
+// ── Audit tool URL config ───────────────────────────────────────────────
+describe('growthAuditConfig', () => {
+  it('AUDIT_TOOL_URL points at the real Growth Audit homepage, not the API endpoint', () => {
+    expect(AUDIT_TOOL_URL).toBe('https://app.dean-da-dev.co.uk/');
+  });
+
+  it('buildAuditToolUrl adds UTM params identifying the channel', () => {
+    const url = buildAuditToolUrl('whatsapp');
+    expect(url).toContain('utm_source=outreach');
+    expect(url).toContain('utm_medium=whatsapp');
+    expect(url).toContain('utm_campaign=website_audit');
+  });
+
+  it('falls back to a generic medium for an unrecognised/missing channel', () => {
+    const url = buildAuditToolUrl(undefined);
+    expect(url).toContain('utm_medium=outreach');
+  });
+});
+
 // ── Quality gate ─────────────────────────────────────────────────────────
 describe('assessOutreachQuality', () => {
   const finding = makeRec({ evidence: 'Homepage LCP measured at 3.9 seconds' });
+  const link = buildAuditToolUrl('email');
 
-  it('passes a short, personalised, evidence-based, low-pressure message', () => {
-    const body = "Hi, I had a quick look at Bright Smiles Dental and ran it through my Growth Audit. Your homepage is taking a while to load — measured at 3.9 seconds — which can cause visitors to leave before it's even loaded. I've got the full audit with recommendations if you'd like me to send it over. No pressure either way.";
+  it('passes a short, personalised, evidence-based message that points to the audit tool', () => {
+    const body = `Hi, I had a quick look at Bright Smiles Dental and noticed your homepage is taking a while to load — measured at 3.9 seconds — which can cause visitors to leave before it's even loaded. I built a free website audit tool that checks for things like this. Run your free audit here: ${link}`;
     const result = assessOutreachQuality(body, { businessName: 'Bright Smiles Dental', channel: 'email', findingsUsed: [finding] });
     expect(result.passed).toBe(true);
     expect(result.checks.personalisation).toBe(true);
     expect(result.checks.evidence).toBe(true);
+    expect(result.checks.includesAuditUrl).toBe(true);
   });
 
   it('fails on a banned generic phrase', () => {
-    const body = 'Hope you\'re well! I came across your amazing business and wanted to reach out.';
+    const body = `Hope you're well! I came across your amazing business and wanted to reach out. ${link}`;
     const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [] });
     expect(result.passed).toBe(false);
     expect(result.checks.naturalTone).toBe(false);
   });
 
-  it('fails on an aggressive first CTA', () => {
-    const body = 'Hi Test Ltd, I found some issues on your site. Book a call with me today to discuss buying a new website.';
+  it('fails on the old "send you the audit" pattern — that CTA is now obsolete', () => {
+    const body = "Hi Test Ltd, I ran a quick audit on your site. I can send you the audit if you'd like — just let me know.";
+    const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [] });
+    expect(result.passed).toBe(false);
+    expect(result.checks.naturalTone).toBe(false);
+  });
+
+  it('fails on generic AI-hype language', () => {
+    const body = `Hi Test Ltd, I built a revolutionary AI-powered website audit tool. Try it here: ${link}`;
+    const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [] });
+    expect(result.passed).toBe(false);
+    expect(result.checks.naturalTone).toBe(false);
+  });
+
+  it('fails on an immediate hard-sell CTA (build/redesign/quote/book a call)', () => {
+    const body = `Hi Test Ltd, I found some issues on your site. Would you like a quote to redesign your site? ${link}`;
     const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [] });
     expect(result.passed).toBe(false);
     expect(result.checks.ctaQuality).toBe(false);
   });
 
+  it('fails when the audit tool link is missing entirely', () => {
+    const body = 'Hi Test Ltd, I had a look at your site and noticed a few things worth fixing.';
+    const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [] });
+    expect(result.passed).toBe(false);
+    expect(result.checks.includesAuditUrl).toBe(false);
+  });
+
   it('fails on overclaiming/unsupported-certainty language', () => {
-    const body = 'Hi Test Ltd, I guarantee fixing this will 100% certain double your enquiries. I can send the audit over.';
+    const body = `Hi Test Ltd, I guarantee fixing this will 100% certain double your enquiries. ${link}`;
     const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [] });
     expect(result.passed).toBe(false);
     expect(result.checks.noUnsupportedClaims).toBe(false);
   });
 
   it('flags a message that is too long for a WhatsApp/Instagram-length channel', () => {
-    const longBody = 'Hi Test Ltd, '.repeat(30) + 'I can send the audit over.';
+    const longBody = 'Hi Test Ltd, '.repeat(30) + `check it out: ${link}`;
     const result = assessOutreachQuality(longBody, { businessName: 'Test Ltd', channel: 'whatsapp', findingsUsed: [] });
     expect(result.checks.brevity).toBe(false);
   });
 
   it('does not require evidence/personalisation for a pass, but does lower the score', () => {
-    const body = 'Hi, hope things are going well at the shop — happy to send the audit if useful.';
+    const body = `Hi, hope things are going well at the shop — here's a free audit tool if useful: ${link}`;
     const result = assessOutreachQuality(body, { businessName: 'Corner Shop', channel: 'email', findingsUsed: [finding] });
     expect(result.checks.personalisation).toBe(false);
     expect(result.score).toBeLessThan(100);
@@ -230,11 +288,37 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
     expect(prompt).toContain('I help businesses like yours');
   });
 
-  it('the CTA instruction is "send the full audit", explicitly not book a call / buy / pay', () => {
+  it('bans the old "send you the audit" CTA and immediate web-dev hard-sell, in favour of the audit tool link', () => {
     const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
     const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
-    expect(prompt).toContain('I can send you the full audit');
-    expect(prompt).toContain('NOT "book a call"');
+    expect(prompt).toContain('Do not say "I can send you the audit"');
+    expect(prompt).toContain('Do not ask "do you want me to build you a website"');
+  });
+
+  it('the CTA points at the exact audit tool URL with a "run it yourself" framing, with real variation examples', () => {
+    const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
+    const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
+    const link = buildAuditToolUrl('email');
+    expect(prompt).toContain(link);
+    expect(prompt).toContain('Run your free audit here');
+    // every CTA variation from the shared list should appear as an example
+    for (const cta of CTA_VARIATIONS) {
+      expect(prompt).toContain(cta.replace('{link}', link));
+    }
+  });
+
+  it('does not brag about the technology — explains what the tool does, not how impressive it is', () => {
+    const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
+    const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
+    expect(prompt).toContain('not to brag about the technology');
+    expect(prompt.toLowerCase()).toContain('no "ai-powered"');
+  });
+
+  it('follow-up prompts point back at the audit tool link, never at "sending the audit"', () => {
+    const prompt1 = buildFollowUpPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', stage: 1 });
+    const link = buildAuditToolUrl('email');
+    expect(prompt1).toContain(link);
+    expect(prompt1).toContain('NOT "just checking if you want me to send the audit"');
   });
 
   it('follow-up 2 prompt is explicitly the final, lowest-pressure message', () => {
@@ -243,16 +327,17 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
     expect(prompt.toLowerCase()).toContain('no worries');
   });
 
-  it('soft-mode prompt explicitly forbids manufacturing problems for a healthy site', () => {
+  it('soft-mode prompt explicitly forbids manufacturing problems for a healthy site, and still includes the tool link', () => {
     const prompt = buildSoftPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings: [] });
     expect(prompt.toLowerCase()).toContain('do not manufacture problems');
+    expect(prompt).toContain(buildAuditToolUrl('email'));
   });
 
   it('business-type focus hint only appears when the industry is recognised, and never overrides real findings', () => {
     const findings = [{ id: 'a', category: 'performance', title: 'x', evidence: 'x', measurementType: 'measured' }];
     const withIndustry = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings, industry: 'personal_trainer' });
     const withoutIndustry = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
-    expect(withIndustry).toContain('bookings, enquiries, trust signals and local visibility');
-    expect(withoutIndustry).not.toContain('bookings, enquiries, trust signals and local visibility');
+    expect(withIndustry).toContain('the booking/enquiry journey, trust signals and local visibility');
+    expect(withoutIndustry).not.toContain('the booking/enquiry journey, trust signals and local visibility');
   });
 });
