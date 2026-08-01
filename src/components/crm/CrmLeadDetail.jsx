@@ -11,8 +11,9 @@ import CrmTasksList from './CrmTasksList';
 import CrmComposer from './CrmComposer';
 import CrmCallScript from './CrmCallScript';
 import CrmAiDraftWidget from './CrmAiDraftWidget';
+import CrmGrowthAuditOutreach from './CrmGrowthAuditOutreach';
 
-const TABS = ['Overview', 'Website Review', 'Notes', 'Tasks', 'Emails', 'Call Script'];
+const TABS = ['Overview', 'Growth Audit Outreach', 'Website Review', 'Notes', 'Tasks', 'Emails', 'Call Script'];
 const MY_NAME = 'Dean Burt';
 
 // Instagram has no send API, so this is a copy-the-caption /
@@ -394,6 +395,7 @@ export default function CrmLeadDetail({ lead, onUpdate, onDelete, onClose }) {
         </div>
       )}
 
+      {tab === 'Growth Audit Outreach' && <CrmGrowthAuditOutreach lead={lead} />}
       {tab === 'Website Review' && <CrmWebsiteReview lead={lead} onUpdate={onUpdate} />}
       {tab === 'Notes' && <CrmNotesTimeline leadId={lead.id} />}
       {tab === 'Tasks' && <CrmTasksList leadId={lead.id} />}

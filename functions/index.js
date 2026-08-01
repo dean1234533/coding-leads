@@ -23,6 +23,10 @@ const { withErrorAlert } = require('./errorAlert');
 const { ensureBacklinkConfig, runBacklinkScan } = require('./backlinkScanner');
 const { auditWebsite } = require('./websiteAudit');
 const { generateAuditEmail } = require('./aiEmailWriter');
+const { fetchGrowthAudit } = require('./growthAuditClient');
+const { selectTopFindings } = require('./findingSelector');
+const { assessOutreachQuality } = require('./outreachQuality');
+const { generateGrowthAuditOutreach } = require('./growthAuditOutreachWriter');
 const { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow, notifyNewHotLeads } = require('./pushNotifications');
 const { generateCommsMessage, approveApproval, rejectApproval, markApprovalSent } = require('./aiCommsAssistant');
 const { scheduledWorkflowEngine, runWorkflowsNow, saveWorkflow } = require('./workflowEngine');
@@ -1754,6 +1758,137 @@ exports.generateAuditEmailNow = onCall(
     const body = await generateAuditEmail(lead, myName || 'Dean', keys);
     if (!body) throw new HttpsError('internal', 'Every AI provider failed — try again in a moment.');
     return { body };
+  }
+);
+
+const GROWTH_AUDIT_OUTREACH_SECRETS = ['GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY', 'HUGGINGFACE_API_KEY'];
+
+function growthAuditOutreachKeys() {
+  return {
+    gemini: process.env.GEMINI_API_KEY,
+    groq: process.env.GROQ_API_KEY,
+    mistral: process.env.MISTRAL_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    cerebras: process.env.CEREBRAS_API_KEY,
+    huggingface: process.env.HUGGINGFACE_API_KEY,
+  };
+}
+
+/**
+ * runGrowthAuditForLead — runs the REAL Growth Audit product (a separate
+ * live app, app.dean-da-dev.co.uk — see growthAuditClient.js) against a
+ * lead's website and stores the score + selected findings on the lead doc.
+ * Deliberately manual/on-demand only, never called from a scheduled job —
+ * each call spends real budget on shared infrastructure this app doesn't
+ * own (real browser rendering), so it must always be an explicit click.
+ * Separate from message generation so "Regenerate" (below) doesn't have to
+ * re-run a 20-30s audit every time — it reuses whatever was stored here.
+ */
+exports.runGrowthAuditForLead = onCall(
+  { cors: true, timeoutSeconds: 60, memory: '256MiB' },
+  async (request) => {
+    requireOwner(request);
+    const { leadId, leadCollection, website: directWebsite, industry: directIndustry } = request.data ?? {};
+
+    let website = directWebsite;
+    let industry = directIndustry;
+    let leadRef = null;
+    if (leadId && leadCollection) {
+      leadRef = db.collection(leadCollection).doc(leadId);
+      const snap = await leadRef.get();
+      if (!snap.exists) throw new HttpsError('not-found', 'Lead not found.');
+      const leadData = snap.data();
+      website = website || leadData.website;
+      industry = industry || leadData.industry;
+    }
+    if (!website) throw new HttpsError('invalid-argument', 'A website URL is required (directly, or via a lead that has one).');
+
+    const audit = await fetchGrowthAudit(website);
+    if (!audit) {
+      throw new HttpsError('unavailable', 'Could not run the Growth Audit for this website right now — it may be unreachable, or the audit tool is temporarily unavailable.');
+    }
+
+    const { findings, hasEnough } = selectTopFindings(audit, { businessType: industry });
+
+    const result = {
+      score: audit.overallScore,
+      categories: audit.categories.map((c) => ({ id: c.id, label: c.label, score: c.score })),
+      findings,
+      hasEnough,
+      scannedAt: audit.scannedAt,
+      jsRenderingUsed: audit.meta?.scanQuality?.jsRenderingUsed ?? null,
+      partial: audit.meta?.partial ?? false,
+    };
+
+    if (leadRef) {
+      await leadRef.update({
+        growthAuditScore: result.score,
+        growthAuditFindings: findings,
+        growthAuditScannedAt: result.scannedAt,
+        growthAuditHasEnoughFindings: hasEnough,
+      }).catch((err) => console.warn('[runGrowthAuditForLead] failed to persist onto lead doc:', err.message));
+    }
+
+    return result;
+  }
+);
+
+/**
+ * generateGrowthAuditOutreachNow — writes a personalised outreach message
+ * from REAL Growth Audit findings (see growthAuditClient.js /
+ * findingSelector.js), positioned as "I find problems costing you customers
+ * online, and can fix them" rather than "I build websites". Supports every
+ * channel in growthAuditOutreachWriter.CHANNELS and both initial + follow-up
+ * modes. Never invents a finding — `findings` must come from a prior
+ * runGrowthAuditForLead call (passed directly, or re-read from the lead doc
+ * if omitted). Runs a deterministic quality check before returning so the
+ * UI can show — and the composer can warn on — a message that still slipped
+ * through with a banned phrase, an aggressive CTA, or an unsupported claim.
+ */
+exports.generateGrowthAuditOutreachNow = onCall(
+  { cors: true, timeoutSeconds: 30, memory: '256MiB', secrets: GROWTH_AUDIT_OUTREACH_SECRETS },
+  async (request) => {
+    requireOwner(request);
+    const {
+      leadId, leadCollection, channel, mode, myName,
+      businessName: directBusinessName, contactName: directContactName, industry: directIndustry,
+      findings: directFindings,
+    } = request.data ?? {};
+
+    let businessName = directBusinessName;
+    let contactName = directContactName;
+    let industry = directIndustry;
+    let findings = directFindings;
+    let hasEnough = Array.isArray(directFindings) && directFindings.length > 0;
+
+    if (leadId && leadCollection) {
+      const snap = await db.collection(leadCollection).doc(leadId).get();
+      if (!snap.exists) throw new HttpsError('not-found', 'Lead not found.');
+      const leadData = snap.data();
+      businessName = businessName || leadData.businessName || leadData.title;
+      contactName = contactName || leadData.contactName;
+      industry = industry || leadData.industry;
+      if (!findings) {
+        findings = Array.isArray(leadData.growthAuditFindings) ? leadData.growthAuditFindings : [];
+        hasEnough = !!leadData.growthAuditHasEnoughFindings;
+      }
+    }
+    if (!businessName) throw new HttpsError('invalid-argument', 'businessName is required.');
+    findings = Array.isArray(findings) ? findings : [];
+
+    const resolvedMode = mode === 'followup1' || mode === 'followup2'
+      ? mode
+      : (hasEnough ? 'initial' : 'soft');
+
+    const result = await generateGrowthAuditOutreach(
+      { businessName, contactName, industry, channel, myName: myName || 'Dean', findings, mode: resolvedMode },
+      growthAuditOutreachKeys(),
+    );
+    if (!result) throw new HttpsError('internal', 'Every AI provider failed — try again in a moment.');
+
+    const quality = assessOutreachQuality(result.body, { businessName, channel: channel || 'email', findingsUsed: resolvedMode === 'initial' ? findings : [] });
+
+    return { ...result, mode: resolvedMode, findingsUsed: findings, quality, notEnoughFindings: !hasEnough && resolvedMode !== 'followup1' && resolvedMode !== 'followup2' };
   }
 );
 

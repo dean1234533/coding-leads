@@ -61,22 +61,24 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
     }
   }
 
-  // Writes a personalized email from the lead's real audit findings
-  // (page speed, issuesChecklist, AI design note) via the same AI providers
-  // used for the design audit — always lands in the editor for review, never
-  // sent automatically. Subject stays the standard audit-email subject;
-  // only the body is generated.
+  // Writes a personalized email built from the lead's REAL Growth Audit
+  // findings (see functions/growthAuditOutreachWriter.js) — positioned as
+  // "I find problems costing you customers online", not "I build websites".
+  // Uses whatever findings were already stored on the lead by a prior
+  // "Run Growth Audit" (Growth Audit Outreach tab); if none have been run
+  // yet, the generator falls back to a softer, honest general message
+  // rather than inventing problems. Always lands in the editor for review,
+  // never sent automatically.
   async function generateWithAi() {
     setGeneratingAi(true);
     setAiError(null);
     try {
-      const fn = httpsCallable(getFunctions(app), 'generateAuditEmailNow', { timeout: 30000 });
-      const { data } = await fn({ lead, myName: MY_NAME });
-      if (!subject.trim()) setSubject(applyTemplateVars(`A quick audit of {{business}}'s website`, vars));
-      // generateAuditEmail deliberately returns body only, no sign-off (see
-      // aiEmailWriter.js) — without appending it here, every AI-generated
-      // draft went out missing the website, since nothing else in this flow
-      // adds it automatically.
+      const fn = httpsCallable(getFunctions(app), 'generateGrowthAuditOutreachNow', { timeout: 30000 });
+      const { data } = await fn({ leadId: lead.id, leadCollection: 'crmLeads', channel: 'email', myName: MY_NAME });
+      if (!subject.trim()) setSubject(data.subject || applyTemplateVars(`A quick audit of {{business}}'s website`, vars));
+      // The generator deliberately returns body only with no sign-off —
+      // without appending it here, every AI-generated draft went out
+      // missing the website, since nothing else in this flow adds it.
       const html = data.body.replace(/\n/g, '<br>') + SIGNATURE;
       if (richMode && editorRef.current) {
         editorRef.current.innerHTML = html;
