@@ -1871,7 +1871,7 @@ exports.generateGrowthAuditOutreachNow = onCall(
     const {
       leadId, leadCollection, channel, mode, myName,
       businessName: directBusinessName, contactName: directContactName, industry: directIndustry,
-      findings: directFindings,
+      findings: directFindings, includePortfolio, includeScore,
     } = request.data ?? {};
 
     let businessName = directBusinessName;
@@ -1880,6 +1880,7 @@ exports.generateGrowthAuditOutreachNow = onCall(
     let findings = directFindings;
     let hasEnough = Array.isArray(directFindings) && directFindings.length > 0;
     let website = null;
+    let overallScore = null;
 
     if (leadId && leadCollection) {
       const snap = await db.collection(leadCollection).doc(leadId).get();
@@ -1889,6 +1890,7 @@ exports.generateGrowthAuditOutreachNow = onCall(
       contactName = contactName || leadData.contactName;
       industry = industry || leadData.industry;
       website = leadData.website ?? null;
+      overallScore = typeof leadData.growthAuditScore === 'number' ? leadData.growthAuditScore : null;
       if (!findings) {
         findings = Array.isArray(leadData.growthAuditFindings) ? leadData.growthAuditFindings : [];
         hasEnough = !!leadData.growthAuditHasEnoughFindings;
@@ -1902,12 +1904,19 @@ exports.generateGrowthAuditOutreachNow = onCall(
       : (hasEnough ? 'initial' : 'soft');
 
     const result = await generateGrowthAuditOutreach(
-      { businessName, contactName, industry, channel, myName: myName || 'Dean', findings, mode: resolvedMode },
+      {
+        businessName, contactName, industry, channel, myName: myName || 'Dean', findings, mode: resolvedMode,
+        includePortfolio: !!includePortfolio, includeScore: !!includeScore, overallScore,
+      },
       growthAuditOutreachKeys(),
     );
     if (!result) throw new HttpsError('internal', 'Every AI provider failed — try again in a moment.');
 
-    const quality = assessOutreachQuality(result.body, { businessName, channel: channel || 'email', findingsUsed: resolvedMode === 'initial' ? findings : [] });
+    const quality = assessOutreachQuality(result.body, {
+      businessName, channel: channel || 'email',
+      findingsUsed: resolvedMode === 'initial' ? findings : [],
+      includeScore: !!includeScore,
+    });
 
     // Lightweight outreach-funnel tracking (outreach -> audit click -> audit
     // -> signup -> website added -> monitoring is the eventual goal; this is

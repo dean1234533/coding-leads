@@ -5,6 +5,10 @@
 // to a PDF-send flow. Never hardcode this URL anywhere else; import it.
 const AUDIT_TOOL_URL = 'https://app.dean-da-dev.co.uk/';
 
+// Only ever included in outreach when explicitly opted into (email only,
+// per spec) — the audit link is the primary CTA, not this.
+const PORTFOLIO_URL = 'https://www.dean-da-dev.co.uk/portfolio';
+
 const UTM_MEDIUM_BY_CHANNEL = {
   email: 'email',
   whatsapp: 'whatsapp',
@@ -32,4 +36,4 @@ function buildAuditToolUrl(channel) {
   return `${AUDIT_TOOL_URL}?${params.toString()}`;
 }
 
-module.exports = { AUDIT_TOOL_URL, buildAuditToolUrl };
+module.exports = { AUDIT_TOOL_URL, PORTFOLIO_URL, buildAuditToolUrl };

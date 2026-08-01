@@ -37,6 +37,8 @@ export default function CrmGrowthAuditOutreach({ lead }) {
   );
 
   const [channel, setChannel] = useState('email');
+  const [includePortfolio, setIncludePortfolio] = useState(false);
+  const [includeScore, setIncludeScore] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState(null);
   const [message, setMessage] = useState(null); // { subject, body, quality, mode, notEnoughFindings }
@@ -72,6 +74,8 @@ export default function CrmGrowthAuditOutreach({ lead }) {
         mode,
         myName: MY_NAME,
         findings: audit?.findings,
+        includePortfolio: includePortfolio && channel === 'email',
+        includeScore,
       });
       setMessage(data);
       setEditedBody(data.body);
@@ -165,6 +169,17 @@ export default function CrmGrowthAuditOutreach({ lead }) {
                 {c.label}
               </button>
             ))}
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-1.5 text-xs text-gray-400">
+              <input type="checkbox" checked={includePortfolio} disabled={channel !== 'email'} onChange={(e) => setIncludePortfolio(e.target.checked)} />
+              Include portfolio {channel !== 'email' && '(email only)'}
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-gray-400">
+              <input type="checkbox" checked={includeScore} onChange={(e) => setIncludeScore(e.target.checked)} />
+              Include audit score
+            </label>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">

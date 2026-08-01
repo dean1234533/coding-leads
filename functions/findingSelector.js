@@ -43,6 +43,17 @@ function normaliseBusinessType(businessType) {
   return BUSINESS_TYPE_CATEGORY_FOCUS[key] ? key : null;
 }
 
+// General outreach priority (independent of business type) — measurable,
+// objective categories are preferred over softer/more subjective ones like
+// "trust" (missing testimonials/reviews/portfolio, which a business may
+// have deliberately chosen not to have). Used only as a tie-breaker within
+// a modest real-priority band, never to bury a genuinely bigger issue.
+const CATEGORY_PREFERENCE_ORDER = ['performance', 'conversion', 'mobile', 'seo', 'localSeo', 'accessibility', 'trust'];
+function categoryRank(category) {
+  const idx = CATEGORY_PREFERENCE_ORDER.indexOf(category);
+  return idx === -1 ? CATEGORY_PREFERENCE_ORDER.length : idx;
+}
+
 /**
  * @param {object} audit - a Growth Audit AuditResult (audit.recommendations required)
  * @param {object} [opts]
@@ -78,17 +89,21 @@ function selectTopFindings(audit, opts = {}) {
   // priority bands (+/-5) so a focus-category match jumps ahead of a
   // near-equal generic one, but a genuinely bigger issue never gets buried
   // under a smaller one just because it's not in the "expected" list for
-  // this business type.
-  let ranked = candidates;
-  if (focusCategories) {
-    ranked = [...candidates].sort((a, b) => {
-      const priorityDiff = (b.priority ?? 0) - (a.priority ?? 0);
-      if (Math.abs(priorityDiff) > 5) return priorityDiff;
+  // this business type. The general category preference (measurable over
+  // subjective) applies as a further tie-break within a slightly wider band
+  // whenever business-type focus doesn't already decide it.
+  const ranked = [...candidates].sort((a, b) => {
+    const priorityDiff = (b.priority ?? 0) - (a.priority ?? 0);
+    if (Math.abs(priorityDiff) > 10) return priorityDiff;
+    if (focusCategories) {
       const aFocus = focusCategories.includes(a.category) ? 1 : 0;
       const bFocus = focusCategories.includes(b.category) ? 1 : 0;
-      return bFocus - aFocus || priorityDiff;
-    });
-  }
+      if (aFocus !== bFocus) return bFocus - aFocus;
+    }
+    const categoryDiff = categoryRank(a.category) - categoryRank(b.category);
+    if (categoryDiff !== 0) return categoryDiff;
+    return priorityDiff;
+  });
 
   const findings = ranked.slice(0, maxFindings).map((rec) => ({
     id: rec.id,

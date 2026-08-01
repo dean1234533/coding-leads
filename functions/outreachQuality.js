@@ -30,6 +30,8 @@ const BANNED_PHRASES = [
   'would you be interested in a website',
   "in today's digital age",
   'i hope this message finds you',
+  'i wanted to reach out',
+  'i noticed your amazing business',
   'i noticed the potential for enhancement',
   'comprehensive and engaging',
   'leverage',
@@ -37,6 +39,12 @@ const BANNED_PHRASES = [
   'circle back',
   'touch base',
   'take your business to the next level',
+  // The old, automated-sounding opener this system used to use — Dean must
+  // be introduced first, not "I was looking at local businesses..." cold.
+  'i was looking at local businesses in the area',
+  // Generic sales-brochure copy — the prospect already knows what a
+  // website does; evidence from their own site should do the work instead.
+  'a working, fast, mobile-friendly website can make a big difference',
   // The old "I'll send you the audit" pattern this system used to use —
   // now obsolete: the audit is self-serve via the tool link, never sent.
   'send you the audit',
@@ -79,11 +87,11 @@ const AGGRESSIVE_CTA_PHRASES = [
 const OVERCLAIM_PHRASES = ['guaranteed', '100% certain', 'definitely will', 'i guarantee'];
 
 const CHANNEL_WORD_LIMITS = {
-  email: 180,
-  whatsapp: 70,
-  instagram: 70,
-  facebook: 70,
-  linkedin: 130,
+  email: 250,
+  whatsapp: 150,
+  instagram: 120,
+  facebook: 150,
+  linkedin: 150,
   sms: 50,
 };
 
@@ -100,16 +108,26 @@ function containsAny(haystack, phrases) {
   return phrases.filter((p) => lower.includes(p));
 }
 
+// A bare "N/100" score dump, or a bullet-list longer than 3 items, both
+// read as an automated audit report rather than a personal note — the
+// audit tool is where the prospect explores the full findings themselves.
+const SCORE_PATTERN = /\b\d{1,3}\s*\/\s*100\b/;
+
+function bulletLineCount(text) {
+  return (text.match(/^\s*[•\-*]\s+/gm) ?? []).length;
+}
+
 /**
  * @param {string} body
  * @param {object} opts
  * @param {string} opts.businessName
  * @param {string} opts.channel
  * @param {object[]} opts.findingsUsed - the findings actually passed to the generator
+ * @param {boolean} [opts.includeScore] - whether the score was explicitly opted into
  * @returns {{ score: number, passed: boolean, issues: string[], checks: object }}
  */
 function assessOutreachQuality(body, opts = {}) {
-  const { businessName = '', channel = 'email', findingsUsed = [] } = opts;
+  const { businessName = '', channel = 'email', findingsUsed = [], includeScore = false } = opts;
   const issues = [];
   const text = body || '';
 
@@ -158,6 +176,14 @@ function assessOutreachQuality(body, opts = {}) {
   const mentionsBusiness = businessName && text.toLowerCase().includes(businessName.toLowerCase());
   if (businessName && !mentionsBusiness) issues.push('Does not mention the business by name.');
 
+  // Doesn't read like an automated audit report — no bare score dump unless
+  // explicitly opted into, and no long bullet-point finding/feature list.
+  const hasUnwantedScore = !includeScore && SCORE_PATTERN.test(text);
+  if (hasUnwantedScore) issues.push('Includes a numeric audit score without it being explicitly requested.');
+  const bulletCount = bulletLineCount(text);
+  const hasBulletDump = bulletCount > 3;
+  if (hasBulletDump) issues.push(`Reads like an audit report dump (${bulletCount} bullet points) rather than a personal message.`);
+
   const checks = {
     personalisation: !!mentionsBusiness,
     evidence: hasEvidence,
@@ -167,6 +193,7 @@ function assessOutreachQuality(body, opts = {}) {
     naturalTone: bannedHits.length === 0,
     ctaQuality: aggressiveHits.length === 0,
     noUnsupportedClaims: overclaimHits.length === 0,
+    notAuditDump: !hasUnwantedScore && !hasBulletDump,
   };
 
   const passedChecks = Object.values(checks).filter(Boolean).length;
@@ -177,7 +204,7 @@ function assessOutreachQuality(body, opts = {}) {
   // must actually include the audit link (the whole point of this system).
   // Personalisation/evidence/benefit/brevity missing lowers the score but
   // doesn't block sending — the human reviews it either way.
-  const passed = checks.naturalTone && checks.ctaQuality && checks.noUnsupportedClaims && checks.includesAuditUrl;
+  const passed = checks.naturalTone && checks.ctaQuality && checks.noUnsupportedClaims && checks.includesAuditUrl && checks.notAuditDump;
 
   return { score, passed, issues, checks };
 }

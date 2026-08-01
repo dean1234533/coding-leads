@@ -133,7 +133,7 @@ export const DEFAULT_TEMPLATES = [
     subject: 'A quick idea for {{business}}',
     body: `Hi {{greeting}},
 
-I was looking at local businesses in the area and had a look at {{business}}'s website{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local businesses I had a look at {{business}}'s website{{issue_highlight}}.
 
 That means anyone finding you through Google, social media, or a recommendation could be leaving within seconds instead of getting in touch — which can result in missed enquiries and bookings without you even realising it.
 
@@ -141,12 +141,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building and improving websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
-
-  • Find you easily on Google
-  • Contact you instantly from their phone
-  • Trust the business from the first impression
-  • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -222,7 +216,7 @@ Thank you for your time, and I hope to hear from you.
     subject: 'Helping {{business}} book more appointments online',
     body: `Hi {{greeting}},
 
-I was looking at local salons in the area and had a look at {{business}}'s website — there isn't currently an easy way for clients to book online{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local salons I had a look at {{business}}'s website — there isn't currently an easy way for clients to book online{{issue_highlight}}.
 
 That usually means missed bookings from people browsing outside your opening hours, who end up booking somewhere that lets them book instantly instead.
 
@@ -230,12 +224,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-A working, fast, mobile-friendly website with online booking can make a big difference because it allows potential clients to:
-
-  • Find you easily on Google
-  • Book an appointment instantly from their phone
-  • Trust the business from the first impression
-  • Book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -248,7 +236,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'A modern website + booking system for {{business}}',
     body: `Hi {{greeting}},
 
-I was looking at local gyms in the area and had a look at {{business}}'s website — it doesn't currently make it easy to see class times or sign up for a membership online{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local gyms I had a look at {{business}}'s website — it doesn't currently make it easy to see class times or sign up for a membership online{{issue_highlight}}.
 
 That's often enough to make someone try a different gym instead, without ever getting in touch to ask.
 
@@ -256,12 +244,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-A working, fast, mobile-friendly website with online booking can make a big difference because it allows potential members to:
-
-  • Find you easily on Google
-  • See class times and sign up instantly from their phone
-  • Trust the business from the first impression
-  • Book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -274,7 +256,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'A more professional online presence for {{business}}',
     body: `Hi {{greeting}},
 
-I was looking at local law firms in the area and had a look at {{business}}'s website — it could do more to build trust with new visitors before they ever pick up the phone{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local law firms I had a look at {{business}}'s website — it could do more to build trust with new visitors before they ever pick up the phone{{issue_highlight}}.
 
 First impressions matter a great deal when someone's choosing who to trust with a legal matter, and a weak website can quietly cost you enquiries before you're even aware of it.
 
@@ -282,12 +264,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-A working, fast, professional website can make a big difference because it allows potential clients to:
-
-  • Find you easily on Google
-  • Contact you instantly from their phone
-  • Trust the firm from the first impression
-  • Enquire even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -300,7 +276,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'Getting {{business}} more online orders/bookings',
     body: `Hi {{greeting}},
 
-I was looking at local restaurants in the area and had a look at {{business}}'s website — it isn't easy to see the menu or book a table online{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local restaurants I had a look at {{business}}'s website — it isn't easy to see the menu or book a table online{{issue_highlight}}.
 
 That's often enough for someone to choose a different restaurant instead, especially when they're deciding in the moment.
 
@@ -308,12 +284,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-A working, fast, mobile-friendly website with online booking can make a big difference because it allows potential diners to:
-
-  • Find you easily on Google
-  • See the menu and book a table instantly from their phone
-  • Trust the business from the first impression
-  • Book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -326,7 +296,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'A website that brings {{business}} more enquiries',
     body: `Hi {{greeting}},
 
-I was looking at local tradespeople in the area and had a look at {{business}} online — the website could do more to build trust with potential customers before they decide who to call{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local tradespeople I had a look at {{business}} online — the website could do more to build trust with potential customers before they decide who to call{{issue_highlight}}.
 
 That can mean enquiries quietly going to a competitor instead, without you ever knowing they existed.
 
@@ -334,12 +304,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
-
-  • Find you easily on Google
-  • Contact you instantly from their phone
-  • Trust the business from the first impression
-  • Enquire or request a quote even when you're out on a job
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -352,7 +316,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'Helping {{business}} book more patients online',
     body: `Hi {{greeting}},
 
-I was looking at local dental practices in the area and had a look at {{business}}'s website — there isn't an easy way for new patients to book online{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local dental practices I had a look at {{business}}'s website — there isn't an easy way for new patients to book online{{issue_highlight}}.
 
 That extra step of having to call can be enough to put some people off, especially anyone looking outside opening hours.
 
@@ -360,12 +324,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-A working, fast, mobile-friendly website with online booking can make a big difference because it allows potential patients to:
-
-  • Find you easily on Google
-  • Book an appointment instantly from their phone
-  • Trust the practice from the first impression
-  • Book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -378,7 +336,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'More enquiries for {{business}} online',
     body: `Hi {{greeting}},
 
-I was looking at local electricians in the area and had a look at {{business}} online — the website could do more to help customers request a quote quickly{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local electricians I had a look at {{business}} online — the website could do more to help customers request a quote quickly{{issue_highlight}}.
 
 That can mean urgent jobs go to whoever responds fastest online — not necessarily whoever'd actually do the best job.
 
@@ -386,12 +344,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
-
-  • Find you easily on Google
-  • Contact you instantly from their phone
-  • Trust the business from the first impression
-  • Request a quote even when you're out on a job
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -404,7 +356,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'Getting {{business}} found online',
     body: `Hi {{greeting}},
 
-I was looking at local plumbers in the area and had a look at {{business}} online — the website could do more to help customers find you and get in touch quickly, especially for more urgent jobs{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local plumbers I had a look at {{business}} online — the website could do more to help customers find you and get in touch quickly, especially for more urgent jobs{{issue_highlight}}.
 
 That can mean the job goes to whoever answers first — not necessarily whoever'd actually do it properly.
 
@@ -412,12 +364,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
-
-  • Find you easily on Google
-  • Contact you instantly from their phone
-  • Trust the business from the first impression
-  • Get in touch even when you're out on a job
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -430,7 +376,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'Getting {{business}} online',
     body: `Hi {{greeting}},
 
-I was looking at local businesses in the area and noticed {{business}} doesn't currently have a website.
+I'm {{myname}}, a web developer and designer, and while looking at local businesses I noticed {{business}} doesn't currently have a website.
 
 That means anyone searching Google, checking social media, or asking for a recommendation has no way to find or check you out online — which usually means they end up going with a competitor who does show up.
 
@@ -438,12 +384,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building websites for local businesses, and I'd be happy to put a few ideas together and give you a clear recommendation, with no obligation.
 
-A fast, mobile-friendly website can make a big difference because it allows potential customers to:
-
-  • Find you easily on Google
-  • Contact you instantly from their phone
-  • Trust the business from the first impression
-  • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -456,7 +396,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'Noticed an issue on {{website}}',
     body: `Hi {{greeting}},
 
-I was looking at local businesses in the area and tried visiting your website. Unfortunately, it didn't load properly on my end{{issue_note}}.
+I'm {{myname}}, a web developer and designer, and while looking at local businesses I tried visiting your website. Unfortunately, it didn't load properly on my end{{issue_note}}.
 
 That means anyone finding you through Google, social media, or a recommendation could be hitting the same problem and leaving within seconds — which can result in missed enquiries and bookings without you even realising it.
 
@@ -464,12 +404,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building and repairing websites for local businesses, and I'd be happy to check what's causing the issue and give you a clear recommendation, with no obligation.
 
-A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
-
-  • Find you easily on Google
-  • Contact you instantly from their phone
-  • Trust the business from the first impression
-  • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -482,7 +416,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: '{{website}} is loading slowly — quick fix ideas',
     body: `Hi {{greeting}},
 
-I was looking at local businesses in the area and ran a quick check on {{business}}'s website — it's loading slower than it should{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local businesses I ran a quick check on {{business}}'s website — it's loading slower than it should{{issue_highlight}}.
 
 That affects both how visitors experience the site and where it ranks in Google, which can mean fewer people ever find you in the first place.
 
@@ -490,12 +424,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building and repairing websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
-
-  • Find you easily on Google
-  • Contact you instantly from their phone
-  • Trust the business from the first impression
-  • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -508,7 +436,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'A modern refresh for {{business}}',
     body: `Hi {{greeting}},
 
-I was looking at local businesses in the area and had a look at {{business}}'s website — it could use a modern refresh{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local businesses I had a look at {{business}}'s website — it could use a modern refresh{{issue_highlight}}.
 
 An outdated design can make people question how established a business is, even when the work itself is great — which can quietly cost you enquiries before anyone even reads what you offer.
 
@@ -516,12 +444,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building websites for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-A modern, fast, mobile-friendly website can make a big difference because it allows potential customers to:
-
-  • Find you easily on Google
-  • Contact you instantly from their phone
-  • Trust the business from the first impression
-  • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -534,7 +456,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'Add online booking to {{business}}',
     body: `Hi {{greeting}},
 
-I was looking at local businesses in the area and had a look at {{business}}'s website — there isn't currently a way for customers to book online{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local businesses I had a look at {{business}}'s website — there isn't currently a way for customers to book online{{issue_highlight}}.
 
 That likely means missed bookings from people browsing outside your opening hours, who end up booking somewhere that lets them book instantly instead.
 
@@ -542,12 +464,6 @@ The good news is that this is usually a straightforward fix.
 
 I specialise in building websites and booking systems for local businesses, and I'd be happy to take a proper look and give you a clear recommendation, with no obligation.
 
-A working, fast, mobile-friendly website with online booking can make a big difference because it allows potential customers to:
-
-  • Find you easily on Google
-  • Book instantly from their phone
-  • Trust the business from the first impression
-  • Book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -560,7 +476,7 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: `A quick audit of {{business}}'s website`,
     body: `Hi {{greeting}},
 
-I was looking at local businesses in the area and ran {{business}}'s website through a quick audit — a few things stood out that are worth knowing about.{{website_score_note}}{{competitor_line}}
+I'm {{myname}}, a web developer and designer, and while looking at local businesses I ran {{business}}'s website through a quick audit — a few things stood out that are worth knowing about.{{website_score_note}}{{competitor_line}}
 
 {{issue_list}}
 
@@ -570,12 +486,6 @@ The good news is that none of this is a huge job to fix.
 
 I specialise in building and improving websites for local businesses, and I'd be happy to walk through the findings and give you a clear recommendation, with no obligation.
 
-A working, fast, mobile-friendly website can make a big difference because it allows potential customers to:
-
-  • Find you easily on Google
-  • Contact you instantly from their phone
-  • Trust the business from the first impression
-  • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}}
@@ -645,18 +555,12 @@ Thank you for your time, and I hope to hear from you.
     subject: 'Quick idea for {{business}}',
     body: `Hi {{greeting}},
 
-I was looking at local businesses in the area and had a look at {{business}}'s website{{issue_highlight}}.
+I'm {{myname}}, a web developer and designer, and while looking at local businesses I had a look at {{business}}'s website{{issue_highlight}}.
 
 That means anyone finding you through Google, social media, or a recommendation could be leaving without getting in touch — which can result in missed enquiries and bookings without you even realising it.
 
 The good news is that this is usually a straightforward fix, and there are two ways to go about it. I build custom websites through Dean Da Dev from £249, or if a full rebuild is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform that gets clients booking and paying online in about ten minutes, for £10–20/month with a 90-day free trial.
 
-Either way, a working, fast, mobile-friendly site can make a big difference because it allows potential customers to:
-
-  • Find you easily on Google
-  • Contact you instantly from their phone
-  • Trust the business from the first impression
-  • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}} — or let me know which of the two paths sounds more like a fit and we'll take it from there.
@@ -669,18 +573,12 @@ I also built a free website audit tool if you want to check things yourself: {{a
     subject: 'Quick idea for {{business}}',
     body: `Hi {{greeting}},
 
-I was looking at local businesses in the area and noticed {{business}} doesn't currently have a website.
+I'm {{myname}}, a web developer and designer, and while looking at local businesses I noticed {{business}} doesn't currently have a website.
 
 That means anyone searching Google, checking social media, or asking for a recommendation has no way to find or check you out online — which usually means they end up going with a competitor who does show up.
 
 The good news is that this is usually a straightforward fix, and there are two ways to go about it. I build custom websites through Dean Da Dev from £249, or if a full site is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform that gets you a professional online presence plus bookings and payments live in about ten minutes, for £10–20/month with a 90-day free trial.
 
-Either way, a fast, mobile-friendly site can make a big difference because it allows potential customers to:
-
-  • Find you easily on Google
-  • Contact you instantly from their phone
-  • Trust the business from the first impression
-  • Enquire or book even when you're not available to answer the phone
 {{portfolio_line}}
 
 I also built a free website audit tool if you want to check things yourself: {{audit_link}} — or let me know which of the two paths sounds more like a fit and we'll take it from there.
