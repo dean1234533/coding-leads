@@ -181,166 +181,6 @@ If you'd be interested in a no-obligation chat about whether it could work for {
 {{signature}}`,
   },
   {
-    name: 'Salon',
-    category: 'Industry',
-    subject: 'A free website check for {{business}}',
-    body: `Hi {{greeting}},
-
-I'm Dean, a web developer, and I've just built a free tool that lets salons check their website for online booking, mobile experience and local search issues.
-
-I thought you might find it useful for {{business}}.
-
-You can run your website through it here — completely free:
-
-{{audit_link}}
-
-It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
-
-No obligation — I just thought it might be useful.
-
-{{signature}}`,
-  },
-  {
-    name: 'Gym',
-    category: 'Industry',
-    subject: 'A free website check for {{business}}',
-    body: `Hi {{greeting}},
-
-I'm Dean, a web developer, and I've just built a free tool that lets gyms and studios check their website for online sign-ups, mobile experience and conversion issues.
-
-I thought you might find it useful for {{business}}.
-
-You can run your website through it here — completely free:
-
-{{audit_link}}
-
-It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
-
-No obligation — I just thought it might be useful.
-
-{{signature}}`,
-  },
-  {
-    name: 'Law Firm',
-    category: 'Industry',
-    subject: 'A free website check for {{business}}',
-    body: `Hi {{greeting}},
-
-I'm Dean, a web developer, and I've just built a free tool that lets local firms check their website for trust signals, SEO and conversion issues.
-
-I thought you might find it useful for {{business}}.
-
-You can run your website through it here — completely free:
-
-{{audit_link}}
-
-It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
-
-No obligation — I just thought it might be useful.
-
-{{signature}}`,
-  },
-  {
-    name: 'Restaurant',
-    category: 'Industry',
-    subject: 'A free website check for {{business}}',
-    body: `Hi {{greeting}},
-
-I'm Dean, a web developer, and I've just built a free tool that lets restaurants check their website for menu visibility, table bookings and mobile issues.
-
-I thought you might find it useful for {{business}}.
-
-You can run your website through it here — completely free:
-
-{{audit_link}}
-
-It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
-
-No obligation — I just thought it might be useful.
-
-{{signature}}`,
-  },
-  {
-    name: 'Trades',
-    category: 'Industry',
-    subject: 'A free website check for {{business}}',
-    body: `Hi {{greeting}},
-
-I'm Dean, a web developer, and I've just built a free tool that lets tradespeople check their website for local search, quote enquiries and mobile issues.
-
-I thought you might find it useful for {{business}}.
-
-You can run your website through it here — completely free:
-
-{{audit_link}}
-
-It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
-
-No obligation — I just thought it might be useful.
-
-{{signature}}`,
-  },
-  {
-    name: 'Dentist',
-    category: 'Industry',
-    subject: 'A free website check for {{business}}',
-    body: `Hi {{greeting}},
-
-I'm Dean, a web developer, and I've just built a free tool that lets dental practices check their website for patient trust, booking and mobile issues.
-
-I thought you might find it useful for {{business}}.
-
-You can run your website through it here — completely free:
-
-{{audit_link}}
-
-It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
-
-No obligation — I just thought it might be useful.
-
-{{signature}}`,
-  },
-  {
-    name: 'Electrician',
-    category: 'Industry',
-    subject: 'A free website check for {{business}}',
-    body: `Hi {{greeting}},
-
-I'm Dean, a web developer, and I've just built a free tool that lets electricians check their website for local search, quote enquiries and mobile issues.
-
-I thought you might find it useful for {{business}}.
-
-You can run your website through it here — completely free:
-
-{{audit_link}}
-
-It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
-
-No obligation — I just thought it might be useful.
-
-{{signature}}`,
-  },
-  {
-    name: 'Plumber',
-    category: 'Industry',
-    subject: 'A free website check for {{business}}',
-    body: `Hi {{greeting}},
-
-I'm Dean, a web developer, and I've just built a free tool that lets plumbers check their website for local search, quote enquiries and mobile issues.
-
-I thought you might find it useful for {{business}}.
-
-You can run your website through it here — completely free:
-
-{{audit_link}}
-
-It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
-
-No obligation — I just thought it might be useful.
-
-{{signature}}`,
-  },
-  {
     name: 'No Website',
     category: 'Issue-based',
     subject: 'Getting {{business}} online',
@@ -419,26 +259,6 @@ I'm Dean, a web developer, and I had a look at {{business}}'s website — there 
 I've also just built a free tool that checks a website for SEO, performance, mobile and conversion issues. You can run it here — completely free:
 
 {{audit_link}}
-
-No obligation — I just thought it might be useful.
-
-{{signature}}`,
-  },
-  {
-    name: 'Website Audit Findings',
-    category: 'Issue-based',
-    subject: `A free website check for {{business}}`,
-    body: `Hi {{greeting}},
-
-I'm Dean, a web developer, and I've just built a free tool that lets businesses check their website for SEO, performance, mobile and conversion issues.
-
-I thought you might find it useful for {{business}}.
-
-You can run your website through it here — completely free:
-
-{{audit_link}}
-
-It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
 
 No obligation — I just thought it might be useful.
 
@@ -730,21 +550,12 @@ function pickRelevantTools(lead) {
 // someone adds through the Template Library) sorts after all of these,
 // alphabetically.
 const TEMPLATE_RELEVANCE_ORDER = [
-  'Website Audit Findings',
+  'General Outreach',
   'Broken Website',
   'Slow Website',
   'Outdated Website',
   'Missing Booking System',
   'No Website',
-  'Salon',
-  'Gym',
-  'Law Firm',
-  'Restaurant',
-  'Trades',
-  'Dentist',
-  'Electrician',
-  'Plumber',
-  'General Outreach',
   'Two-Path Offer',
   'Two-Path Offer (No Website)',
   'Bookrightly Platform Pitch',

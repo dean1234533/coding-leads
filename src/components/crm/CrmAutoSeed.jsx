@@ -50,9 +50,23 @@ function useAutoSeedCollection(collectionName, defaults) {
         const keep = group.find((d) => d.id === canonicalId) ?? group[0];
         extras.push(...group.filter((d) => d !== keep).map((d) => d.id));
       }
-      if (extras.length > 0) {
-        Promise.all(extras.map((id) => deleteDoc(doc(db, collectionName, id))))
-          .catch((err) => console.error(`[CrmAutoSeed] ${collectionName} dedupe failed:`, err));
+
+      // Retire built-in templates that were merged/renamed/deleted from
+      // `defaults` (e.g. duplicate industry variants consolidated into one) —
+      // otherwise the stale seeded doc lingers in Firestore forever and keeps
+      // showing up in the compose-time picker even though it's gone from the
+      // source. Never touches a doc the user edited themselves (isDefault:
+      // false) or anything not originally seeded by this component at all
+      // (isDefault === undefined, i.e. a genuinely custom template).
+      const defaultNames = new Set(defaults.map((d) => d.name));
+      const retired = docs
+        .filter((d) => d.isDefault === true && !defaultNames.has(d.name))
+        .map((d) => d.id);
+
+      const toDelete = [...new Set([...extras, ...retired])];
+      if (toDelete.length > 0) {
+        Promise.all(toDelete.map((id) => deleteDoc(doc(db, collectionName, id))))
+          .catch((err) => console.error(`[CrmAutoSeed] ${collectionName} cleanup failed:`, err));
       }
     });
   }, [collectionName, defaults]);

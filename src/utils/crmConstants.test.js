@@ -64,20 +64,20 @@ describe('buildTemplateVars', () => {
 });
 
 describe('sortTemplatesByRelevance', () => {
-  it('puts Website Audit Findings first', () => {
-    const templates = [{ name: 'Follow Up' }, { name: 'Website Audit Findings' }, { name: 'General Outreach' }];
+  it('puts General Outreach first', () => {
+    const templates = [{ name: 'Follow Up' }, { name: 'Broken Website' }, { name: 'General Outreach' }];
     const sorted = sortTemplatesByRelevance(templates);
-    expect(sorted[0].name).toBe('Website Audit Findings');
+    expect(sorted[0].name).toBe('General Outreach');
   });
 
   it('sorts unranked custom templates after every known one, alphabetically', () => {
-    const templates = [{ name: 'Zebra Custom' }, { name: 'Website Audit Findings' }, { name: 'Alpha Custom' }];
+    const templates = [{ name: 'Zebra Custom' }, { name: 'General Outreach' }, { name: 'Alpha Custom' }];
     const sorted = sortTemplatesByRelevance(templates);
-    expect(sorted.map((t) => t.name)).toEqual(['Website Audit Findings', 'Alpha Custom', 'Zebra Custom']);
+    expect(sorted.map((t) => t.name)).toEqual(['General Outreach', 'Alpha Custom', 'Zebra Custom']);
   });
 
   it('does not mutate the input array', () => {
-    const templates = [{ name: 'Follow Up' }, { name: 'Website Audit Findings' }];
+    const templates = [{ name: 'Follow Up' }, { name: 'General Outreach' }];
     const copy = [...templates];
     sortTemplatesByRelevance(templates);
     expect(templates).toEqual(copy);
