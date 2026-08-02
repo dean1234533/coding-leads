@@ -281,6 +281,26 @@ describe('assessOutreachQuality', () => {
     expect(result.checks.noUnsupportedClaims).toBe(false);
   });
 
+  it('fails on a fabricated claim that Growth Audit generated the findings — the outreach analyzer is a separate, lightweight, non-browser system', () => {
+    const body = `Hi Test Ltd, I ran your site through Growth Audit and it flagged some issues. ${link}`;
+    const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [] });
+    expect(result.passed).toBe(false);
+    expect(result.checks.noFabricatedSource).toBe(false);
+  });
+
+  it('fails on a fabricated PageSpeed/Lighthouse-style performance claim — this analyzer never measures real performance', () => {
+    const body = `Hi Test Ltd, your PageSpeed score is only 42 and your LCP is 9.5 seconds. ${link}`;
+    const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [] });
+    expect(result.passed).toBe(false);
+    expect(result.checks.noFabricatedSource).toBe(false);
+  });
+
+  it('passes a message that honestly attributes findings to a quick/lightweight check, not Growth Audit', () => {
+    const body = `Hi Test Ltd, I'm Dean, a web developer and designer, and I came across your website. I ran a quick audit tool I built and noticed your homepage is taking a while to load — measured at 3.9 seconds. Run your free audit here: ${link}`;
+    const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [finding] });
+    expect(result.checks.noFabricatedSource).toBe(true);
+  });
+
   it('flags a message that is too long for a WhatsApp-length channel (over 150 words)', () => {
     const longBody = 'Hi Test Ltd, '.repeat(60) + `check it out: ${link}`;
     const result = assessOutreachQuality(longBody, { businessName: 'Test Ltd', channel: 'whatsapp', findingsUsed: [] });

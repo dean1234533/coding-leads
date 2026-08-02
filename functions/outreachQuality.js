@@ -86,6 +86,32 @@ const AGGRESSIVE_CTA_PHRASES = [
 // "measured" finding shouldn't be oversold as a guarantee of outcome.
 const OVERCLAIM_PHRASES = ['guaranteed', '100% certain', 'definitely will', 'i guarantee'];
 
+// The outreach analyzer (outreachWebsiteAudit.js) is a separate, lightweight,
+// non-browser system — it never runs Growth Audit, never uses Browser
+// Rendering/Puppeteer/Playwright/Lighthouse/PageSpeed Insights, and produces
+// no LCP/FCP/CLS/TBT/score numbers at all. A generated message claiming
+// otherwise would be a factual misrepresentation of what actually happened,
+// not just a tone issue — checked separately from BANNED_PHRASES/naturalTone
+// so it always hard-fails the gate (see FABRICATED_SOURCE_PHRASES below).
+const FABRICATED_SOURCE_PHRASES = [
+  'ran your site through growth audit',
+  'ran your website through growth audit',
+  'ran it through growth audit',
+  'through the growth audit',
+  'growth audit scored your',
+  'growth audit gave your',
+  'your growth audit score',
+  'your pagespeed score',
+  'your lighthouse score',
+  'core web vitals are',
+  'your lcp is',
+  'your fcp is',
+  'your cls is',
+  'your tbt is',
+  'using browser rendering',
+  'browser rendering shows',
+];
+
 const CHANNEL_WORD_LIMITS = {
   email: 250,
   whatsapp: 150,
@@ -145,6 +171,13 @@ function assessOutreachQuality(body, opts = {}) {
   const overclaimHits = containsAny(text, OVERCLAIM_PHRASES);
   if (overclaimHits.length > 0) issues.push(`Contains overclaiming language: ${overclaimHits.join(', ')}.`);
 
+  // 2b. Fabricated source claims — the outreach analyzer never runs Growth
+  // Audit, Browser Rendering, PageSpeed Insights, or Lighthouse, and never
+  // produces LCP/FCP/CLS/TBT/score numbers. A message claiming otherwise is
+  // a factual misrepresentation, not just a tone slip — hard-fails on its own.
+  const fabricatedSourceHits = containsAny(text, FABRICATED_SOURCE_PHRASES);
+  if (fabricatedSourceHits.length > 0) issues.push(`Misrepresents how the findings were produced (claims Growth Audit/Browser Rendering/a fabricated performance score): ${fabricatedSourceHits.join(', ')}.`);
+
   // 3. Brevity — channel-appropriate length.
   const words = wordCount(text);
   const limit = CHANNEL_WORD_LIMITS[channel] ?? CHANNEL_WORD_LIMITS.email;
@@ -194,19 +227,21 @@ function assessOutreachQuality(body, opts = {}) {
     ctaQuality: aggressiveHits.length === 0,
     noUnsupportedClaims: overclaimHits.length === 0,
     notAuditDump: !hasUnwantedScore && !hasBulletDump,
+    noFabricatedSource: fabricatedSourceHits.length === 0,
   };
 
   const passedChecks = Object.values(checks).filter(Boolean).length;
   const score = Math.round((passedChecks / Object.keys(checks).length) * 100);
 
   // A message only "passes" with zero hard-fail issues — no unsupported
-  // claims, no banned/obsolete phrases, no premature hard-sell CTA, and it
-  // must actually include the audit link (the whole point of this system).
+  // claims, no fabricated Growth-Audit/performance-score claims, no banned/
+  // obsolete phrases, no premature hard-sell CTA, and it must actually
+  // include the audit link (the whole point of this system).
   // Personalisation/evidence/benefit/brevity missing lowers the score but
   // doesn't block sending — the human reviews it either way.
-  const passed = checks.naturalTone && checks.ctaQuality && checks.noUnsupportedClaims && checks.includesAuditUrl && checks.notAuditDump;
+  const passed = checks.naturalTone && checks.ctaQuality && checks.noUnsupportedClaims && checks.includesAuditUrl && checks.notAuditDump && checks.noFabricatedSource;
 
   return { score, passed, issues, checks };
 }
 
-module.exports = { assessOutreachQuality, BANNED_PHRASES, AGGRESSIVE_CTA_PHRASES, OVERCLAIM_PHRASES, CHANNEL_WORD_LIMITS };
+module.exports = { assessOutreachQuality, BANNED_PHRASES, AGGRESSIVE_CTA_PHRASES, OVERCLAIM_PHRASES, FABRICATED_SOURCE_PHRASES, CHANNEL_WORD_LIMITS };

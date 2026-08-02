@@ -695,20 +695,19 @@ const sendAutoFollowUpNow = onCall(
 
 // ─────────────────────────────────────────────────────────────────────────────
 // scheduledAutoAuditEmail — writes a personalized outreach email (via the
-// same Growth-Audit-driven generator used by the manual "Generate with AI"
-// button in the composer — see growthAuditOutreachWriter.js) for any new
-// lead that's already had a real Growth Audit run against it, and saves it
-// as a Gmail DRAFT rather than sending it. Dean still has to open the draft
-// and hit send himself — this only automates the writing, never the
-// sending, so a bad or off-tone AI output never reaches a real business
+// same outreach generator used by the manual "Generate with AI" button in
+// the composer — see growthAuditOutreachWriter.js) for any new lead that's
+// already had a lightweight outreach website check run against it, and
+// saves it as a Gmail DRAFT rather than sending it. Dean still has to open
+// the draft and hit send himself — this only automates the writing, never
+// the sending, so a bad or off-tone AI output never reaches a real business
 // unreviewed.
 //
-// Deliberately does NOT trigger a fresh Growth Audit scan itself — each scan
-// spends real budget on shared infrastructure this app doesn't own (see
-// growthAuditClient.js) — it only drafts for leads someone has already run
-// "Run Growth Audit" against manually. A lead with no stored findings yet is
-// simply skipped until that's done. Off by default (gated on
-// autoAuditEmailConfig/settings.enabled).
+// Deliberately does NOT trigger a fresh website check itself (see
+// outreachWebsiteAudit.js) — it only drafts for leads someone has already
+// run "Run Outreach Website Check" against manually. A lead with no stored
+// findings yet is simply skipped until that's done. Off by default (gated
+// on autoAuditEmailConfig/settings.enabled).
 // ─────────────────────────────────────────────────────────────────────────────
 const AUDIT_EMAIL_AI_SECRETS = ['GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY', 'HUGGINGFACE_API_KEY'];
 

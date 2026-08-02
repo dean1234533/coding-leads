@@ -34,7 +34,7 @@ const { requireOwner } = require('./authGuard');
 const { withErrorAlert } = require('./errorAlert');
 const { ensureBacklinkConfig, runBacklinkScan } = require('./backlinkScanner');
 const { auditWebsite } = require('./websiteAudit');
-const { fetchGrowthAudit } = require('./growthAuditClient');
+const { analyzeWebsiteForOutreach, toGrowthAuditShapedResult } = require('./outreachWebsiteAudit');
 const { selectTopFindings } = require('./findingSelector');
 const { assessOutreachQuality } = require('./outreachQuality');
 const { generateGrowthAuditOutreach } = require('./growthAuditOutreachWriter');
@@ -1758,17 +1758,26 @@ function growthAuditOutreachKeys() {
 }
 
 /**
- * runGrowthAuditForLead — runs the REAL Growth Audit product (a separate
- * live app, app.dean-da-dev.co.uk — see growthAuditClient.js) against a
- * lead's website and stores the score + selected findings on the lead doc.
- * Deliberately manual/on-demand only, never called from a scheduled job —
- * each call spends real budget on shared infrastructure this app doesn't
- * own (real browser rendering), so it must always be an explicit click.
- * Separate from message generation so "Regenerate" (below) doesn't have to
- * re-run a 20-30s audit every time — it reuses whatever was stored here.
+ * runGrowthAuditForLead — runs the outreach tool's OWN lightweight website
+ * check (outreachWebsiteAudit.js: plain HTTP fetch + regex HTML parsing —
+ * no browser, no PageSpeed, no third-party audit API) against a lead's
+ * website and stores the selected findings on the lead doc. Kept under its
+ * original name/response-shape for backward compatibility with the
+ * frontend and other callers, but it no longer calls the real Growth Audit
+ * product (app.dean-da-dev.co.uk) at all — see outreachWebsiteAudit.js's
+ * module comment for why: outreach volume must never consume Growth
+ * Audit's shared Browser Rendering budget. `score` is always null now —
+ * this lightweight check has no comparable 0-100 scoring concept, and the
+ * UI already hides the score display when it's absent.
+ * Deliberately manual/on-demand only, never called from a scheduled job,
+ * so a batch of leads is never fetched unattended. Separate from message
+ * generation so "Regenerate" (below) doesn't have to re-run the check every
+ * time — it reuses whatever was stored here (and outreachWebsiteAudit.js's
+ * own short-lived cache also protects against accidental rapid re-checks
+ * of the same URL).
  */
 exports.runGrowthAuditForLead = onCall(
-  { cors: true, timeoutSeconds: 60, memory: '256MiB' },
+  { cors: true, timeoutSeconds: 30, memory: '256MiB' },
   async (request) => {
     requireOwner(request);
     const { leadId, leadCollection, website: directWebsite, industry: directIndustry } = request.data ?? {};
@@ -1786,21 +1795,23 @@ exports.runGrowthAuditForLead = onCall(
     }
     if (!website) throw new HttpsError('invalid-argument', 'A website URL is required (directly, or via a lead that has one).');
 
-    const audit = await fetchGrowthAudit(website);
-    if (!audit) {
-      throw new HttpsError('unavailable', 'Could not run the Growth Audit for this website right now — it may be unreachable, or the audit tool is temporarily unavailable.');
+    const analysis = await analyzeWebsiteForOutreach(website);
+    if (analysis.status === 'error') {
+      throw new HttpsError('unavailable', analysis.reason || 'Could not check this website right now — it may be unreachable.');
     }
 
+    const audit = toGrowthAuditShapedResult(analysis);
     const { findings, hasEnough } = selectTopFindings(audit, { businessType: industry });
 
     const result = {
-      score: audit.overallScore,
-      categories: audit.categories.map((c) => ({ id: c.id, label: c.label, score: c.score })),
+      score: null,
+      categories: [],
       findings,
       hasEnough,
-      scannedAt: audit.scannedAt,
-      jsRenderingUsed: audit.meta?.scanQuality?.jsRenderingUsed ?? null,
-      partial: audit.meta?.partial ?? false,
+      scannedAt: analysis.scannedAt,
+      jsRenderingUsed: false,
+      partial: analysis.status === 'partial',
+      renderingRequired: analysis.renderingRequired,
     };
 
     if (leadRef) {

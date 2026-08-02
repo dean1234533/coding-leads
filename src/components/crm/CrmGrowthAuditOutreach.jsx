@@ -34,11 +34,14 @@ function formatPhoneIntl(phone) {
 }
 
 /**
- * Growth-Audit-driven outreach generator. Positions Dean as "someone who
+ * Outreach Website Check + message generator. Positions Dean as "someone who
  * finds problems costing businesses potential customers online" rather than
  * "I build websites" — the message is only ever built from real findings
- * returned by the Growth Audit product (app.dean-da-dev.co.uk), never
- * invented. See functions/growthAuditClient.js, findingSelector.js,
+ * returned by the outreach tool's OWN lightweight website check (plain HTTP
+ * fetch + HTML parsing — no browser, no PageSpeed, and NOT the Growth Audit
+ * product at app.dean-da-dev.co.uk, which this tool deliberately never
+ * calls, to avoid consuming its shared Browser Rendering budget), never
+ * invented. See functions/outreachWebsiteAudit.js, findingSelector.js,
  * growthAuditOutreachWriter.js, outreachQuality.js for the server side.
  *
  * The generated message is persisted on the lead doc (growthAuditOutreachMessage)
@@ -79,7 +82,7 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
       setAudit(data);
     } catch (err) {
       console.error('[CrmGrowthAuditOutreach] audit failed:', err);
-      setAuditError(err?.message ?? 'Could not run the Growth Audit right now.');
+      setAuditError(err?.message ?? 'Could not run the website check right now.');
     } finally {
       setAuditing(false);
     }
@@ -227,7 +230,7 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
           {audit?.score != null && (
             <div className="text-right">
               <p className={`text-2xl font-bold ${audit.score >= 80 ? 'text-green-400' : audit.score >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>{audit.score}<span className="text-sm text-gray-500">/100</span></p>
-              <p className="text-[11px] text-gray-500">Growth Audit score</p>
+              <p className="text-[11px] text-gray-500">Audit score</p>
             </div>
           )}
         </div>
@@ -237,7 +240,7 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
           disabled={auditing || !lead.website}
           className="mt-3 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {auditing ? 'Running Growth Audit…' : audit ? 'Re-run Growth Audit' : 'Run Growth Audit'}
+          {auditing ? 'Running Outreach Website Check…' : audit ? 'Re-run Outreach Website Check' : 'Run Outreach Website Check'}
         </button>
         {!lead.website && <p className="mt-2 text-xs text-yellow-500">Add a website to this lead first.</p>}
         {auditError && <p className="mt-2 text-xs text-red-400">{auditError}</p>}

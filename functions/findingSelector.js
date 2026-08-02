@@ -110,6 +110,12 @@ function selectTopFindings(audit, opts = {}) {
     category: rec.category,
     title: rec.title,
     description: rec.description,
+    // Passed through when the source provides it (e.g. outreachWebsiteAudit.js's
+    // lightweight analyzer) — a pre-written, outreach-appropriate phrasing of
+    // the finding, preferred by growthAuditOutreachWriter.js's prompt builder
+    // over the more technical `description`. undefined for sources that don't
+    // set it, in which case the writer falls back to evidence/description as before.
+    outreachText: rec.outreachText,
     evidence: rec.evidence,
     severity: rec.severity,
     impact: rec.impact,
