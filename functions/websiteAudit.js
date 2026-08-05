@@ -208,8 +208,44 @@ async function fetchPageSpeed(reqUrl) {
   }
 }
 
+// Some leads have "website" pointed at a social profile instead of a real
+// site (common for small/local businesses). Running PageSpeed + the AI
+// vision check against instagram.com or facebook.com itself would judge
+// Instagram/Facebook's own performance, SSL, and layout — not this
+// business's actual page — producing findings that are technically about
+// the wrong site entirely (e.g. "your SSL is missing" when Instagram is
+// obviously HTTPS) and reading as nonsense in outreach. Caught before any
+// of that runs.
+const SOCIAL_ONLY_HOSTS = [
+  { re: /(^|\.)instagram\.com$/i, label: 'Instagram' },
+  { re: /(^|\.)facebook\.com$/i, label: 'Facebook' },
+];
+
+function detectSocialOnly(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return SOCIAL_ONLY_HOSTS.find((p) => p.re.test(host))?.label ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function auditWebsite(url, apiKey, visionKeys) {
   if (!url || !apiKey) return null;
+
+  const socialPlatform = detectSocialOnly(url);
+  if (socialPlatform) {
+    return {
+      websiteScore: null,
+      issuesChecklist: ['Social Media Only'],
+      speedNotes: null,
+      mobileNotes: null,
+      seoNotes: null,
+      overallImpression: `No real website — the link they have listed is just their ${socialPlatform} page, not an actual site.`,
+      aiDesignNote: `Their only real online presence is ${socialPlatform} — there's no proper website to search, rank on Google, or send people to that isn't controlled by someone else's app.`,
+      aiVisualCheckFailed: false,
+    };
+  }
 
   try {
     // Built manually (not via axios's `params` object) because axios

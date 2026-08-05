@@ -247,6 +247,43 @@ describe('analyzeWebsiteForOutreach — fetch failures', () => {
   });
 });
 
+// ── Social-media-as-website ──────────────────────────────────────────────
+// A lead's "website" is sometimes actually an Instagram/Facebook page —
+// analysing that URL would report on Instagram/Facebook's own HTML, not the
+// business, and read as nonsense in outreach. These must never fetch at all.
+
+describe('analyzeWebsiteForOutreach — social-media-only "websites"', () => {
+  it.each([
+    ['https://www.instagram.com/riversideplumbing/', 'Instagram'],
+    ['https://instagram.com/riversideplumbing', 'Instagram'],
+    ['https://www.facebook.com/RiversidePlumbing', 'Facebook'],
+    ['https://facebook.com/RiversidePlumbing', 'Facebook'],
+  ])('detects %s as %s without fetching it', async (url, platform) => {
+    const result = await analyzeWebsiteForOutreach(url, { skipCache: true });
+    expect(axiosGet).not.toHaveBeenCalled();
+    expect(result.status).toBe('ok');
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].evidence.socialPlatform).toBe(platform);
+    expect(result.findings[0].outreachText).toMatch(new RegExp(platform));
+  });
+
+  it('still fetches a real business website normally, unaffected by the social-only check', async () => {
+    mockPublicDns();
+    mockHtml(fullPageHtml());
+    const result = await analyzeWebsiteForOutreach('https://a-real-plumber.example.com/', { skipCache: true });
+    expect(axiosGet).toHaveBeenCalled();
+    expect(result.status).toBe('ok');
+  });
+
+  it('flows through findingSelector as a top, hasEnough finding', async () => {
+    const analysis = await analyzeWebsiteForOutreach('https://www.instagram.com/riversideplumbing/', { skipCache: true });
+    const audit = toGrowthAuditShapedResult(analysis);
+    const { findings, hasEnough } = selectTopFindings(audit, {});
+    expect(hasEnough).toBe(true);
+    expect(findings[0].id ?? findings[0].title).toBeTruthy();
+  });
+});
+
 // ── HTML parsing helpers ─────────────────────────────────────────────────
 
 describe('HTML parsing helpers', () => {

@@ -619,9 +619,47 @@ async function analyzeWebsiteForOutreach(url, opts = {}) {
   return promise;
 }
 
+// Some leads have "website" pointed at a social profile instead of a real
+// site. Fetching and parsing instagram.com/facebook.com's own HTML would
+// produce findings about THEIR page (Instagram's forms, Instagram's title
+// tag, Instagram's CTAs) misattributed to the business being prospected —
+// confusing and factually wrong once it reaches outreach copy. Caught
+// before any fetch happens, and replaced with a single honest, high-value
+// finding instead of running the normal HTML-signal pipeline at all.
+const SOCIAL_ONLY_HOSTS = [
+  { re: /(^|\.)instagram\.com$/i, label: 'Instagram' },
+  { re: /(^|\.)facebook\.com$/i, label: 'Facebook' },
+];
+
+function detectSocialOnly(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return SOCIAL_ONLY_HOSTS.find((p) => p.re.test(host))?.label ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function runAnalysis(rawUrl) {
   const scannedAt = new Date().toISOString();
   const inputUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+
+  const socialPlatform = detectSocialOnly(inputUrl);
+  if (socialPlatform) {
+    return {
+      url: inputUrl, scannedAt, status: 'ok', reason: null,
+      title: '', metaDescription: '', headings: [], wordCount: 0, links: [], forms: 0, buttons: [], images: [],
+      viewport: false, performanceSignals: null, trustSignals: null, conversionSignals: null, seoSignals: null,
+      localSignals: null, renderingRequired: false,
+      findings: [makeFinding({
+        id: 'identity.socialOnly', category: 'conversion', severity: 'critical', confidence: 'high',
+        title: `No real website — just a ${socialPlatform} page`,
+        description: `The "website" on record for this business is a ${socialPlatform} profile, not an actual website.`,
+        outreachText: `the link listed for your website actually goes to your ${socialPlatform} page rather than a real website — so there's nothing of yours that ranks on Google, and the page itself is controlled by ${socialPlatform}, not you`,
+        evidence: { socialPlatform },
+      })],
+    };
+  }
 
   let fetched;
   try {

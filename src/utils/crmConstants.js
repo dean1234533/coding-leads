@@ -41,6 +41,7 @@ export const SOURCES = ['Google Maps', 'Referral', 'RSS Scout', 'Cold Search', '
 // ─── Website issues checklist ──────────────────────────────────────────────
 export const WEBSITE_ISSUES = [
   'No Website',
+  'Social Media Only',
   'Outdated Design',
   'Slow Loading',
   'Not Mobile Friendly',
@@ -72,6 +73,7 @@ export const WEBSITE_ISSUES = [
 // name back ("Missing SSL stood out to me").
 export const ISSUE_DETAILS = {
   'No Website': "there's no website at all, so anyone searching online can't find you and is likely finding a competitor instead",
+  'Social Media Only': "the only online presence is a social media page, not an actual website — so there's nothing to rank on Google, and the page itself is controlled by someone else's platform, not yours",
   'Outdated Design': 'the design looks dated next to competitors, which can make people question how established the business is',
   'Slow Loading': "it takes too long to load, and most visitors leave before it even finishes",
   'Not Mobile Friendly': "it doesn't work properly on mobile, where most visitors are browsing from",
