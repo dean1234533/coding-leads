@@ -18,7 +18,43 @@ const { assessDesign } = require('./websiteDesignAudit');
 // on the word alone, not just specific plugin names) since it's virtually
 // always a reliable signal and covers page-builder-native widgets that
 // don't fit a fixed plugin-name list.
-const REVIEW_WIDGET_PATTERNS = [/testimonial/i, /trustindex/i, /elfsight/i, /trustpilot/i, /reviews\.io/i, /judge\.me/i, /yotpo/i, /feefo/i, /aggregateRating/i, /based on\s*<?\/?\w*>?\s*\d+\s*<?\/?\w*>?\s*reviews?/i];
+const REVIEW_WIDGET_PATTERNS = [
+  /testimonial/i,
+  /trustindex/i,
+  /elfsight/i,
+  /trustpilot/i,
+  /reviews\.io/i,
+  /judge\.me/i,
+  /yotpo/i,
+  /feefo/i,
+  /aggregateRating/i,
+  /reviewCount/i,
+  /reviewRating/i,
+  /itemprop=["']review/i,
+  /class=["'][^"']*(?:review|rating|stars?)[^"']*["']/i,
+  /based on\s*<?\/?\w*>?\s*\d+\s*<?\/?\w*>?\s*reviews?/i,
+];
+
+// A booking button is often the only booking UI on the business's own
+// homepage. The actual calendar then lives on Fresha (or another hosted
+// provider), so it cannot appear in the PageSpeed screenshot. Inspect link
+// destinations as well as embedded widget markup before claiming that no
+// booking system exists.
+const BOOKING_PROVIDER_PATTERNS = [
+  /(?:www\.)?fresha\.com/i,
+  /calendly\.com/i,
+  /acuityscheduling\.com/i,
+  /setmore\.com/i,
+  /book\.squareup\.com/i,
+  /simplybook\.me/i,
+  /vagaro\.com/i,
+  /booksy\.com/i,
+  /phorest\.com/i,
+  /treatwell\.(?:co\.uk|com)/i,
+  /bookings\.microsoft\.com/i,
+];
+
+const REVIEW_PAGE_LINK_RE = /href=["']([^"']*(?:review|testimonial|what-(?:our-)?(?:clients|customers)-say)[^"']*)["']/gi;
 
 async function fetchPageHtml(url, timeout = 15_000) {
   const { data } = await axios.get(url, {
@@ -52,10 +88,40 @@ async function pageHtmlHasReviewWidget(url) {
   if (!url) return false;
   try {
     const html = await fetchPageHtml(url);
-    return REVIEW_WIDGET_PATTERNS.some((re) => re.test(html));
+    if (REVIEW_WIDGET_PATTERNS.some((re) => re.test(html))) return true;
+
+    // Reviews frequently live on a dedicated /reviews or /testimonials page.
+    // Follow a small number of explicit same-site review links rather than
+    // treating their absence from the homepage screenshot as proof.
+    const pageHost = new URL(url).hostname;
+    const linkedPages = [...html.matchAll(REVIEW_PAGE_LINK_RE)]
+      .map((match) => {
+        try { return new URL(match[1], url); } catch { return null; }
+      })
+      .filter((linked) => linked && linked.hostname === pageHost)
+      .slice(0, 3);
+    for (const linked of linkedPages) {
+      try {
+        const linkedHtml = await fetchPageHtml(linked.href, 10_000);
+        if (REVIEW_WIDGET_PATTERNS.some((re) => re.test(linkedHtml))) return true;
+      } catch {
+        // One broken/blocked review link should not stop us checking the next.
+      }
+    }
+    return false;
   } catch {
     // Can't fetch -> no evidence either way, so don't suppress the AI's
     // screenshot-based finding just because this secondary check failed.
+    return false;
+  }
+}
+
+async function pageHtmlHasBookingSystem(url) {
+  if (!url) return false;
+  try {
+    const html = await fetchPageHtml(url);
+    return BOOKING_PROVIDER_PATTERNS.some((re) => re.test(html));
+  } catch {
     return false;
   }
 }
@@ -399,6 +465,21 @@ async function auditWebsite(url, apiKey, visionKeys) {
       }
     }
 
+    // Hosted booking systems such as Fresha are normally linked from a
+    // "Book now" button and open off-site. A static screenshot cannot see
+    // the destination, but the homepage HTML can identify it reliably.
+    if (designIssues.includes('No Booking System') || designIssues.includes('No Contact Form')) {
+      const hasBookingSystem = await pageHtmlHasBookingSystem(data.lighthouseResult?.finalUrl || url);
+      if (hasBookingSystem) {
+        designIssues = designIssues.filter((i) => i !== 'No Booking System' && i !== 'No Contact Form');
+        designImpression = designImpression
+          ?.split(/(?<=[.!?])\s+/)
+          .filter((sentence) => !/booking|book online|contact form/i.test(sentence))
+          .join(' ')
+          .trim() || null;
+      }
+    }
+
     if (staleCopyrightYear) {
       const copyrightNote = `The footer copyright still reads ${staleCopyrightYear} — the site hasn't been touched in a while.`;
       designImpression = designImpression ? `${designImpression} ${copyrightNote}` : copyrightNote;
@@ -467,6 +548,8 @@ module.exports = {
   pickScreenshot,
   pageHtmlHasReviewWidget,
   REVIEW_WIDGET_PATTERNS,
+  pageHtmlHasBookingSystem,
+  BOOKING_PROVIDER_PATTERNS,
   pageOrContactPageHasForm,
   CONTACT_LINK_RE,
 };

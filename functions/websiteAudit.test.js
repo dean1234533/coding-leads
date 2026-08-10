@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveIssues, pickScreenshot, REVIEW_WIDGET_PATTERNS, CONTACT_LINK_RE } from './websiteAudit.js';
+import { deriveIssues, pickScreenshot, REVIEW_WIDGET_PATTERNS, BOOKING_PROVIDER_PATTERNS, CONTACT_LINK_RE } from './websiteAudit.js';
 
 describe('deriveIssues — cumulative layout shift threshold', () => {
   // Regression: this used to only fire above 0.25 (Google's "poor" tier),
@@ -102,6 +102,24 @@ describe('REVIEW_WIDGET_PATTERNS', () => {
 
   it('does not match a page with no review-related content', () => {
     expect(matchesAny('<div class="hero"><h1>Welcome to our barbershop</h1></div>')).toBe(false);
+  });
+
+  it('matches schema.org review markup even when no visible review text is in the initial HTML', () => {
+    expect(matchesAny('<meta itemprop="reviewCount" content="48"><span itemprop="reviewRating">5</span>')).toBe(true);
+  });
+});
+
+describe('BOOKING_PROVIDER_PATTERNS', () => {
+  function matchesAny(html) {
+    return BOOKING_PROVIDER_PATTERNS.some((re) => re.test(html));
+  }
+
+  it('detects a linked Fresha booking page', () => {
+    expect(matchesAny('<a href="https://www.fresha.com/a/example-salon-london">Book now</a>')).toBe(true);
+  });
+
+  it('does not mistake a normal contact link for a booking system', () => {
+    expect(matchesAny('<a href="/contact">Get in touch</a>')).toBe(false);
   });
 });
 
