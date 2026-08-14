@@ -494,6 +494,70 @@ describe('analyzeWebsiteForOutreach — finding scenarios', () => {
     expect(withoutSignals.findings.some((f) => f.id === 'local.hours')).toBe(true);
     expect(withoutSignals.findings.some((f) => f.id === 'local.serviceArea')).toBe(true);
   });
+
+  // Regression: a postcode/hours/review block that only exists inside a
+  // <script type="application/ld+json"> tag never appeared in bodyText
+  // (which strips all <script> content) — very common in practice, since
+  // Yoast/RankMath and similar SEO plugins auto-inject a LocalBusiness
+  // schema block even when the page itself never shows the address as
+  // visible text. These findings falsely fired despite the info being
+  // genuinely present on the page.
+  it('honesty: does NOT claim a missing address when it only exists in JSON-LD schema, not visible page text', async () => {
+    mockPublicDns();
+    const html = fullPageHtml({
+      extra: `<script type="application/ld+json">{"@context":"https://schema.org","@type":"LocalBusiness","name":"Riverside Plumbing","address":{"@type":"PostalAddress","streetAddress":"12 River Lane","addressLocality":"Riverside","postalCode":"SW1A 1AA"}}</script>`,
+    }).replace('<p>SW1A 1AA</p>', '');
+    mockHtml(html);
+    const result = await analyzeWebsiteForOutreach('https://jsonld-address.example.com/', { skipCache: true });
+    expect(result.findings.some((f) => f.id === 'local.address')).toBe(false);
+  });
+
+  it('honesty: does NOT claim missing opening hours when only declared via JSON-LD openingHoursSpecification', async () => {
+    mockPublicDns();
+    const html = fullPageHtml({
+      extra: `<script type="application/ld+json">{"@context":"https://schema.org","@type":"LocalBusiness","openingHoursSpecification":[{"@type":"OpeningHoursSpecification","dayOfWeek":"Monday","opens":"08:00","closes":"18:00"}]}</script>`,
+    }).replace('<p>Open Monday-Friday 8am-6pm</p>', '');
+    mockHtml(html);
+    const result = await analyzeWebsiteForOutreach('https://jsonld-hours.example.com/', { skipCache: true });
+    expect(result.findings.some((f) => f.id === 'local.hours')).toBe(false);
+  });
+
+  it('honesty: does NOT claim missing testimonials/reviews when only a JSON-LD aggregateRating block is present, with no visible review text', async () => {
+    mockPublicDns();
+    const html = fullPageHtml({
+      extra: `<script type="application/ld+json">{"@context":"https://schema.org","@type":"LocalBusiness","aggregateRating":{"@type":"AggregateRating","ratingValue":"4.9","reviewCount":"87"}}</script>`,
+    }).replace(/What our clients say:.*?<\/p>/, '').replace(/<a href="https:\/\/google\.com\/maps.*?<\/a>/, '');
+    mockHtml(html);
+    const result = await analyzeWebsiteForOutreach('https://jsonld-reviews.example.com/', { skipCache: true });
+    expect(result.findings.some((f) => f.id === 'trust.testimonials')).toBe(false);
+    expect(result.findings.some((f) => f.id === 'trust.googleReviews')).toBe(false);
+  });
+
+  it('honesty: does NOT claim missing reviews when a review widget (Elfsight/Trustindex) is embedded, even with no visible review text', async () => {
+    mockPublicDns();
+    const html = fullPageHtml({
+      extra: `<div class="elfsight-app-abc123" data-elfsight-app-lazy></div><script src="https://static.elfsight.com/platform/platform.js" async></script>`,
+    }).replace(/What our clients say:.*?<\/p>/, '').replace(/<a href="https:\/\/google\.com\/maps.*?<\/a>/, '');
+    mockHtml(html);
+    const result = await analyzeWebsiteForOutreach('https://widget-reviews.example.com/', { skipCache: true });
+    expect(result.findings.some((f) => f.id === 'trust.testimonials')).toBe(false);
+    expect(result.findings.some((f) => f.id === 'trust.googleReviews')).toBe(false);
+  });
+
+  it('still correctly detects a genuinely missing address/hours/reviews when neither visible text nor JSON-LD/widget markers are present', async () => {
+    mockPublicDns();
+    const html = fullPageHtml()
+      .replace('<p>SW1A 1AA</p>', '')
+      .replace('<p>Open Monday-Friday 8am-6pm</p>', '')
+      .replace(/What our clients say:.*?<\/p>/, '')
+      .replace(/<a href="https:\/\/google\.com\/maps.*?<\/a>/, '');
+    mockHtml(html);
+    const result = await analyzeWebsiteForOutreach('https://genuinely-missing.example.com/', { skipCache: true });
+    expect(result.findings.some((f) => f.id === 'local.address')).toBe(true);
+    expect(result.findings.some((f) => f.id === 'local.hours')).toBe(true);
+    expect(result.findings.some((f) => f.id === 'trust.testimonials')).toBe(true);
+    expect(result.findings.some((f) => f.id === 'trust.googleReviews')).toBe(true);
+  });
 });
 
 // ── JS-heavy shell handling ────────────────────────────────────────────

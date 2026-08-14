@@ -279,9 +279,20 @@ const PHONE_REGEX = /(\+44\s?\(?0?\)?\s?\d{2,4}[\s-]?\d{3,4}[\s-]?\d{3,4})|(\b0\
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
 const UK_POSTCODE_REGEX = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
 
-const BOOKING_PROVIDERS = /(calendly\.com|acuityscheduling\.com|setmore\.com|book\.squareup\.com|square\.site|housecallpro\.com|getjobber\.com|vagaro\.com|fresha\.com|simplybook\.me|bookings\.microsoft\.com)/i;
+const BOOKING_PROVIDERS = /(calendly\.com|acuityscheduling\.com|setmore\.com|book\.squareup\.com|square\.site|housecallpro\.com|getjobber\.com|vagaro\.com|fresha\.com|simplybook\.me|bookings\.microsoft\.com|booksy\.com|phorest\.com|treatwell\.(?:co\.uk|com))/i;
 const REVIEW_LINK_REGEX = /(g\.page|google\.com\/maps|goo\.gl\/maps|trustpilot\.com|checkatrade\.com|mybuilder\.com)/i;
 const TESTIMONIAL_WORDS = /(testimonial|what our clients say|what customers say|customer review|verified review|\d\s?(star|out of 5))/i;
+// A review/rating widget (Elfsight, Trustindex, etc.) is usually rendered
+// entirely client-side — its content never appears in the static HTML this
+// analyzer sees — but its own embed markup or a schema.org review/rating
+// block almost always does. Checked against the FULL raw html (not the
+// script-stripped bodyText used elsewhere), since this is exactly the kind
+// of signal that lives inside a <script type="application/ld+json"> block.
+const REVIEW_WIDGET_OR_SCHEMA_MARKERS = /(trustindex|elfsight|reviews\.io|judge\.me|yotpo|feefo|aggregateRating|itemprop=["']review|"@type"\s*:\s*"(?:Review|AggregateRating)"|reviewCount|ratingValue)/i;
+// LocalBusiness schema.org JSON-LD commonly carries opening hours even when
+// the page never shows them as visible text — same script-stripping issue
+// as reviews above, checked against raw html for the same reason.
+const OPENING_HOURS_SCHEMA_RE = /"openingHours(?:Specification)?"/i;
 const TRUST_BADGE_WORDS = /(insured|accredited|guaranteed?|certified|award[- ]winning|checkatrade|trustpilot|which\?\s*trusted|feefo|iso\s?\d{4,5}|gas safe|niceic|federation of master builders|\bfmb\b|trustmark|fully insured|dbs checked)/i;
 const PORTFOLIO_WORDS = /(portfolio|gallery|our work|case stud|before\s?(and|&)?\s?after|recent projects|completed projects)/i;
 const FAQ_WORDS = /(frequently asked questions|\bfaqs?\b|common questions)/i;
@@ -708,13 +719,23 @@ async function runAnalysis(rawUrl) {
   const embeddedFormFound = hasEmbeddedFormProvider(html);
   const pricingFound = PRICING_WORDS.test(bodyText) || /pric(e|ing)/i.test(linkHrefs);
   const faqFound = FAQ_WORDS.test(bodyText);
-  const testimonialSignal = TESTIMONIAL_WORDS.test(bodyText);
-  const reviewLinkFound = REVIEW_LINK_REGEX.test(html);
+  // A widget/schema signal means reviews genuinely exist on the page even
+  // though neither the word "testimonial" nor a link to an external review
+  // platform is anywhere in the visible text — without folding it into both
+  // signals below, a JSON-LD-only review block would correctly clear "No
+  // Google reviews linked" while still wrongly claiming "No testimonials".
+  const reviewWidgetOrSchemaFound = REVIEW_WIDGET_OR_SCHEMA_MARKERS.test(html);
+  const testimonialSignal = TESTIMONIAL_WORDS.test(bodyText) || reviewWidgetOrSchemaFound;
+  const reviewLinkFound = REVIEW_LINK_REGEX.test(html) || reviewWidgetOrSchemaFound;
   const trustBadgeFound = TRUST_BADGE_WORDS.test(bodyText);
   const portfolioFound = PORTFOLIO_WORDS.test(bodyText) || PORTFOLIO_WORDS.test(linkHrefs);
-  const postcodeFound = UK_POSTCODE_REGEX.test(bodyText);
+  // Checked against raw html too, not just bodyText — a postcode embedded in
+  // a <script type="application/ld+json"> LocalBusiness block (very common
+  // via Yoast/RankMath SEO plugins) never appears in bodyText, since that's
+  // script-stripped, but is just as real an address as visible page text.
+  const postcodeFound = UK_POSTCODE_REGEX.test(bodyText) || UK_POSTCODE_REGEX.test(html);
   const mapsLinkFound = /(google\.com\/maps|maps\.google|goo\.gl\/maps)/i.test(html);
-  const hoursFound = HOURS_WORDS.test(bodyText);
+  const hoursFound = HOURS_WORDS.test(bodyText) || OPENING_HOURS_SCHEMA_RE.test(html);
   const serviceAreaFound = SERVICE_AREA_WORDS.test(bodyText);
 
   const isShell = looksLikeJsAppShell({ wordCount, headings, forms, buttonTexts, htmlLength: html.length, bodyTextLength: bodyText.length });
