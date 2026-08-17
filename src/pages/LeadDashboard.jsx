@@ -13,69 +13,86 @@ import CallScripts    from '../components/CallScripts';
 import BookingManager from '../components/BookingManager';
 import InstallBanner  from '../components/InstallBanner';
 import CodingLeadsPage from '../components/CodingLeadsPage';
+import AppIcon from '../components/AppIcon';
 
 const NAV_TABS = [
-  { key: 'codingLeads', label: 'Coding Leads' },
-  { key: 'booking',     label: 'Booking'      },
-  { key: 'pricing',     label: 'Pricing'      },
-  { key: 'scripts',     label: 'Call Scripts' },
+  { key: 'codingLeads', label: 'Coding leads', icon: 'tools', title: 'Coding opportunities', description: 'Review developer roles and projects collected from your lead sources.' },
+  { key: 'booking', label: 'Bookings', icon: 'calendar', title: 'Bookings', description: 'Manage discovery calls and keep your client calendar organised.' },
+  { key: 'pricing', label: 'Pricing', icon: 'pricing', title: 'Pricing calculator', description: 'Build confident project estimates without undercharging for your time.' },
+  { key: 'scripts', label: 'Call scripts', icon: 'script', title: 'Call scripts', description: 'Prepare for outreach and discovery calls with a clear conversation framework.' },
 ];
 
 export default function LeadDashboard() {
   const [activeTab, setActiveTab] = useState('codingLeads');
+  const activeMeta = NAV_TABS.find((tab) => tab.key === activeTab) ?? NAV_TABS[0];
 
   return (
-    <div className="min-h-screen bg-gray-950 font-sans text-gray-100 antialiased">
-
-      {/* ── Nav ── */}
-      <header className="sticky top-0 z-10 border-b border-gray-800 bg-gray-950/90 backdrop-blur-sm">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 py-3 sm:py-4">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-400">dean-da-dev</p>
-              <h1 className="text-base font-semibold leading-tight text-gray-100">Tools</h1>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Link
-                to="/"
-                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400"
-              >
-                ← Outreach CRM
-              </Link>
-              <div className="flex items-center gap-2 rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5">
-                <span className="h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_theme(colors.emerald.400)]" />
-                <span className="text-xs text-gray-400 hidden sm:inline">Dean Burt · deanburt1308@gmail.com</span>
-                <span className="text-xs text-gray-400 sm:hidden">Dean Burt</span>
-              </div>
-            </div>
+    <div className="app-shell">
+      <aside className="app-sidebar">
+        <div className="flex items-center gap-3 px-2">
+          <div className="app-brand-mark">DD</div>
+          <div>
+            <p className="text-sm font-bold text-white">Dean Digital</p>
+            <p className="text-[11px] text-slate-500">Business toolkit</p>
           </div>
-          {/* Tab bar */}
-          <div className="flex gap-1 -mb-px overflow-x-auto">
-            {NAV_TABS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setActiveTab(key)}
-                className={`whitespace-nowrap px-4 py-2 text-xs font-semibold border-b-2 transition ${
-                  activeTab === key
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                {label}
+        </div>
+        <nav className="mt-9 flex-1" aria-label="Tools navigation">
+          <p className="app-nav-label">Tools</p>
+          <div className="mt-2 space-y-1">
+            {NAV_TABS.map(({ key, label, icon }) => (
+              <button key={key} onClick={() => setActiveTab(key)} className={`app-nav-item ${activeTab === key ? 'is-active' : ''}`}>
+                <AppIcon name={icon} />
+                <span>{label}</span>
               </button>
             ))}
           </div>
+        </nav>
+        <Link to="/" className="app-nav-item mt-6 border border-slate-800">
+          <AppIcon name="leads" />
+          <span>Outreach CRM</span>
+          <span className="ml-auto text-slate-600">↗</span>
+        </Link>
+      </aside>
+
+      <div className="app-main">
+        <header className="app-topbar">
+          <div className="flex items-center gap-3">
+            <div className="app-brand-mark md:hidden">DD</div>
+            <div>
+              <p className="text-sm font-semibold text-slate-100 md:text-xs md:font-medium md:text-slate-400">Business toolkit</p>
+              <p className="hidden text-xs text-slate-600 md:block">Useful tools for winning and delivering work.</p>
+            </div>
+          </div>
+          <Link to="/" className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-blue-500">
+            <AppIcon name="leads" className="h-4 w-4" /> Outreach CRM
+          </Link>
+        </header>
+
+        <div className="mobile-nav" aria-label="Tools navigation">
+          {NAV_TABS.map(({ key, label, icon }) => (
+            <button key={key} onClick={() => setActiveTab(key)} className={`app-nav-item ${activeTab === key ? 'is-active' : ''}`}>
+              <AppIcon name={icon} />
+              <span>{label}</span>
+            </button>
+          ))}
         </div>
-      </header>
 
-      <InstallBanner />
+        <InstallBanner />
 
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-        {activeTab === 'codingLeads' && <CodingLeadsPage />}
-        {activeTab === 'booking'     && <BookingManager />}
-        {activeTab === 'pricing'     && <Pricing />}
-        {activeTab === 'scripts'     && <CallScripts />}
-      </main>
+        <main className="page-wrap">
+          <div className="page-heading">
+            <div>
+              <p className="page-eyebrow">Business toolkit</p>
+              <h1 className="page-title">{activeMeta.title}</h1>
+              <p className="page-description">{activeMeta.description}</p>
+            </div>
+          </div>
+          {activeTab === 'codingLeads' && <CodingLeadsPage />}
+          {activeTab === 'booking'     && <BookingManager />}
+          {activeTab === 'pricing'     && <Pricing />}
+          {activeTab === 'scripts'     && <CallScripts />}
+        </main>
+      </div>
     </div>
   );
 }

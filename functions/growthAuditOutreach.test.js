@@ -200,9 +200,13 @@ describe('growthAuditConfig', () => {
     expect(AUDIT_TOOL_URL).toBe('https://app.dean-da-dev.co.uk/');
   });
 
-  it('buildAuditToolUrl returns the bare URL, no tracking query string — a clean link reads like a real person sent it', () => {
+  it('returns a bare URL for generic links and an opaque referral for a specific lead', () => {
     expect(buildAuditToolUrl('whatsapp')).toBe('https://app.dean-da-dev.co.uk/');
     expect(buildAuditToolUrl(undefined)).toBe('https://app.dean-da-dev.co.uk/');
+    const url = new URL(buildAuditToolUrl('email', { website: 'https://example.com', leadId: 'lead-1', leadCollection: 'crmLeads' }));
+    expect(url.searchParams.has('r')).toBe(true);
+    const payload = JSON.parse(Buffer.from(url.searchParams.get('r'), 'base64url').toString('utf8'));
+    expect(payload).toMatchObject({ site: 'https://example.com', channel: 'email', leadId: 'lead-1', leadCollection: 'crmLeads' });
   });
 
   it('PORTFOLIO_URL is a single configured value', () => {
@@ -327,11 +331,12 @@ describe('assessOutreachQuality', () => {
     expect(result.checks.notAuditDump).toBe(false);
   });
 
-  it('does not require evidence/personalisation for a pass, but does lower the score', () => {
+  it('blocks a draft without evidence or personalisation', () => {
     const body = `Hi, hope things are going well at the shop — here's a free audit tool if useful: ${link}`;
     const result = assessOutreachQuality(body, { businessName: 'Corner Shop', channel: 'email', findingsUsed: [finding] });
     expect(result.checks.personalisation).toBe(false);
     expect(result.score).toBeLessThan(100);
+    expect(result.passed).toBe(false);
   });
 });
 
@@ -344,7 +349,7 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
     expect(prompt).toContain('Do NOT start with "I was looking at local businesses in the area..." on its own');
   });
 
-  it('caps findings at 3 and instructs the model to normally use only 2', () => {
+  it('caps available findings at 3 but instructs the model to use one, or two only when justified', () => {
     const findings = [
       { id: 'a', category: 'performance', title: 'x', evidence: 'x', measurementType: 'measured' },
       { id: 'b', category: 'conversion', title: 'y', evidence: 'y', measurementType: 'measured' },
@@ -352,14 +357,15 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
       { id: 'd', category: 'seo', title: 'w', evidence: 'w', measurementType: 'measured' },
     ];
     const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
-    expect(prompt).toContain('USE 2 OF THESE FINDINGS NORMALLY');
+    expect(prompt).toContain('USE THE SINGLE STRONGEST FINDING NORMALLY');
+    expect(prompt).toContain('Never use a third');
     expect(prompt).not.toContain('[seo] w'); // 4th finding dropped, only top 3 passed through
   });
 
   it('warns against treating subjective findings (no testimonials/portfolio, looks outdated) as automatic problems', () => {
     const findings = [{ id: 'a', category: 'trust', title: 'x', evidence: 'x', measurementType: 'detected' }];
     const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
-    expect(prompt).toContain('a business may have deliberately chosen not to have that thing');
+    expect(prompt).toContain('Prefer measurable evidence over subjective observations');
   });
 
   it('includes explicit hedging instructions matching each finding\'s real confidence level', () => {
@@ -374,12 +380,11 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
     expect(prompt).toContain('inferred rather than directly observed — hedge it clearly');
   });
 
-  it('translates technical jargon into plain-English examples', () => {
+  it('instructs the model to translate technical jargon into plain English', () => {
     const findings = [{ id: 'a', category: 'performance', title: 'x', evidence: 'x', measurementType: 'measured' }];
     const prompt = buildInitialPrompt({ businessName: 'Test Ltd', channel: 'email', myName: 'Dean', findings });
-    expect(prompt).toContain('your homepage is taking around 9.5 seconds to load its main content');
-    expect(prompt).toContain('some text on the site has low colour contrast');
-    expect(prompt).toContain("there's an issue with how the site is configured for mobile devices");
+    expect(prompt).toContain('state one specific observation in plain English');
+    expect(prompt).toContain('Never lead with jargon such as LCP, DOM, schema, viewport, or WCAG');
   });
 
   it('never lets a finding be presented without its evidence text somewhere in the prompt', () => {
@@ -394,9 +399,9 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
     const waPrompt = buildInitialPrompt({ businessName: 'T', channel: 'whatsapp', myName: 'Dean', findings });
     const liPrompt = buildInitialPrompt({ businessName: 'T', channel: 'linkedin', myName: 'Dean', findings });
     expect(emailPrompt).toContain('This is an EMAIL');
-    expect(emailPrompt).toContain('150-250 words');
+    expect(emailPrompt).toContain('80-130 words');
     expect(waPrompt).toContain('This is a WHATSAPP message');
-    expect(waPrompt).toContain('80-150 words');
+    expect(waPrompt).toContain('50-90 words');
     expect(liPrompt).toContain('This is a LINKEDIN message');
   });
 

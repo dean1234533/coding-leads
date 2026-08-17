@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '../../firebase';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { app, db } from '../../firebase';
 import { followUpPatchForSend } from '../../utils/crmFollowUps';
+import { formatRecommendedTime, getOutreachTiming, nextRecommendedOutreachTime, toDateTimeLocal } from '../../utils/outreachTiming';
 
 const MY_NAME = 'Dean Burt';
 
@@ -72,6 +74,8 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
   const [sendSuccess, setSendSuccess] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState('');
+  const [usedRecommendedTime, setUsedRecommendedTime] = useState(false);
 
   async function runAudit() {
     setAuditing(true);
@@ -196,6 +200,19 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
     setSendError(null);
     setSendSuccess(false);
     try {
+      if (scheduleAt) {
+        const sendAt = new Date(scheduleAt);
+        if (!Number.isFinite(sendAt.getTime()) || sendAt <= new Date()) throw new Error('Choose a future send time.');
+        await addDoc(collection(db, 'scheduledEmails'), {
+          to: lead.email.trim(), cc: null, subject: message.subject,
+          bodyHtml: editedBody.replace(/\n/g, '<br>'), bodyText: editedBody,
+          attachments: [], sendAt, leadId: lead.id, templateId: null,
+          outreachChannel: 'email', usedRecommendedTiming: usedRecommendedTime,
+          sent: false, createdAt: serverTimestamp(),
+        });
+        setSendSuccess(`Email scheduled for ${formatRecommendedTime(sendAt)}.`);
+        return;
+      }
       const fn = httpsCallable(getFunctions(app), 'gmailSendEmail', { timeout: 45000 });
       const { data } = await fn({
         to: lead.email.trim(),
@@ -204,7 +221,7 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
         bodyText: editedBody,
         threadId: lead.gmailThreadId,
       });
-      setSendSuccess(true);
+      setSendSuccess('Email sent.');
       // Sending should advance the follow-up ladder on its own, same as the
       // old Emails-tab composer did — no manual status flip needed after.
       await onUpdate({ gmailThreadId: data.threadId, ...followUpPatchForSend(lead) });
@@ -217,6 +234,7 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
   }
 
   const channelLabel = CHANNELS.find((c) => c.id === channel)?.label ?? channel;
+  const recommendedTime = nextRecommendedOutreachTime(channel);
 
   return (
     <div className="space-y-4">
@@ -293,6 +311,19 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
             </label>
           </div>
 
+          <div className="mt-3 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs">
+            <p className="font-semibold text-blue-300">Best next time (UK): {formatRecommendedTime(recommendedTime)}</p>
+            <p className="mt-0.5 text-gray-500">{getOutreachTiming(channel).summary}</p>
+            {channel === 'email' && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input type="datetime-local" value={scheduleAt} onChange={(e) => { setScheduleAt(e.target.value); setUsedRecommendedTime(false); }} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-gray-200" />
+                <button type="button" onClick={() => { setScheduleAt(toDateTimeLocal(nextRecommendedOutreachTime('email'))); setUsedRecommendedTime(true); }} className="rounded-md bg-blue-500/15 px-2.5 py-1 font-semibold text-blue-300 hover:bg-blue-500/25">
+                  Use best time
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               onClick={() => generate('initial')}
@@ -338,7 +369,7 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
                     title={!lead.email?.trim() ? 'No email address on file for this lead' : undefined}
                     className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {sending ? 'Sending…' : 'Send Email'}
+                    {sending ? 'Working…' : scheduleAt ? 'Schedule Email' : 'Send Email'}
                   </button>
                 ) : (
                   <button
@@ -367,7 +398,7 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
                 <p className="text-[11px] text-gray-600">LinkedIn has no pre-filled-message link — "Send via LinkedIn" copies the message so you can paste it in.</p>
               )}
               {sendError && <p className="text-xs text-red-400">{sendError}</p>}
-              {sendSuccess && <p className="text-xs text-emerald-400">Email sent.</p>}
+              {sendSuccess && <p className="text-xs text-emerald-400">{sendSuccess}</p>}
 
               {message.quality && (
                 <span className={`inline-block text-xs font-medium ${message.quality.passed ? 'text-green-400' : 'text-red-400'}`}>

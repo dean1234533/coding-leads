@@ -17,19 +17,22 @@ import CrmAdAdvice from '../components/crm/CrmAdAdvice';
 import CrmRedditPostGenerator from '../components/crm/CrmRedditPostGenerator';
 import { enablePushNotifications, onForegroundPush } from '../utils/pushNotifications';
 import Modal from '../components/Modal';
+import AppIcon from '../components/AppIcon';
 
 const SUB_TABS = [
-  { key: 'dashboard',  label: 'Dashboard'  },
-  { key: 'leads',      label: 'Leads'      },
-  { key: 'backlinks',  label: 'Backlinks'  },
-  { key: 'charity',    label: 'Charity'    },
-  { key: 'inbox',      label: 'Inbox'      },
-  { key: 'scanner',    label: 'Scanner'    },
-  { key: 'insights',   label: 'Insights'   },
-  { key: 'adAdvice',   label: 'Ad Advice'  },
-  { key: 'reddit',     label: 'Reddit Post'},
-  { key: 'settings',   label: 'Settings'   },
+  { key: 'dashboard', label: 'Overview', icon: 'dashboard', group: 'Workspace', title: 'Good morning, Dean', description: 'See what needs attention and move the best opportunities forward.' },
+  { key: 'leads', label: 'Leads', icon: 'leads', group: 'Workspace', title: 'Leads', description: 'Qualify, organise, and follow up with every prospect from one place.' },
+  { key: 'inbox', label: 'Inbox', icon: 'inbox', group: 'Workspace', title: 'Inbox', description: 'Review replies and turn positive conversations into booked work.' },
+  { key: 'scanner', label: 'Website scanner', icon: 'search', group: 'Prospecting', title: 'Website scanner', description: 'Find credible website issues and turn them into useful outreach angles.' },
+  { key: 'backlinks', label: 'Backlink leads', icon: 'link', group: 'Prospecting', title: 'Backlink opportunities', description: 'Find relevant sites that can improve a client\'s visibility and authority.' },
+  { key: 'charity', label: 'Charity leads', icon: 'heart', group: 'Prospecting', title: 'Charity leads', description: 'Discover organisations that could benefit from a stronger digital presence.' },
+  { key: 'insights', label: 'Insights', icon: 'chart', group: 'Growth', title: 'Insights', description: 'Understand outreach performance and where your next wins are coming from.' },
+  { key: 'adAdvice', label: 'Ad advice', icon: 'megaphone', group: 'Growth', title: 'Ad advice', description: 'Create sharper advertising recommendations from real prospect signals.' },
+  { key: 'reddit', label: 'Reddit', icon: 'message', group: 'Growth', title: 'Reddit opportunities', description: 'Find relevant conversations where your expertise can be genuinely useful.' },
+  { key: 'settings', label: 'Settings', icon: 'settings', group: 'System', title: 'Settings', description: 'Configure integrations, sending preferences, and workspace defaults.' },
 ];
+
+const NAV_GROUPS = ['Workspace', 'Prospecting', 'Growth', 'System'];
 
 const AUTO_SCAN_BUSINESS_TYPES = [
   { value: 'restaurant',         label: 'Restaurants & Cafés'      },
@@ -174,7 +177,7 @@ function CrmAutoFollowUp() {
         </button>
       </div>
       <p className="mt-1 text-xs text-gray-500">
-        Every morning at 9am, automatically sends the "Follow Up" template to any lead whose follow-up date is due — no manual send needed. Skips anyone who's already replied, Won, Lost, or Archived. This sends real emails with no review step, so double-check the "Follow Up" template in your Template Library reads how you want before turning this on. Turned {enabled ? 'on' : 'off'} right now.
+        Every Tuesday, Wednesday, and Thursday at 9:35am UK time, automatically sends the "Follow Up" template to any lead whose follow-up date is due — the strongest weekday morning window for professional inboxes. Skips anyone who's already replied, Won, Lost, or Archived. This sends real emails with no review step, so double-check the "Follow Up" template in your Template Library reads how you want before turning this on. Turned {enabled ? 'on' : 'off'} right now.
       </p>
       <button
         onClick={handleSendNow}
@@ -747,42 +750,78 @@ export default function OutreachCrmPage() {
   const businessLeads = useMemo(() => (leads ? leads.filter((l) => l.category !== 'Backlink' && l.category !== 'Charity') : leads), [leads]);
   const backlinkLeads = useMemo(() => (leads ? leads.filter((l) => l.category === 'Backlink') : leads), [leads]);
   const charityLeads  = useMemo(() => (leads ? leads.filter((l) => l.category === 'Charity') : leads), [leads]);
+  const activeTab = SUB_TABS.find((tab) => tab.key === subTab) ?? SUB_TABS[0];
 
   return (
-    <div className="min-h-screen bg-gray-950 font-sans text-gray-100 antialiased">
-      <header className="sticky top-0 z-10 border-b border-gray-800 bg-gray-950/90 backdrop-blur-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 py-3 sm:py-4">
-            <div>
-              <Link to="/tools" className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-400 hover:text-blue-300 transition">
-                More Tools →
-              </Link>
-              <h1 className="text-base font-semibold leading-tight text-gray-100">Outreach CRM</h1>
-            </div>
-            <CrmGmailConnect />
-          </div>
-          <div className="flex gap-1 -mb-px overflow-x-auto">
-            {SUB_TABS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setSubTab(key)}
-                className={`whitespace-nowrap px-4 py-2 text-xs font-semibold border-b-2 transition ${
-                  subTab === key
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+    <div className="app-shell">
+      <aside className="app-sidebar">
+        <div className="flex items-center gap-3 px-2">
+          <div className="app-brand-mark">DD</div>
+          <div>
+            <p className="text-sm font-bold text-white">Dean Digital</p>
+            <p className="text-[11px] text-slate-500">Client acquisition</p>
           </div>
         </div>
-      </header>
 
-      <CrmAutoSeed />
-      <InstallBanner />
+        <nav className="mt-9 flex-1 space-y-7" aria-label="CRM navigation">
+          {NAV_GROUPS.map((group) => (
+            <div key={group}>
+              <p className="app-nav-label">{group}</p>
+              <div className="mt-2 space-y-1">
+                {SUB_TABS.filter((tab) => tab.group === group).map(({ key, label, icon }) => (
+                  <button key={key} onClick={() => setSubTab(key)} className={`app-nav-item ${subTab === key ? 'is-active' : ''}`}>
+                    <AppIcon name={icon} />
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
 
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        <Link to="/tools" className="app-nav-item mt-6 border border-slate-800">
+          <AppIcon name="tools" />
+          <span>More tools</span>
+          <span className="ml-auto text-slate-600">↗</span>
+        </Link>
+      </aside>
+
+      <div className="app-main">
+        <header className="app-topbar">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="app-brand-mark md:hidden">DD</div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-100 md:text-xs md:font-medium md:text-slate-400">Outreach CRM</p>
+              <p className="hidden text-xs text-slate-600 md:block">Find the right work. Follow up well.</p>
+            </div>
+          </div>
+          <CrmGmailConnect />
+        </header>
+
+        <div className="mobile-nav" aria-label="CRM navigation">
+          {SUB_TABS.map(({ key, label, icon }) => (
+            <button key={key} onClick={() => setSubTab(key)} className={`app-nav-item ${subTab === key ? 'is-active' : ''}`}>
+              <AppIcon name={icon} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+
+        <CrmAutoSeed />
+        <InstallBanner />
+
+        <main className="page-wrap">
+          <div className="page-heading">
+            <div>
+              <p className="page-eyebrow">Outreach workspace</p>
+              <h1 className="page-title">{activeTab.title}</h1>
+              <p className="page-description">{activeTab.description}</p>
+            </div>
+            <div className="page-summary-pill">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              {businessLeads?.length ?? 0} active leads
+            </div>
+          </div>
         {pushBanner && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3">
             <div>
@@ -847,7 +886,8 @@ export default function OutreachCrmPage() {
             <CrmPushNotifications />
           </div>
         )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

@@ -7,9 +7,9 @@ import { STATUS_COLORS } from '../../utils/crmConstants';
 
 function StatCard({ label, value, accent = 'text-gray-100', sub }) {
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/80 backdrop-blur px-4 py-4 transition hover:border-gray-700">
+    <div className="metric-card min-w-0">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 truncate">{label}</p>
-      <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${accent}`}>{value}</p>
+      <p className={`mt-2 text-2xl font-semibold tracking-tight tabular-nums ${accent}`}>{value}</p>
       {sub && <p className="mt-0.5 text-[11px] text-gray-600">{sub}</p>}
     </div>
   );
@@ -96,6 +96,8 @@ export default function CrmDashboard({ leads, onOpenLead, onGoToLeads, onGoToInb
   }, [leads]);
 
   const formatGbp = (n) => n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${n}`;
+  const dueNow = followUps.late.length + followUps.today.length;
+  const todayLabel = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
 
   const recentActivity = useMemo(() => {
     return [...leads]
@@ -106,9 +108,32 @@ export default function CrmDashboard({ leads, onOpenLead, onGoToLeads, onGoToInb
 
   return (
     <div className="space-y-6">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <section className="crm-focus-card">
+        <div className="relative z-[1] flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-300">{todayLabel}</p>
+            <h2 className="mt-3 max-w-2xl text-xl font-semibold tracking-tight text-white sm:text-2xl">
+              {dueNow > 0 ? `${dueNow} conversation${dueNow === 1 ? '' : 's'} need your attention.` : 'Your follow-up queue is clear.'}
+            </h2>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+              {dueNow > 0 ? 'Start with overdue replies, then work through today’s follow-ups while the leads are still warm.' : 'A good time to review new prospects or prepare the next personalised outreach batch.'}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <button onClick={onGoToInbox} className="rounded-xl border border-slate-700 bg-slate-900/70 px-4 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-800">Open inbox</button>
+            <button onClick={onGoToLeads} className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-blue-500">Work follow-ups</button>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Today's Follow Ups" value={followUps.today.length} accent="text-amber-400" />
+        <StatCard label="Replies Received" value={counts.replied} accent="text-violet-400" />
+        <StatCard label="Open Leads" value={counts.openLeads} />
+        <StatCard label="Clients Won" value={counts.won} accent="text-emerald-400" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard
           label="Emails Sent Today"
           value={gmailStats ? gmailStats.sentToday : statsError ? '—' : '…'}
@@ -121,10 +146,7 @@ export default function CrmDashboard({ leads, onOpenLead, onGoToLeads, onGoToInb
           accent="text-cyan-400"
           sub={gmailStats ? `${gmailStats.sentThisWeekManual} manual, ${gmailStats.sentThisWeekAuto} auto follow-up` : undefined}
         />
-        <StatCard label="Replies Received" value={counts.replied} accent="text-violet-400" />
-        <StatCard label="Open Leads" value={counts.openLeads} />
         <StatCard label="Quotes Sent" value={counts.quotesSent} accent="text-purple-400" />
-        <StatCard label="Clients Won" value={counts.won} accent="text-emerald-400" />
         <StatCard label="Clients Lost" value={counts.lost} accent="text-red-400" />
         <StatCard label="Late Follow Ups" value={followUps.late.length} accent={followUps.late.length ? 'text-red-400' : 'text-gray-100'} />
         <StatCard label="Follow Ups This Week" value={followUps.thisWeek.length} />

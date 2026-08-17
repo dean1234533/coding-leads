@@ -36,11 +36,11 @@ const SUBJECT_LINE_GUIDANCE = `SUBJECT LINE — this decides whether the email g
 - Vary the phrasing each time rather than reusing the same template — a few shapes that work: naming the specific thing you noticed, a direct question, or a short benefit-led statement.`;
 
 const CHANNEL_GUIDANCE = {
-  email: `This is an EMAIL. 150-250 words. No "Dear [Business]," corporate opener, no subject-line fluff. A real subject line is still needed (return it separately).\n\n${SUBJECT_LINE_GUIDANCE}`,
-  whatsapp: 'This is a WHATSAPP message. 80-150 words, conversational, reads like a text from a real person. No formal sign-off — just "Dean" at the end.',
-  instagram: 'This is an INSTAGRAM DM. 60-120 words, casual and short. A relaxed "Hey" or "Hi" opener is fine. No formal sign-off — just "Dean".',
-  facebook: 'This is a FACEBOOK MESSENGER DM. 80-150 words, casual "Hi" opener. No formal sign-off — just "Dean".',
-  linkedin: 'This is a LINKEDIN message. 80-150 words, professional but still conversational and human — not a corporate pitch.',
+  email: `This is an EMAIL. Aim for 80-130 words. No "Dear [Business]," corporate opener. A real subject line is still needed (return it separately).\n\n${SUBJECT_LINE_GUIDANCE}`,
+  whatsapp: 'This is a WHATSAPP message. Aim for 50-90 words, conversational, like a real text. No formal sign-off — just "Dean".',
+  instagram: 'This is an INSTAGRAM DM. Aim for 40-80 words, casual and short. No formal sign-off — just "Dean".',
+  facebook: 'This is a FACEBOOK MESSENGER DM. Aim for 50-100 words, casual and direct. No formal sign-off — just "Dean".',
+  linkedin: 'This is a LINKEDIN message. Aim for 50-100 words, professional but conversational — not a corporate pitch.',
 };
 
 // Business-type action language for the IMPACT sentence — "make it harder
@@ -120,11 +120,11 @@ function auditIntroSentence() {
   return 'Mention that you also built a free website audit tool (Growth Audit) that checks things like SEO, mobile experience, accessibility, trust signals and conversion — offered as a separate, useful thing for them to try themselves, not as the source of the findings you just mentioned. Never say "I ran your site through it" or "I ran your site through Growth Audit" — factual, not hyped, and never "AI-powered", "AI website audit" or "revolutionary".';
 }
 
-function buildInitialPrompt({ businessName, contactName, industry, channel, myName, findings, includePortfolio = false, includeScore = false, overallScore }) {
+function buildInitialPrompt({ businessName, contactName, industry, channel, myName, findings, includePortfolio = false, includeScore = false, overallScore, website, leadId, leadCollection }) {
   const capped = (findings ?? []).slice(0, 3);
   const findingsBlock = capped.map(describeFindingForPrompt).join('\n');
   const actionHint = BUSINESS_TYPE_ACTION_HINT[String(industry ?? '').toLowerCase().replace(/[\s-]+/g, '_')];
-  const link = buildAuditToolUrl(channel);
+  const link = buildAuditToolUrl(channel, { website, leadId, leadCollection });
   const ctaExamples = CTA_VARIATIONS.map((c) => c.replace('{link}', link)).join('\n');
   const serviceExamples = SERVICE_MENTION_EXAMPLES.join('\n');
   const first = firstName(myName);
@@ -138,7 +138,7 @@ BUSINESS: ${businessName || 'the business'}${industry ? `\nINDUSTRY: ${industry}
 REAL FINDINGS AVAILABLE (use ONLY these — never invent or assume anything beyond what's listed):
 ${findingsBlock}
 
-USE 2 OF THESE FINDINGS NORMALLY. Only mention a 3rd if all three are genuinely strong and clearly different from each other — do not force all 3 into every message just because they're available. Never dump a long list of findings; this is a personal note, not an audit report. Be careful with anything inherently subjective (e.g. "no testimonials", "no portfolio", "looks outdated") — only mention it if the evidence genuinely supports it being a real issue; a business may have deliberately chosen not to have that thing, so measurable findings ("takes 9.5 seconds to load") are always stronger than subjective ones ("looks outdated").
+USE THE SINGLE STRONGEST FINDING NORMALLY. Mention a second only when it is clearly different, highly relevant, and still keeps the message inside the channel limit. Never use a third. This is a personal note, not an audit report. Prefer measurable evidence over subjective observations.
 
 AUDIT TOOL LINK (use this EXACT link, do not modify it or invent a different one): ${link}
 ${includeScore && typeof overallScore === 'number' ? `\nThe site's overall audit score is ${overallScore}/100 — you may mention it if it genuinely helps, but don't lead with it.` : '\nDo NOT mention any numeric audit score in this message — it makes cold outreach feel automated. It is fine (and expected) to mention specific measured findings like load time.'}
@@ -148,13 +148,12 @@ CHANNEL: ${CHANNEL_GUIDANCE[channel] ?? CHANNEL_GUIDANCE.email}
 STRUCTURE to hit (in your own words each time — vary phrasing and sentence order, don't reuse the same patterns message to message):
 1. GREETING — "Hi ${businessName ? `${businessName} team` : 'there'},"
 2. INTRODUCTION — introduce yourself as ${first}, a web developer and designer, and say you came across their website. Example: "I'm ${first}, a web developer and designer, and I came across your website while looking at local businesses." Do NOT start with "I was looking at local businesses in the area..." on its own — ${first} needs to be introduced first, in the same or very next sentence.
-3. OBSERVATION — something like "I had a quick look and noticed a few things that caught my attention."
-4. FINDINGS — weave in 2 (occasionally 3) real findings from above, translated into plain English a non-technical business owner understands. Never lead with raw technical terms like "LCP", "DOM", "schema", "meta tag", "viewport", "WCAG" — describe the real-world effect instead. Examples: "LCP is 9.5 seconds" becomes "your homepage is taking around 9.5 seconds to load its main content, which can be frustrating for visitors on slower connections"; "Four elements fail WCAG contrast" becomes "some text on the site has low colour contrast, which can make it harder to read for some visitors"; "Missing viewport meta tag" becomes "there's an issue with how the site is configured for mobile devices".
+3. FINDING — state one specific observation in plain English with its practical effect. Mention a second only if it adds distinct value. Never lead with jargon such as LCP, DOM, schema, viewport, or WCAG.
 5. IMPACT — briefly explain what this could mean in plain English, proportional to the evidence. Use hedged language: "could make it harder for...", "can affect...", "may be costing you enquiries...". NEVER say "you're losing customers", "you're losing thousands of pounds", "people are definitely leaving", or state anything as certain that isn't.${actionHint ? ` Where it fits naturally, you can frame the impact in terms of the visitor journey — e.g. "...could make it harder for someone to ${actionHint}." — but only if it reads naturally, don't force it.` : ''}
 6. TOOL INTRODUCTION — ${auditIntroSentence()}
 7. PRIMARY CTA — send them to the audit tool using the exact link above. Use a CTA in this style (vary which one, don't always pick the first):
 ${ctaExamples}
-8. SERVICE MENTION — soft, no hard sell, after the CTA. Use wording close to one of these (vary it):
+8. SERVICE MENTION — optional and one short sentence only, after the CTA. Use wording close to one of these (vary it):
 ${serviceExamples}
 ${includePortfolio && channel === 'email' ? `9. PORTFOLIO — email only, keep it minimal, its own short block near the end, separate from the audit link:\nPortfolio:\n${PORTFOLIO_URL}` : ''}
 ${channel === 'email' ? `${includePortfolio ? '10' : '9'}. SIGN-OFF — professional signature:\nKind regards,\n\nDean Burt\nWeb Developer & Designer\ndean-da-dev.co.uk\ndean@dean-da-dev.co.uk` : `${includePortfolio ? '10' : '9'}. SIGN-OFF — just "${first}" on its own line, nothing more formal.`}
@@ -173,8 +172,8 @@ BANNED — never do any of these:
 ${channel === 'email' ? 'Respond with ONLY a JSON object: {"subject": "...", "body": "..."}' : 'Respond with ONLY a JSON object: {"subject": "", "body": "..."} (no subject needed for this channel, leave it as an empty string)'}`;
 }
 
-function buildFollowUpPrompt({ businessName, channel, myName, stage }) {
-  const link = buildAuditToolUrl(channel);
+function buildFollowUpPrompt({ businessName, channel, myName, stage, website, leadId, leadCollection }) {
+  const link = buildAuditToolUrl(channel, { website, leadId, leadCollection });
   const first = firstName(myName);
   const stageGuidance = stage === 2
     ? `This is the FINAL, lowest-pressure follow-up. Example shape (vary wording): "Just leaving this here in case it's useful:\n\n${link}\n\nIt's completely free to run your website through the audit.\n\nAll the best,\n${first}". Do not push again after this.`
@@ -193,14 +192,14 @@ Keep it very short (1-3 sentences plus the link). No pressure, no guilt-tripping
 ${channel === 'email' ? 'Respond with ONLY a JSON object: {"subject": "...", "body": "..."}' : 'Respond with ONLY a JSON object: {"subject": "", "body": "..."}'}`;
 }
 
-function buildSoftPrompt({ businessName, channel, myName, findings }) {
+function buildSoftPrompt({ businessName, channel, myName, findings, website, leadId, leadCollection }) {
   // Called when the audit came back mostly healthy — genuine minor
   // opportunities only, never manufactured weaknesses. If findings is
   // empty, the prompt below deliberately doesn't ask for any "problem"
   // framing at all.
   const capped = (findings ?? []).slice(0, 2);
   const findingsBlock = capped.length > 0 ? capped.map(describeFindingForPrompt).join('\n') : '(none of real significance — the site is in good shape)';
-  const link = buildAuditToolUrl(channel);
+  const link = buildAuditToolUrl(channel, { website, leadId, leadCollection });
   const first = firstName(myName);
 
   return `${identityBlock(myName)}
@@ -269,7 +268,8 @@ async function runProviderChain(prompt, keys) {
 /**
  * Generates one Growth-Audit-driven outreach message. Should read like Dean
  * personally looked at the prospect's site, not like an automated audit
- * report: introduce Dean, mention 2-3 real findings translated into plain
+ * report: introduce Dean, mention one strong real finding (two only when
+ * clearly useful) translated into plain
  * English, point at the free audit tool as the primary CTA, and only softly
  * mention web development help afterwards.
  *
@@ -293,9 +293,9 @@ async function generateGrowthAuditOutreach(input, keys) {
 
   let prompt;
   if (mode === 'followup1' || mode === 'followup2') {
-    prompt = buildFollowUpPrompt({ businessName: input.businessName, channel, myName: input.myName, stage: mode === 'followup2' ? 2 : 1 });
+    prompt = buildFollowUpPrompt({ businessName: input.businessName, channel, myName: input.myName, stage: mode === 'followup2' ? 2 : 1, website: input.website, leadId: input.leadId, leadCollection: input.leadCollection });
   } else if (mode === 'soft') {
-    prompt = buildSoftPrompt({ businessName: input.businessName, channel, myName: input.myName, findings: input.findings ?? [] });
+    prompt = buildSoftPrompt({ businessName: input.businessName, channel, myName: input.myName, findings: input.findings ?? [], website: input.website, leadId: input.leadId, leadCollection: input.leadCollection });
   } else {
     prompt = buildInitialPrompt({
       businessName: input.businessName,
@@ -307,6 +307,9 @@ async function generateGrowthAuditOutreach(input, keys) {
       includePortfolio: !!input.includePortfolio && channel === 'email',
       includeScore: !!input.includeScore,
       overallScore: input.overallScore,
+      website: input.website,
+      leadId: input.leadId,
+      leadCollection: input.leadCollection,
     });
   }
 

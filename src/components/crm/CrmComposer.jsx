@@ -4,6 +4,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase';
 import { applyTemplateVars, buildTemplateVars, sortTemplatesByRelevance } from '../../utils/crmConstants';
 import { recordIssuesSent } from '../../utils/issueAnalytics';
+import { formatRecommendedTime, getOutreachTiming, nextRecommendedOutreachTime, toDateTimeLocal } from '../../utils/outreachTiming';
 
 const MY_NAME = 'Dean Burt';
 const SIGNATURE = `<p>Kind regards,</p><p>Dean Burt<br>dean-da-dev<br>📧 dean@dean-da-dev.co.uk<br>🌐 https://www.dean-da-dev.co.uk</p>`;
@@ -46,6 +47,11 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
   }, []);
 
   const vars = buildTemplateVars(lead, { myName: MY_NAME });
+  const recommendedTime = nextRecommendedOutreachTime('email');
+
+  function useRecommendedTime() {
+    setScheduleAt(toDateTimeLocal(nextRecommendedOutreachTime('email')));
+  }
 
   function insertAtCursor(html) {
     if (richMode && editorRef.current) {
@@ -278,6 +284,16 @@ export default function CrmComposer({ lead, threadId, inReplyTo, references, def
           <input type="datetime-local" value={scheduleAt} onChange={(e) => setScheduleAt(e.target.value)}
             className="rounded-lg border border-gray-700 bg-gray-800/50 px-2 py-1 text-xs text-gray-200 focus:border-blue-500 focus:outline-none" />
         </span>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs">
+        <div>
+          <span className="font-semibold text-blue-300">Recommended (UK): {formatRecommendedTime(recommendedTime)}</span>
+          <span className="ml-2 text-gray-500">{getOutreachTiming('email').summary}</span>
+        </div>
+        <button type="button" onClick={useRecommendedTime} className="rounded-md bg-blue-500/15 px-2.5 py-1 font-semibold text-blue-300 hover:bg-blue-500/25">
+          Use best time
+        </button>
       </div>
 
       {aiError && <p className="text-xs text-red-400">{aiError}</p>}

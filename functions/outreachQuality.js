@@ -85,6 +85,7 @@ const AGGRESSIVE_CTA_PHRASES = [
 // Absolute-certainty language is a red flag regardless of source — even a
 // "measured" finding shouldn't be oversold as a guarantee of outcome.
 const OVERCLAIM_PHRASES = ['guaranteed', '100% certain', 'definitely will', 'i guarantee'];
+const BENEFIT_PATTERN = /\b(visitors?|customers?|enquir(?:y|ies)|book(?:ing|ings)?|appointments?|contact|read(?:able)?|usability|visibility|conversion|trust|frustrat(?:e|ing)|harder to|easier to)\b/i;
 
 // The outreach analyzer (outreachWebsiteAudit.js) is a separate, lightweight,
 // non-browser system — it never runs Growth Audit, never uses Browser
@@ -113,11 +114,11 @@ const FABRICATED_SOURCE_PHRASES = [
 ];
 
 const CHANNEL_WORD_LIMITS = {
-  email: 250,
-  whatsapp: 150,
-  instagram: 120,
-  facebook: 150,
-  linkedin: 150,
+  email: 130,
+  whatsapp: 90,
+  instagram: 80,
+  facebook: 100,
+  linkedin: 100,
   sms: 50,
 };
 
@@ -162,7 +163,7 @@ function assessOutreachQuality(body, opts = {}) {
   // for any distinctive word (5+ chars) from each finding's evidence/
   // description appearing in the body.
   const evidenceWords = findingsUsed
-    .flatMap((f) => `${f.evidence ?? ''} ${f.description ?? ''}`.toLowerCase().split(/\W+/))
+    .flatMap((f) => `${f.outreachText ?? ''} ${f.evidence ?? ''} ${f.description ?? ''}`.toLowerCase().split(/\W+/))
     .filter((w) => w.length >= 5);
   const hasEvidence = findingsUsed.length === 0 || evidenceWords.some((w) => text.toLowerCase().includes(w));
   if (findingsUsed.length > 0 && !hasEvidence) issues.push('Does not clearly reference any specific audit finding.');
@@ -192,7 +193,7 @@ function assessOutreachQuality(body, opts = {}) {
   // 5. Explains the benefit of using the audit — there's real substance
   // beyond just a bare link (a message that's only a URL isn't "explaining"
   // anything).
-  const explainsBenefit = findingsUsed.length === 0 || (hasEvidence && words >= 15);
+  const explainsBenefit = findingsUsed.length === 0 || (hasEvidence && words >= 15 && BENEFIT_PATTERN.test(text));
   if (findingsUsed.length > 0 && !explainsBenefit) issues.push('Does not explain why the findings matter before linking to the tool.');
 
   // 6. Includes the audit URL.
@@ -237,9 +238,9 @@ function assessOutreachQuality(body, opts = {}) {
   // claims, no fabricated Growth-Audit/performance-score claims, no banned/
   // obsolete phrases, no premature hard-sell CTA, and it must actually
   // include the audit link (the whole point of this system).
-  // Personalisation/evidence/benefit/brevity missing lowers the score but
-  // doesn't block sending — the human reviews it either way.
-  const passed = checks.naturalTone && checks.ctaQuality && checks.noUnsupportedClaims && checks.includesAuditUrl && checks.notAuditDump && checks.noFabricatedSource;
+  // Missing personalisation, evidence, benefit, or brevity now blocks the
+  // draft too. Those are conversion fundamentals, not optional polish.
+  const passed = Object.values(checks).every(Boolean);
 
   return { score, passed, issues, checks };
 }

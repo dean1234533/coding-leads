@@ -128,10 +128,7 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-white">Leads</h1>
-          <p className="text-xs text-gray-500">Every business you find becomes a lead here.</p>
-        </div>
+        <p className="text-xs font-medium text-slate-500">{leads?.length ?? 0} prospects in this pipeline</p>
         <div className="flex flex-wrap gap-2">
           {dueForFollowUpIds.length > 0 && (
             <button onClick={selectAllDueForFollowUp}
@@ -140,14 +137,14 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
             </button>
           )}
           <button onClick={() => setShowAddForm(true)}
-            className="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-3.5 py-2 text-xs font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400">
+            className="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:from-blue-400 hover:to-cyan-400">
             + Add Lead
           </button>
         </div>
       </div>
 
       {/* Search + filters */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900 p-4 space-y-3">
+      <div className="space-y-3 rounded-2xl border border-gray-800 bg-gray-900 p-4 sm:p-5">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -211,7 +208,7 @@ export default function CrmLeadsPage({ leads, openLeadId, onOpenLeadHandled }) {
         </div>
       )}
 
-      <section className="rounded-xl border border-gray-800 bg-gray-900">
+      <section className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl shadow-black/10">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-800 px-4 py-3 sm:px-6 sm:py-4">
           <h2 className="text-sm font-semibold text-gray-200">Pipeline</h2>
           <div className="flex items-center gap-3">

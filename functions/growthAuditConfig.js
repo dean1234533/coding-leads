@@ -10,18 +10,23 @@ const AUDIT_TOOL_URL = 'https://app.dean-da-dev.co.uk/';
 const PORTFOLIO_URL = 'https://www.dean-da-dev.co.uk/portfolio';
 
 /**
- * Builds the audit tool link a prospect gets sent. Deliberately the bare
- * URL, no tracking query string — a link with "?ref=..." or "?utm_..." on
- * the end reads as a marketing/tracking link the moment someone glances at
- * it, which undermines the whole "I just built a free tool, have a look"
- * tone. `channel` is accepted for API-compatibility with existing callers
- * but no longer changes the output.
- *
- * @param {string} [channel]
- * @returns {string}
+ * Builds a clean-looking referral link. The compact payload lets Growth
+ * Audit prefill the prospect's website and attribute conversions without
+ * exposing a row of marketing query parameters.
  */
-function buildAuditToolUrl(_channel) {
-  return AUDIT_TOOL_URL;
+function buildAuditToolUrl(channel, { website, leadId, leadCollection } = {}) {
+  if (!website && !leadId) return AUDIT_TOOL_URL;
+  const payload = {
+    v: 1,
+    site: website || undefined,
+    channel: CHANNELS.has(channel) ? channel : 'email',
+    leadId: leadId || undefined,
+    leadCollection: leadCollection || undefined,
+  };
+  const referral = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  return `${AUDIT_TOOL_URL}?r=${referral}`;
 }
+
+const CHANNELS = new Set(['email', 'whatsapp', 'instagram', 'facebook', 'linkedin']);
 
 module.exports = { AUDIT_TOOL_URL, PORTFOLIO_URL, buildAuditToolUrl };

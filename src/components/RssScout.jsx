@@ -206,6 +206,14 @@ function HasWebBadge() {
   );
 }
 
+function UnavailableBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-700/50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-300 ring-1 ring-inset ring-gray-600">
+      Details unavailable
+    </span>
+  );
+}
+
 function IntentBadge({ intent, reason }) {
   if (!intent) return null;
   const styles = {
@@ -250,7 +258,7 @@ function LeadCard({ lead, onFigmaCopy, isFigmaCopied, businessType, onAddToCrm, 
       {/* Badges + name */}
       <div>
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          {isPrime ? <PrimeBadge /> : isWeak ? <WeakWebBadge /> : <HasWebBadge />}
+          {lead.detailsUnavailable ? <UnavailableBadge /> : isPrime ? <PrimeBadge /> : isWeak ? <WeakWebBadge /> : <HasWebBadge />}
           <IntentBadge intent={lead.buyingIntent} reason={lead.buyingIntentReason} />
           <StarRating rating={lead.rating} count={lead.reviewCount} />
         </div>
@@ -305,6 +313,8 @@ function LeadCard({ lead, onFigmaCopy, isFigmaCopied, businessType, onAddToCrm, 
             </svg>
             {(() => { try { return new URL(lead.website).hostname.replace(/^www\./, ''); } catch { return lead.website; } })()}
           </a>
+        ) : lead.detailsUnavailable ? (
+          <span className="text-gray-500 italic">Website status not verified</span>
         ) : (
           <span className="text-gray-600 italic">No website found</span>
         )}
@@ -371,7 +381,7 @@ function LeadCard({ lead, onFigmaCopy, isFigmaCopied, businessType, onAddToCrm, 
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
           onClick={() => onAddToCrm(lead)}
-          disabled={crmStatus === 'added' || crmStatus === 'duplicate' || crmStatus === 'adding'}
+          disabled={lead.detailsUnavailable || crmStatus === 'added' || crmStatus === 'duplicate' || crmStatus === 'adding'}
           className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition disabled:cursor-default ${
             crmStatus === 'added' || crmStatus === 'duplicate'
               ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30'
@@ -389,15 +399,16 @@ function LeadCard({ lead, onFigmaCopy, isFigmaCopied, businessType, onAddToCrm, 
             </>
           ) : crmStatus === 'duplicate' ? (
             'Already in CRM'
-          ) : 'Add to CRM'}
+          ) : lead.detailsUnavailable ? 'Retry scan first' : 'Add to CRM'}
         </button>
 
         <button
           onClick={() => onFigmaCopy(lead)}
+          disabled={lead.detailsUnavailable}
           className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
             isFigmaCopied
               ? 'bg-violet-500/15 text-violet-400 ring-1 ring-violet-500/30'
-              : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              : 'bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40'
           }`}
         >
           {isFigmaCopied ? (
@@ -550,6 +561,7 @@ export default function RssScout() {
   // so scanned businesses show up in the CRM without going through the old
   // manual-draft form / legacy `leads` collection.
   async function addLeadToCrm(lead) {
+    if (lead.detailsUnavailable) return 'skipped';
     setCrmStatusById((s) => ({ ...s, [lead.id]: 'adding' }));
     try {
       if (lead.googleMapsUrl) {
@@ -612,7 +624,7 @@ export default function RssScout() {
     setAddAllSummary(null);
     let added = 0;
     let skipped = 0;
-    for (const lead of visible) {
+    for (const lead of visible.filter((item) => !item.detailsUnavailable)) {
       const existing = crmStatusById[lead.id];
       if (existing === 'added' || existing === 'duplicate') { skipped += 1; continue; }
       const result = await addLeadToCrm(lead);

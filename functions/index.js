@@ -40,6 +40,7 @@ const { assessOutreachQuality } = require('./outreachQuality');
 const { generateGrowthAuditOutreach } = require('./growthAuditOutreachWriter');
 const { generateRedditPost } = require('./redditPostWriter');
 const { buildAuditToolUrl } = require('./growthAuditConfig');
+const { isLookupCacheFresh, sortBusinessLeads, unavailableLead } = require('./businessScannerUtils');
 const { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow, notifyNewHotLeads } = require('./pushNotifications');
 const { generateCommsMessage, approveApproval, rejectApproval, markApprovalSent } = require('./aiCommsAssistant');
 const { scheduledWorkflowEngine, runWorkflowsNow, saveWorkflow } = require('./workflowEngine');
@@ -971,7 +972,7 @@ async function runBusinessScan({
   type,                        // legacy single-type param — still accepted
   types,                       // preferred: array of BUSINESS_TYPES values, searched and merged together
   scanMode   = 'business',    // 'business' | 'agency'
-  maxResults = 20,
+  maxResults = 40,
 } = {}) {
   const apiKey = process.env.GOOGLE_PLACES_KEY;
   if (!apiKey) throw new HttpsError('internal', 'GOOGLE_PLACES_KEY secret not set.');
@@ -1012,14 +1013,33 @@ async function runBusinessScan({
           BUSINESS_TYPES.find((t) => t.value === v) ?? { value: v, keyword: String(v).replace(/_/g, ' ') }
         );
 
-    const searchResults = await Promise.allSettled(
-      selectedTypes.map((t) =>
-        axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', {
-          params: { query: `${t.keyword} near ${location}`, location: `${lat},${lng}`, radius, key: apiKey },
-          timeout: 15_000,
-        })
-      )
-    );
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const fetchSearchPages = async (searchType) => {
+      const found = [];
+      let pageToken = null;
+      do {
+        if (pageToken) await wait(2_000); // Google needs time to activate next_page_token.
+        let response;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          response = await axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', {
+            params: pageToken
+              ? { pagetoken: pageToken, key: apiKey }
+              : { query: `${searchType.keyword} near ${location}`, location: `${lat},${lng}`, radius, key: apiKey },
+            timeout: 15_000,
+          });
+          if (response.data.status !== 'INVALID_REQUEST' || !pageToken) break;
+          await wait(1_000);
+        }
+        if (!['OK', 'ZERO_RESULTS'].includes(response.data.status)) {
+          throw new Error(response.data.error_message || `Places search returned ${response.data.status}`);
+        }
+        found.push(...(response.data.results ?? []));
+        pageToken = response.data.next_page_token ?? null;
+      } while (pageToken && found.length < maxResults);
+      return { data: { results: found.slice(0, maxResults) } };
+    };
+
+    const searchResults = await Promise.allSettled(selectedTypes.map(fetchSearchPages));
 
     const seenPlaceIds = new Set();
     let places = [];
@@ -1073,32 +1093,11 @@ async function runBusinessScan({
     const rawLeads = detailResults.map((r, i) => {
       if (r.status === 'rejected') {
         console.warn('[scanBusinessLeads] detail fetch failed:', r.reason.message);
-        const p = places[i];
-        const intent = computeBuyingIntent(p, 5);
-        return {
-          id:               p.place_id,
-          name:             p.name,
-          address:          p.vicinity ?? '',
-          phone:            null,
-          website:          null,
-          googleMapsUrl:    null,
-          rating:           p.rating ?? null,
-          reviewCount:      p.user_ratings_total ?? 0,
-          types:            p.types ?? [],
-          hasWebsite:       false,
-          opportunityScore: 5,
-          opportunityLabel: 'No Website — Prime Lead',
-          buyingIntent:       intent.label,
-          buyingIntentReason: intent.reason,
-          ownerName:        null,
-          instagramUrl:     null,
-          whatsappUrl:      null,
-          facebookUrl:      null,
-          industryLabel:    p.__industryLabel ?? null,
-          competitorName:       null,
-          competitorRating:     null,
-          competitorReviewCount: null,
-        };
+        return unavailableLead(places[i]);
+      }
+      if (r.value.data.status !== 'OK' || !r.value.data.result) {
+        console.warn('[scanBusinessLeads] detail response unavailable:', r.value.data.status, r.value.data.error_message ?? '');
+        return unavailableLead(places[i]);
       }
       const d = r.value.data.result ?? {};
       const hasWebsite = !!d.website;
@@ -1115,6 +1114,7 @@ async function runBusinessScan({
         reviewCount:      d.user_ratings_total ?? 0,
         types:            d.types ?? [],
         hasWebsite,
+        detailsUnavailable: false,
         opportunityScore: opportunityScoreValue,
         opportunityLabel: opportunityLabel(d),
         buyingIntent:       intent.label,
@@ -1163,8 +1163,12 @@ async function runBusinessScan({
     // overnight auto-scan) — without this, re-scanning the same area burns
     // fresh quota re-looking-up businesses already checked, even ones never
     // added to the CRM. Cached by Google's place_id, which is stable across
-    // scans, forever (a business's owner/email doesn't change day to day).
-    const toResolve = rawLeads.slice(0, 15);
+    // scans. Positive results are refreshed yearly and misses after 60 days,
+    // since a small business can add a website or public contact details.
+    // Spend enrichment quota on the strongest verified opportunities, not
+    // whichever businesses Google happened to return first.
+    const rankedLeads = sortBusinessLeads(rawLeads);
+    const toResolve = rankedLeads.filter((lead) => !lead.detailsUnavailable).slice(0, 15);
     const cacheRefs = toResolve.map((lead) => db.collection('emailLookupCache').doc(lead.id));
     const cacheSnaps = cacheRefs.length ? await db.getAll(...cacheRefs) : [];
 
@@ -1172,7 +1176,7 @@ async function runBusinessScan({
     await Promise.allSettled(
       toResolve.map(async (lead, i) => {
         const cached = cacheSnaps[i]?.exists ? cacheSnaps[i].data() : null;
-        if (cached) {
+        if (isLookupCacheFresh(cached)) {
           lead.ownerName       = cached.ownerName ?? null;
           lead.ownerNameSource = cached.ownerNameSource ?? null;
           lead.contactEmail    = cached.email ?? null;
@@ -1216,9 +1220,8 @@ async function runBusinessScan({
 
         console.log(`[owner] "${lead.name}" → ${ownerResult ? `${ownerResult.name} (${ownerResult.source})` : 'null'} | email: ${email ?? 'none'} | instagram: ${lead.instagramUrl ?? 'none'} | whatsapp: ${lead.whatsappUrl ?? 'none'} | facebook: ${lead.facebookUrl ?? 'none'}`);
 
-        // Cache the result either way — a confirmed "no email found" is just
-        // as worth remembering as a hit, so a dead end isn't re-queried
-        // forever.
+        // Cache both hits and misses; freshness policy above retries misses
+        // much sooner so newly published contact details can be discovered.
         await cacheRefs[i].set({
           email: lead.contactEmail,
           ownerName: lead.ownerName,
@@ -1232,11 +1235,7 @@ async function runBusinessScan({
     );
 
     // ── Step 6: Sort and return ──────────────────────────────────────────────
-    const leads = rawLeads.sort((a, b) =>
-      b.opportunityScore !== a.opportunityScore
-        ? b.opportunityScore - a.opportunityScore
-        : (a.reviewCount ?? 999) - (b.reviewCount ?? 999)
-    );
+    const leads = sortBusinessLeads(rawLeads);
 
   return {
     leads,
@@ -1888,6 +1887,7 @@ exports.generateGrowthAuditOutreachNow = onCall(
       {
         businessName, contactName, industry, channel, myName: myName || 'Dean', findings, mode: resolvedMode,
         includePortfolio: !!includePortfolio, includeScore: !!includeScore, overallScore,
+        website, leadId, leadCollection,
       },
       growthAuditOutreachKeys(),
     );
@@ -1920,7 +1920,7 @@ exports.generateGrowthAuditOutreachNow = onCall(
       mode: resolvedMode,
       findingsUsed: findings,
       quality,
-      auditUrl: buildAuditToolUrl(channel),
+      auditUrl: buildAuditToolUrl(channel, { website, leadId, leadCollection }),
       notEnoughFindings: !hasEnough && resolvedMode !== 'followup1' && resolvedMode !== 'followup2',
     };
   }
@@ -2065,7 +2065,7 @@ async function runAutoBusinessScan({ bypassHourCheck = false, overrides = null }
 
   let leads;
   try {
-    ({ leads } = await runBusinessScan({ location, radius, types: businessTypes, scanMode, maxResults: 20 }));
+    ({ leads } = await runBusinessScan({ location, radius, types: businessTypes, scanMode, maxResults: 40 }));
   } catch (err) {
     console.error('[autoBusinessScan] scan failed:', err.message);
     return { ran: true, error: err.message };

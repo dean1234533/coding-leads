@@ -141,10 +141,7 @@ export default function CodingLeadsPage() {
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-white">Coding Leads</h1>
-          <p className="text-xs text-gray-500">Internal tracker for people publicly looking for a developer.</p>
-        </div>
+        <p className="text-xs font-medium text-gray-500">People publicly looking for a developer</p>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={handleScanNow}

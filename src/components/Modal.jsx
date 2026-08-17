@@ -10,9 +10,9 @@ export default function Modal({ title, subtitle, onClose, children, maxWidth = '
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-6 backdrop-blur-sm sm:items-center">
-      <div className={`w-full ${maxWidth} rounded-xl border border-gray-800 bg-gray-900 shadow-2xl`}>
-        <div className="flex items-start justify-between border-b border-gray-800 px-5 py-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 px-4 py-6 backdrop-blur-md sm:items-center">
+      <div className={`w-full ${maxWidth} overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl shadow-black/50`}>
+        <div className="flex items-start justify-between border-b border-gray-800 bg-slate-900/50 px-5 py-4 sm:px-6">
           <div>
             <h2 className="text-sm font-semibold text-gray-100">{title}</h2>
             {subtitle && <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p>}
@@ -27,7 +27,7 @@ export default function Modal({ title, subtitle, onClose, children, maxWidth = '
             </svg>
           </button>
         </div>
-        <div className="max-h-[75vh] overflow-y-auto px-5 py-4">{children}</div>
+        <div className="max-h-[78vh] overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
       </div>
     </div>
   );

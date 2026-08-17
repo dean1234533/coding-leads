@@ -534,9 +534,12 @@ const sendScheduledEmails = onSchedule(
         await doc.ref.update({ sent: true, sentAt: FieldValue.serverTimestamp(), messageId: res.data.id, threadId: res.data.threadId });
 
         if (item.leadId) {
-          await db.collection('crmLeads').doc(item.leadId).update({
+          const leadRef = db.collection('crmLeads').doc(item.leadId);
+          const leadSnap = await leadRef.get();
+          const sentDate = new Date();
+          await leadRef.update({
             gmailThreadId: res.data.threadId,
-            lastContactDate: FieldValue.serverTimestamp(),
+            ...(leadSnap.exists ? nextFollowUpPatch(leadSnap.data(), sentDate) : { lastContactDate: sentDate }),
             updatedAt: FieldValue.serverTimestamp(),
             ...(item.templateId ? { lastTemplateId: item.templateId } : {}),
           }).catch(() => {});
@@ -598,6 +601,9 @@ function renderFollowUpTemplate(lead) {
 }
 
 function nextFollowUpPatch(lead, sentDate) {
+  if (FOLLOW_UP_EXCLUDED_STATUSES.has(lead.status) || lead.category === 'Backlink') {
+    return { lastContactDate: sentDate };
+  }
   const stage = (lead.followUpStage ?? -1) + 1;
   const days = FOLLOW_UP_LADDER_DAYS[stage];
   if (days == null) return { status: 'Archive', followUpStage: stage, followUpDate: null, lastContactDate: sentDate };
@@ -680,7 +686,7 @@ async function runAutoFollowUp({ skipEnabledCheck = false } = {}) {
 }
 
 const scheduledAutoFollowUp = onSchedule(
-  { schedule: '0 9 * * *', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
+  { schedule: '35 9 * * 2-4', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
   withErrorAlert('scheduledAutoFollowUp', () => runAutoFollowUp())
 );
 
@@ -752,6 +758,9 @@ async function runAutoAuditEmail() {
         myName: MY_NAME,
         findings: lead.growthAuditFindings,
         mode: 'initial',
+        website: lead.website,
+        leadId: doc.id,
+        leadCollection: 'crmLeads',
       }, keys);
       if (!result) { console.warn(`[autoAuditEmail] AI generation failed for "${lead.businessName}" — every provider unavailable.`); continue; }
 
