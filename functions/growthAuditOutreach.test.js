@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { selectTopFindings } from './findingSelector.js';
-import { assessOutreachQuality } from './outreachQuality.js';
+import { assessOutreachQuality, CHANNEL_WORD_LIMITS } from './outreachQuality.js';
 import { buildInitialPrompt, buildFollowUpPrompt, buildSoftPrompt, CTA_VARIATIONS, SERVICE_MENTION_EXAMPLES, NO_WEBSITE_FINDING_ID, hasNoRealWebsite } from './growthAuditOutreachWriter.js';
 import { AUDIT_TOOL_URL, PORTFOLIO_URL, buildAuditToolUrl } from './growthAuditConfig.js';
 
@@ -396,10 +396,24 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
     const waPrompt = buildInitialPrompt({ businessName: 'T', channel: 'whatsapp', myName: 'Dean', findings });
     const liPrompt = buildInitialPrompt({ businessName: 'T', channel: 'linkedin', myName: 'Dean', findings });
     expect(emailPrompt).toContain('This is an EMAIL');
-    expect(emailPrompt).toContain('80-130 words');
+    expect(emailPrompt).toContain('130 words is a HARD LIMIT');
     expect(waPrompt).toContain('This is a WHATSAPP message');
-    expect(waPrompt).toContain('50-90 words');
+    expect(waPrompt).toContain('90 words is a HARD LIMIT');
     expect(liPrompt).toContain('This is a LINKEDIN message');
+  });
+
+  // Regression: a soft "aim for 50-90 words" phrasing reads as a target,
+  // not a ceiling, and the model routinely overshot it — the WhatsApp
+  // "too long" complaint that prompted this. The stated limit is now
+  // pulled directly from CHANNEL_WORD_LIMITS (the same numbers
+  // assessOutreachQuality actually enforces) so the instruction and the
+  // gate can never silently drift apart, for every channel.
+  it('every channel\'s stated hard limit matches the actual enforced CHANNEL_WORD_LIMITS value', () => {
+    const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
+    for (const channel of ['email', 'whatsapp', 'instagram', 'facebook', 'linkedin']) {
+      const prompt = buildInitialPrompt({ businessName: 'T', channel, myName: 'Dean', findings });
+      expect(prompt).toContain(`${CHANNEL_WORD_LIMITS[channel]} words is a HARD LIMIT`);
+    }
   });
 
   it('gives the email prompt real high-converting subject-line guidance, not just "no fluff"', () => {
@@ -569,6 +583,17 @@ describe('growthAuditOutreachWriter — no-real-website leads (identity.socialOn
       expect(prompt).toContain('free homepage concept');
       expect(prompt).toContain('Never mention Growth Audit');
     }
+  });
+
+  it('uses a tighter, combined structure for short channels (WhatsApp) than for email, given the much smaller word budget', () => {
+    const emailPrompt = buildInitialPrompt({ businessName: 'Cheers Bar Lounge', channel: 'email', myName: 'Dean', findings: [socialFinding] });
+    const waPrompt = buildInitialPrompt({ businessName: 'Cheers Bar Lounge', channel: 'whatsapp', myName: 'Dean', findings: [socialFinding] });
+    expect(emailPrompt).toContain('3. OBSERVATION');
+    expect(emailPrompt).toContain('4. WHY IT MATTERS');
+    expect(waPrompt).not.toContain('3. OBSERVATION');
+    expect(waPrompt).toContain('ONE sentence combining');
+    expect(waPrompt).toContain('tight word limit');
+    expect(waPrompt).toContain('free homepage concept');
   });
 
   it('a normal lead (no social-only finding) is completely unaffected — still gets the standard audit-tool pitch', () => {

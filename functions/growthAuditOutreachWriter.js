@@ -2,6 +2,7 @@
 
 const axios = require('axios');
 const { buildAuditToolUrl, PORTFOLIO_URL } = require('./growthAuditConfig');
+const { CHANNEL_WORD_LIMITS } = require('./outreachQuality');
 
 const CHANNELS = ['email', 'whatsapp', 'instagram', 'facebook', 'linkedin'];
 
@@ -46,12 +47,23 @@ const SUBJECT_LINE_GUIDANCE = `SUBJECT LINE — this decides whether the email g
 - Personalise with the business name where it fits naturally, but don't force it into every subject.
 - Vary the phrasing each time rather than reusing the same template — a few shapes that work: naming the specific thing you noticed, a direct question, or a short benefit-led statement.`;
 
+// "Aim for X words" reads to a model as a soft target, not a ceiling — it
+// routinely overshoots it. Stating the exact number tied to
+// outreachQuality.js's CHANNEL_WORD_LIMITS (so the instruction and the
+// automated gate that actually enforces it can never drift apart), framed
+// as a hard limit the message gets rejected for exceeding, measurably
+// improves compliance versus a vague target range alone.
+function hardWordLimitLine(channel, targetFloor) {
+  const ceiling = CHANNEL_WORD_LIMITS[channel];
+  return `Aim for around ${targetFloor} words. ${ceiling} words is a HARD LIMIT, not a target — a message over ${ceiling} words fails an automated check and gets rejected outright. Count roughly as you write; if you're near the limit, cut a sentence rather than run over it.`;
+}
+
 const CHANNEL_GUIDANCE = {
-  email: `This is an EMAIL. Aim for 80-130 words. No "Dear [Business]," corporate opener. A real subject line is still needed (return it separately).\n\n${SUBJECT_LINE_GUIDANCE}`,
-  whatsapp: 'This is a WHATSAPP message. Aim for 50-90 words, conversational, like a real text. No formal sign-off — just "Dean".',
-  instagram: 'This is an INSTAGRAM DM. Aim for 40-80 words, casual and short. No formal sign-off — just "Dean".',
-  facebook: 'This is a FACEBOOK MESSENGER DM. Aim for 50-100 words, casual and direct. No formal sign-off — just "Dean".',
-  linkedin: 'This is a LINKEDIN message. Aim for 50-100 words, professional but conversational — not a corporate pitch.',
+  email: `This is an EMAIL. ${hardWordLimitLine('email', 90)} No "Dear [Business]," corporate opener. A real subject line is still needed (return it separately).\n\n${SUBJECT_LINE_GUIDANCE}`,
+  whatsapp: `This is a WHATSAPP message. ${hardWordLimitLine('whatsapp', 60)} Conversational, like a real text. No formal sign-off — just "Dean".`,
+  instagram: `This is an INSTAGRAM DM. ${hardWordLimitLine('instagram', 55)} Casual and short. No formal sign-off — just "Dean".`,
+  facebook: `This is a FACEBOOK MESSENGER DM. ${hardWordLimitLine('facebook', 65)} Casual and direct. No formal sign-off — just "Dean".`,
+  linkedin: `This is a LINKEDIN message. ${hardWordLimitLine('linkedin', 65)} Professional but conversational — not a corporate pitch.`,
 };
 
 // Business-type action language for the IMPACT sentence — "make it harder
@@ -164,13 +176,17 @@ WHAT WAS FOUND (use this, don't invent anything beyond it): ${platformDetail}
 CHANNEL: ${CHANNEL_GUIDANCE[channel] ?? CHANNEL_GUIDANCE.email}
 
 STRUCTURE (in your own words, vary phrasing and sentence order each time):
-1. GREETING — "Hi ${businessName ? `${businessName} team` : 'there'},"
+${channel === 'email' ? `1. GREETING — "Hi ${businessName ? `${businessName} team` : 'there'},"
 2. INTRODUCTION — introduce yourself as ${first}, a web developer and designer, and say you came across their page.
 3. OBSERVATION — mention factually, without judgement, that their online presence right now is their Instagram/Facebook page rather than a website of their own — reference the specific detail found above in your own words.
 4. WHY IT MATTERS — briefly, in plain English, why a real website is worth having alongside that — e.g. it's easier for customers to find and contact them, it shows up in a Google search the way a social page doesn't, and it's actually theirs rather than a page a platform controls. Hedged and factual, never "you're losing customers" or anything stated as certain.
 5. CONCRETE OFFER — offer to put together a free homepage concept for ${businessName || 'them'}, no obligation, so they can see what a real website could look like for their business.
 6. LOW-PRESSURE CLOSE — invite them to let you know if they're interested and you'll send it over. No hard CTA, no deadline, no link of any kind.
-7. SIGN-OFF — ${channel === 'email' ? `professional signature:\nKind regards,\n\nDean Burt\nWeb Developer & Designer\ndean-da-dev.co.uk\ndean@dean-da-dev.co.uk` : `just "${first}" on its own line, nothing more formal.`}
+7. SIGN-OFF — professional signature:\nKind regards,\n\nDean Burt\nWeb Developer & Designer\ndean-da-dev.co.uk\ndean@dean-da-dev.co.uk` : `This channel has a tight word limit — keep every beat below to ONE short sentence, combined where natural, not a separate paragraph each:
+1. GREETING + INTRODUCTION — "Hi," introduce yourself as ${first}, a web developer and designer, in the same sentence or the next one.
+2. OBSERVATION + WHY IT MATTERS — ONE sentence combining the fact that their online presence is currently just their Instagram/Facebook page (reference the specific detail found above) with the single clearest reason a real website helps — e.g. it's easier for customers to find and contact them. Do not list multiple reasons — pick the one that fits best.
+3. OFFER + CLOSE — ONE sentence offering a free homepage concept, no obligation, and inviting them to say if they're interested. No hard CTA, no deadline, no link.
+4. SIGN-OFF — just "${first}" on its own line, nothing more formal.`}
 
 BANNED — never do any of these:
 - Never mention Growth Audit, "audit tool", "run your website through", "check your website", or any link — there is no website to point them to.
