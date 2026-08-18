@@ -37,7 +37,7 @@ const { auditWebsite } = require('./websiteAudit');
 const { analyzeWebsiteForOutreach, toGrowthAuditShapedResult } = require('./outreachWebsiteAudit');
 const { selectTopFindings } = require('./findingSelector');
 const { assessOutreachQuality } = require('./outreachQuality');
-const { generateGrowthAuditOutreach } = require('./growthAuditOutreachWriter');
+const { generateGrowthAuditOutreach, hasNoRealWebsite } = require('./growthAuditOutreachWriter');
 const { generateRedditPost } = require('./redditPostWriter');
 const { buildAuditToolUrl } = require('./growthAuditConfig');
 const { isLookupCacheFresh, sortBusinessLeads, unavailableLead } = require('./businessScannerUtils');
@@ -1883,6 +1883,12 @@ exports.generateGrowthAuditOutreachNow = onCall(
       ? mode
       : (hasEnough ? 'initial' : 'soft');
 
+    // A lead whose "website" is actually just an Instagram/Facebook page has
+    // nothing an audit tool can check — the message correctly never mentions
+    // Growth Audit or a link for this lead (see growthAuditOutreachWriter.js),
+    // so the quality gate below must not fail it for "missing the audit link".
+    const isNoWebsiteLead = hasNoRealWebsite(findings);
+
     const result = await generateGrowthAuditOutreach(
       {
         businessName, contactName, industry, channel, myName: myName || 'Dean', findings, mode: resolvedMode,
@@ -1897,6 +1903,7 @@ exports.generateGrowthAuditOutreachNow = onCall(
       businessName, channel: channel || 'email',
       findingsUsed: resolvedMode === 'initial' ? findings : [],
       includeScore: !!includeScore,
+      expectsAuditUrl: !isNoWebsiteLead,
     });
 
     // Lightweight outreach-funnel tracking (outreach -> audit click -> audit

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { selectTopFindings } from './findingSelector.js';
 import { assessOutreachQuality } from './outreachQuality.js';
-import { buildInitialPrompt, buildFollowUpPrompt, buildSoftPrompt, CTA_VARIATIONS, SERVICE_MENTION_EXAMPLES } from './growthAuditOutreachWriter.js';
+import { buildInitialPrompt, buildFollowUpPrompt, buildSoftPrompt, CTA_VARIATIONS, SERVICE_MENTION_EXAMPLES, NO_WEBSITE_FINDING_ID, hasNoRealWebsite } from './growthAuditOutreachWriter.js';
 import { AUDIT_TOOL_URL, PORTFOLIO_URL, buildAuditToolUrl } from './growthAuditConfig.js';
 
 function makeRec(overrides = {}) {
@@ -505,5 +505,91 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
     const withoutIndustry = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
     expect(withIndustry).toContain('go from finding your site to booking a session');
     expect(withoutIndustry).not.toContain('go from finding your site to booking a session');
+  });
+});
+
+// ── No-real-website leads (Instagram/Facebook as "website") ────────────────
+// Regression: a lead whose only "website" is a social media page has
+// nothing an audit tool can check — the standard prompt was pitching
+// "run your free audit tool" regardless, which read as broken/careless
+// once the message reached someone with no real site at all.
+describe('growthAuditOutreachWriter — no-real-website leads (identity.socialOnly)', () => {
+  const socialFinding = {
+    id: NO_WEBSITE_FINDING_ID, category: 'conversion', severity: 'critical', confidence: 'high',
+    title: 'No real website — just an Instagram page',
+    outreachText: 'the link listed for your website actually goes to your Instagram page rather than a real website — so there\'s nothing of yours that ranks on Google, and the page itself is controlled by Instagram, not you',
+  };
+
+  it('hasNoRealWebsite detects the finding by id, regardless of other findings present', () => {
+    expect(hasNoRealWebsite([socialFinding])).toBe(true);
+    expect(hasNoRealWebsite([{ id: 'seo.missingTitle' }, socialFinding])).toBe(true);
+    expect(hasNoRealWebsite([{ id: 'seo.missingTitle' }])).toBe(false);
+    expect(hasNoRealWebsite([])).toBe(false);
+    expect(hasNoRealWebsite(undefined)).toBe(false);
+  });
+
+  it('buildInitialPrompt never instructs the model to offer/mention Growth Audit or link to it when the lead has no real website', () => {
+    const prompt = buildInitialPrompt({ businessName: 'Cheers Bar Lounge', channel: 'whatsapp', myName: 'Dean', findings: [socialFinding] });
+    // The identity block's "you also built Growth Audit... offering it
+    // afterwards" framing must not leak in — that would directly contradict
+    // the "never mention it" instruction below.
+    expect(prompt).not.toContain('You also built Growth Audit');
+    expect(prompt).not.toContain('offering Growth Audit afterwards');
+    expect(prompt).not.toContain(AUDIT_TOOL_URL);
+    expect(prompt).not.toContain('Run your free audit here');
+    // The negative instruction itself is expected to name what's banned.
+    expect(prompt).toContain('must NEVER mention Growth Audit');
+  });
+
+  it('buildInitialPrompt pivots to a concrete, no-obligation website offer instead', () => {
+    const prompt = buildInitialPrompt({ businessName: 'Cheers Bar Lounge', channel: 'email', myName: 'Dean', findings: [socialFinding] });
+    expect(prompt).toContain('free homepage concept');
+    expect(prompt).toContain('no obligation');
+    expect(prompt).toContain(socialFinding.outreachText);
+  });
+
+  it('buildInitialPrompt explicitly instructs never claiming to have checked/audited the (nonexistent) website', () => {
+    const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings: [socialFinding] });
+    expect(prompt).toContain('Never say or imply you checked/audited/ran their website');
+  });
+
+  it('takes priority even when mixed with other, unrelated findings', () => {
+    const otherFinding = { id: 'seo.missingTitle', category: 'seo', title: 'No page title', evidence: 'x', measurementType: 'measured' };
+    const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings: [otherFinding, socialFinding] });
+    expect(prompt).not.toContain(AUDIT_TOOL_URL);
+    expect(prompt).not.toContain('Run your free audit here');
+    expect(prompt).toContain('free homepage concept');
+  });
+
+  it('follow-ups also avoid linking to the audit tool and reference the earlier free-concept offer instead', () => {
+    const followUp1 = buildFollowUpPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', stage: 1, findings: [socialFinding] });
+    const followUp2 = buildFollowUpPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', stage: 2, findings: [socialFinding] });
+    for (const prompt of [followUp1, followUp2]) {
+      expect(prompt).not.toContain(AUDIT_TOOL_URL);
+      expect(prompt).toContain('free homepage concept');
+      expect(prompt).toContain('Never mention Growth Audit');
+    }
+  });
+
+  it('a normal lead (no social-only finding) is completely unaffected — still gets the standard audit-tool pitch', () => {
+    const findings = [{ id: 'seo.missingTitle', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
+    const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
+    expect(prompt).toContain(buildAuditToolUrl('email'));
+    expect(prompt).toContain('Run your free audit here');
+  });
+
+  it('assessOutreachQuality does not fail a no-website message for lacking the audit link when expectsAuditUrl is false', () => {
+    const body = `Hi Cheers Bar Lounge team, I'm Dean, a web developer and designer. I noticed your Instagram page is currently the only place people can find Cheers Bar Lounge online, rather than a real website of your own. Having a website makes it easier for customers to find and contact you, and shows up in a Google search the way a social page doesn't. I'd like to put together a free homepage concept for you, no obligation. Let me know if you're interested and I'll send it over.\n\nKind regards,\nDean`;
+    const result = assessOutreachQuality(body, { businessName: 'Cheers Bar Lounge', channel: 'email', findingsUsed: [socialFinding], expectsAuditUrl: false });
+    expect(result.checks.includesAuditUrl).toBe(true);
+    expect(result.issues).not.toContain('Does not include the audit tool link.');
+  });
+
+  it('assessOutreachQuality still fails a normal-lead message for lacking the audit link when expectsAuditUrl defaults true', () => {
+    const finding = { id: 'seo.missingTitle', category: 'seo', title: 'x', evidence: 'x', outreachText: 'no page title was set', measurementType: 'measured' };
+    const body = 'Hi Test Ltd team, I noticed your homepage has no page title set, which search engines rely on heavily.';
+    const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [finding] });
+    expect(result.checks.includesAuditUrl).toBe(false);
+    expect(result.issues).toContain('Does not include the audit tool link.');
   });
 });
