@@ -200,13 +200,10 @@ describe('growthAuditConfig', () => {
     expect(AUDIT_TOOL_URL).toBe('https://app.dean-da-dev.co.uk/');
   });
 
-  it('returns a bare URL for generic links and an opaque referral for a specific lead', () => {
+  it('always returns the bare URL, with no tracking query string, regardless of what is passed', () => {
     expect(buildAuditToolUrl('whatsapp')).toBe('https://app.dean-da-dev.co.uk/');
     expect(buildAuditToolUrl(undefined)).toBe('https://app.dean-da-dev.co.uk/');
-    const url = new URL(buildAuditToolUrl('email', { website: 'https://example.com', leadId: 'lead-1', leadCollection: 'crmLeads' }));
-    expect(url.searchParams.has('r')).toBe(true);
-    const payload = JSON.parse(Buffer.from(url.searchParams.get('r'), 'base64url').toString('utf8'));
-    expect(payload).toMatchObject({ site: 'https://example.com', channel: 'email', leadId: 'lead-1', leadCollection: 'crmLeads' });
+    expect(buildAuditToolUrl('email', { website: 'https://example.com', leadId: 'lead-1', leadCollection: 'crmLeads' })).toBe('https://app.dean-da-dev.co.uk/');
   });
 
   it('PORTFOLIO_URL is a single configured value', () => {

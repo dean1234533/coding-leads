@@ -10,23 +10,16 @@ const AUDIT_TOOL_URL = 'https://app.dean-da-dev.co.uk/';
 const PORTFOLIO_URL = 'https://www.dean-da-dev.co.uk/portfolio';
 
 /**
- * Builds a clean-looking referral link. The compact payload lets Growth
- * Audit prefill the prospect's website and attribute conversions without
- * exposing a row of marketing query parameters.
+ * Always the bare Growth Audit homepage — no referral/attribution payload.
+ * A previous version base64-encoded the website/channel/leadId into a `?r=`
+ * query param, which produced a 200+ character blob that read as broken
+ * spam in an actual outreach message (especially WhatsApp/SMS, where it's
+ * the only thing in the text). Accepts the same (channel, { website,
+ * leadId, leadCollection }) signature as before purely so none of its
+ * callers need to change — the arguments are otherwise unused.
  */
-function buildAuditToolUrl(channel, { website, leadId, leadCollection } = {}) {
-  if (!website && !leadId) return AUDIT_TOOL_URL;
-  const payload = {
-    v: 1,
-    site: website || undefined,
-    channel: CHANNELS.has(channel) ? channel : 'email',
-    leadId: leadId || undefined,
-    leadCollection: leadCollection || undefined,
-  };
-  const referral = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  return `${AUDIT_TOOL_URL}?r=${referral}`;
+function buildAuditToolUrl() {
+  return AUDIT_TOOL_URL;
 }
-
-const CHANNELS = new Set(['email', 'whatsapp', 'instagram', 'facebook', 'linkedin']);
 
 module.exports = { AUDIT_TOOL_URL, PORTFOLIO_URL, buildAuditToolUrl };

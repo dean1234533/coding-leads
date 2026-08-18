@@ -805,6 +805,14 @@ export default function OutreachCrmPage() {
               <span>{label}</span>
             </button>
           ))}
+          {/* .app-sidebar (the only other place this link lived) is desktop-only
+              (display: none below 1024px) — without a copy here, Bookings,
+              Pricing, Call Scripts and Coding Leads were completely
+              unreachable on mobile, not just harder to find. */}
+          <Link to="/tools" className="app-nav-item">
+            <AppIcon name="tools" />
+            <span>More tools</span>
+          </Link>
         </div>
 
         <CrmAutoSeed />
