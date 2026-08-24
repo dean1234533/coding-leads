@@ -15,6 +15,15 @@
         { "fieldPath": "scanMode", "order": "ASCENDING" },
         { "fieldPath": "scannedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "scannerResults",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "scanMode", "order": "ASCENDING" },
+        { "fieldPath": "location", "order": "ASCENDING" },
+        { "fieldPath": "scannedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
