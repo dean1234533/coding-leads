@@ -1019,18 +1019,29 @@ async function runBusinessScan({
       let pageToken = null;
       do {
         if (pageToken) await wait(2_000); // Google needs time to activate next_page_token.
+        const requestParams = pageToken
+          ? { pagetoken: pageToken, key: apiKey }
+          : { query: `${searchType.keyword} near ${location}`, location: `${lat},${lng}`, radius, key: apiKey };
         let response;
         for (let attempt = 0; attempt < 3; attempt += 1) {
           response = await axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', {
-            params: pageToken
-              ? { pagetoken: pageToken, key: apiKey }
-              : { query: `${searchType.keyword} near ${location}`, location: `${lat},${lng}`, radius, key: apiKey },
+            params: requestParams,
             timeout: 15_000,
           });
           if (response.data.status !== 'INVALID_REQUEST' || !pageToken) break;
           await wait(1_000);
         }
         if (!['OK', 'ZERO_RESULTS'].includes(response.data.status)) {
+          // Temporary — investigating a consistent INVALID_REQUEST that started
+          // after the pagination rewrite. Redacts the key but logs everything
+          // else about the actual request/response, since a fake-key curl test
+          // can't reproduce this (Google checks key validity before request
+          // format, so REQUEST_DENIED masks whatever else might be wrong).
+          console.error('[scanBusinessLeads] non-OK Places response', {
+            requestParams: { ...requestParams, key: '[redacted]' },
+            responseStatus: response.status,
+            data: response.data,
+          });
           throw new Error(response.data.error_message || `Places search returned ${response.data.status}`);
         }
         found.push(...(response.data.results ?? []));
