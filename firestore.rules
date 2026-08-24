@@ -44,6 +44,13 @@ service cloud.firestore {
     match /scannerResults/{placeId} {
       allow read, write, delete: if isOwner();
     }
+    // Records which location/types the last scan (per scanMode) actually
+    // searched for, so the scannerResults listener above can scope itself
+    // to that instead of showing every business ever scanned, from every
+    // past session and location, unfiltered.
+    match /scannerMeta/{scanModeId} {
+      allow read, write: if isOwner();
+    }
     // Sent-count is written client-side on send (like crmTemplates'
     // sentCount); replied/interested counts are written server-side by
     // syncGmailReplies (Admin SDK bypasses rules) when a reply is detected.

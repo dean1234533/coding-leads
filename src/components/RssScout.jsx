@@ -10,7 +10,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { collection, addDoc, query, where, orderBy, getDocs, onSnapshot, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, getDocs, getDoc, setDoc, onSnapshot, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { app, db } from '../firebase';
 
 // ─── Scan modes ───────────────────────────────────────────────────────────────
@@ -492,17 +492,42 @@ export default function RssScout() {
     setTypes((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
   }
 
-  // Loads whatever was found on the last scan (of this mode) straight from
-  // Firestore, so leaving this tab or refreshing the page doesn't lose
-  // results that already cost real Places/Hunter/Serper API quota to
-  // produce — re-running "Scan Now" is only needed to look for genuinely
-  // new businesses, not just to see the same ones again.
+  // Regression: this used to query every scannerResults doc for the mode
+  // with no location/type scoping at all — every business ever scanned,
+  // from every past session and every location, accumulated into one
+  // unbounded list forever. A fresh "Barbers near Stratford" scan showed
+  // hundreds of unrelated leads from unrelated past searches, since
+  // nothing here actually reflected what was just searched for. Restores
+  // the last scan's own location/types (persisted separately from the
+  // leads themselves, in scannerMeta) so both a live scan AND a page
+  // refresh scope the list to what was actually last searched.
   useEffect(() => {
-    const q = query(collection(db, 'scannerResults'), where('scanMode', '==', scanMode), orderBy('scannedAt', 'desc'));
-    return onSnapshot(q, (snap) => setLeads(snap.docs.map((d) => d.data())), (err) => {
+    let cancelled = false;
+    getDoc(doc(db, 'scannerMeta', scanMode)).then((snap) => {
+      if (!cancelled) setMeta(snap.exists() ? snap.data() : null);
+    }).catch((err) => console.error('[BusinessScout] Failed to load last scan meta:', err));
+    return () => { cancelled = true; };
+  }, [scanMode]);
+
+  useEffect(() => {
+    if (!meta?.location) { setLeads([]); return undefined; }
+    const q = query(
+      collection(db, 'scannerResults'),
+      where('scanMode', '==', scanMode),
+      where('location', '==', meta.location),
+      orderBy('scannedAt', 'desc'),
+    );
+    return onSnapshot(q, (snap) => {
+      const docs = snap.docs.map((d) => d.data());
+      // Location alone isn't enough on its own — a later scan of the same
+      // location with a different set of business types shouldn't resurrect
+      // leads from an earlier, different-type scan of that same place.
+      const typeLabels = new Set((meta.types ?? []).map((v) => BUSINESS_TYPES.find((t) => t.value === v)?.label).filter(Boolean));
+      setLeads(typeLabels.size > 0 ? docs.filter((l) => typeLabels.has(l.industryLabel)) : docs);
+    }, (err) => {
       console.error('[BusinessScout] Failed to load saved results:', err);
     });
-  }, [scanMode]);
+  }, [scanMode, meta?.location, meta?.types]);
 
   const scan = useCallback(async () => {
     if (!location.trim()) return;
@@ -515,6 +540,11 @@ export default function RssScout() {
       const res = await httpsCallable(fns, 'scanBusinessLeads', { timeout: 100000 })({ location, types, radius, scanMode });
       const found = res.data.leads ?? [];
       setMeta(res.data.meta);
+      // Persisted (not just held in local state) so a page refresh restores
+      // which location/types the results list should actually be scoped
+      // to — without this, a refresh would fall back to showing nothing
+      // (or, before this fix existed, everything ever scanned).
+      await setDoc(doc(db, 'scannerMeta', scanMode), { ...res.data.meta, scannedAt: serverTimestamp() }, { merge: true });
       // Persisted (not just held in local state) — the onSnapshot listener
       // above picks this up automatically. Keyed by Google's place_id, so a
       // re-scan naturally refreshes an already-seen business's data rather
