@@ -463,7 +463,14 @@ function SkeletonCard() {
 export default function RssScout() {
   const [scanMode, setScanMode]   = useState('business');
   const [location, setLocation]   = useState('London, UK');
-  const [types,    setTypes]      = useState(['restaurant']);
+  // Deliberately empty, not pre-checked to 'restaurant' — a silently
+  // pre-selected type is easy to miss, so picking "Barbers" on top of an
+  // unnoticed leftover "Restaurants" selection searched both and buried
+  // barber results under whichever type happened to rank higher. Forcing
+  // an explicit choice (the existing "Pick at least one business type"
+  // validation already handles the empty case) makes what's being
+  // searched unambiguous.
+  const [types,    setTypes]      = useState([]);
   const [radius,   setRadius]     = useState(2000);
   const [leads,    setLeads]      = useState([]);
   const [loading,  setLoading]    = useState(false);
