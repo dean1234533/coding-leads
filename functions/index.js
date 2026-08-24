@@ -1018,30 +1018,37 @@ async function runBusinessScan({
       const found = [];
       let pageToken = null;
       do {
-        if (pageToken) await wait(2_000); // Google needs time to activate next_page_token.
+        // Google's own next_page_token activation delay is documented as
+        // "a short time" but is genuinely variable in practice — confirmed
+        // in production logs to sometimes still return INVALID_REQUEST even
+        // after a 2s wait plus three 1s retries (~5s total). More headroom
+        // here directly reduces how often the fallback below has to kick in.
+        if (pageToken) await wait(3_000);
         const requestParams = pageToken
           ? { pagetoken: pageToken, key: apiKey }
           : { query: `${searchType.keyword} near ${location}`, location: `${lat},${lng}`, radius, key: apiKey };
         let response;
-        for (let attempt = 0; attempt < 3; attempt += 1) {
+        for (let attempt = 0; attempt < 4; attempt += 1) {
           response = await axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', {
             params: requestParams,
             timeout: 15_000,
           });
           if (response.data.status !== 'INVALID_REQUEST' || !pageToken) break;
-          await wait(1_000);
+          await wait(2_000);
         }
         if (!['OK', 'ZERO_RESULTS'].includes(response.data.status)) {
-          // Temporary — investigating a consistent INVALID_REQUEST that started
-          // after the pagination rewrite. Redacts the key but logs everything
-          // else about the actual request/response, since a fake-key curl test
-          // can't reproduce this (Google checks key validity before request
-          // format, so REQUEST_DENIED masks whatever else might be wrong).
           console.error('[scanBusinessLeads] non-OK Places response', {
             requestParams: { ...requestParams, key: '[redacted]' },
             responseStatus: response.status,
             data: response.data,
           });
+          // A failed FOLLOW-UP page (pagetoken never activating, rate
+          // limiting, etc.) must never discard results the first page
+          // already found successfully — confirmed in production this was
+          // turning "got 20 real results, page 2 flaked" into "found
+          // nothing at all" for the entire search. Only the very first
+          // request has nothing already-found to fall back to.
+          if (pageToken) break;
           throw new Error(response.data.error_message || `Places search returned ${response.data.status}`);
         }
         found.push(...(response.data.results ?? []));
