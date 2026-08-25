@@ -51,7 +51,7 @@ export default function AuthGate({ children }) {
       <div className="flex min-h-screen items-center justify-center bg-gray-950 px-5 py-12">
         <section className="w-full max-w-md overflow-hidden rounded-3xl border border-gray-800 bg-gray-900 shadow-2xl shadow-black/40">
           <div className="border-b border-gray-800 bg-gradient-to-br from-blue-500/15 via-transparent to-emerald-500/10 px-7 py-8 text-left">
-            <div className="app-brand-mark">DD</div>
+            <img src="/logo-192.png" alt="" className="app-brand-mark" />
             <p className="mt-7 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-400">Private workspace</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-gray-100">Welcome back, Dean.</h1>
             <p className="mt-2 text-sm leading-6 text-gray-500">Sign in to manage prospects, outreach, follow-ups, and client opportunities.</p>

@@ -11,7 +11,7 @@ export default defineConfig({
       // instead of the auto-injected script, so it can poll for updates and
       // prompt to reload rather than silently waiting for the next full app close.
       injectRegister: null,
-      includeAssets: ['icon.svg'],
+      includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Outreach CRM',
         short_name: 'Outreach CRM',
@@ -23,9 +23,21 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'logo-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'logo-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'logo-512.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'any maskable',
           },
         ],

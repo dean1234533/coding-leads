@@ -756,7 +756,7 @@ export default function OutreachCrmPage() {
     <div className="app-shell">
       <aside className="app-sidebar">
         <div className="flex items-center gap-3 px-2">
-          <div className="app-brand-mark">DD</div>
+          <img src="/logo-192.png" alt="" className="app-brand-mark" />
           <div>
             <p className="text-sm font-bold text-white">Dean Digital</p>
             <p className="text-[11px] text-slate-500">Client acquisition</p>
@@ -789,7 +789,7 @@ export default function OutreachCrmPage() {
       <div className="app-main">
         <header className="app-topbar">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="app-brand-mark md:hidden">DD</div>
+            <img src="/logo-192.png" alt="" className="app-brand-mark md:hidden" />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-slate-100 md:text-xs md:font-medium md:text-slate-400">Outreach CRM</p>
               <p className="hidden text-xs text-slate-600 md:block">Find the right work. Follow up well.</p>
