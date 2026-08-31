@@ -564,9 +564,8 @@ const sendScheduledEmails = onSchedule(
 // never gets a canned "just following up" email on top of it.
 // ─────────────────────────────────────────────────────────────────────────────
 const MY_NAME = 'Dean Burt';
-const MY_WEBSITE = 'https://www.dean-da-dev.co.uk';
-const MY_PORTFOLIO = 'https://www.dean-da-dev.co.uk/portfolio';
-const MY_EMAIL = 'dean@dean-da-dev.co.uk';
+const MY_WEBSITE = 'https://bookrightly.co.uk';
+const MY_EMAIL = 'info@bookrightly.co.uk';
 const FOLLOW_UP_LADDER_DAYS = [7, 7, 14];
 const FOLLOW_UP_EXCLUDED_STATUSES = new Set(['Won', 'Lost', 'Archive', 'Replied']);
 
@@ -577,11 +576,9 @@ I hope you're doing well.
 
 I just wanted to follow up on my previous email in case you hadn't had a chance to read it.
 
-When I visited your website, I noticed a few areas where I believe it could be improved. Whether that was an outdated design, mobile usability issues, slow loading, or another issue, I'd be happy to discuss it further if it's something you're already considering.
+Bookrightly gives small businesses their own professional website and online booking system in one place — so customers can find out about you, view your services, and book online (and pay a deposit) without everything having to go through calls or messages.
 
-A modern, mobile-friendly website does more than just look good — it's often the first impression a potential customer gets before deciding whether to trust you, it helps people actually find you when they search on Google, and it means you can pick up enquiries and bookings any time, not just during opening hours. Without one, that's business quietly going to a competitor who does show up.{{portfolio_line}}
-
-If you'd be interested in a no-obligation chat about your website, just reply to this email and I'd be happy to help.
+I'd be happy to show you what it could look like for your business, no obligation.
 
 Thank you for your time, and I hope to hear from you.
 
@@ -591,8 +588,7 @@ function renderFollowUpTemplate(lead) {
   const vars = {
     business: lead.businessName ?? '',
     contact: lead.contactName?.trim() ?? '',
-    portfolio_line: `\n\nYou can view my portfolio and live demos here:\n\nPortfolio: ${MY_PORTFOLIO}`,
-    signature: `Kind regards,\n\n${MY_NAME}\ndean-da-dev\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}`,
+    signature: `Thanks,\n\n${MY_NAME}\nFounder, Bookrightly\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}`,
   };
   const fill = (text) => text
     .replace(/\{\{(\w+)\}\}/g, (m, key) => (typeof vars[key] === 'string' && vars[key].trim() ? vars[key] : ''))

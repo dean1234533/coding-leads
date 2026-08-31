@@ -1,6 +1,6 @@
 'use strict';
 
-const { AUDIT_TOOL_URL } = require('./growthAuditConfig');
+const { PRODUCT_URL } = require('./growthAuditConfig');
 
 // Deterministic (non-AI) quality gate for a generated outreach message —
 // checked in code rather than asking another AI call to grade its own
@@ -122,9 +122,9 @@ const CHANNEL_WORD_LIMITS = {
   sms: 50,
 };
 
-// The exact domain from AUDIT_TOOL_URL, e.g. "dean-da-dev.co.uk" — checked
+// The exact domain from PRODUCT_URL, e.g. "bookrightly.co.uk" — checked
 // as a substring so it still matches with a trailing UTM query string.
-const AUDIT_URL_HOST = new URL(AUDIT_TOOL_URL).host;
+const PRODUCT_URL_HOST = new URL(PRODUCT_URL).host;
 
 function wordCount(text) {
   return (text.trim().match(/\S+/g) ?? []).length;
@@ -151,12 +151,10 @@ function bulletLineCount(text) {
  * @param {string} opts.channel
  * @param {object[]} opts.findingsUsed - the findings actually passed to the generator
  * @param {boolean} [opts.includeScore] - whether the score was explicitly opted into
- * @param {boolean} [opts.expectsAuditUrl] - false for a no-real-website lead (identity.socialOnly),
- *   where the message correctly never links to the audit tool since there's nothing to audit
  * @returns {{ score: number, passed: boolean, issues: string[], checks: object }}
  */
 function assessOutreachQuality(body, opts = {}) {
-  const { businessName = '', channel = 'email', findingsUsed = [], includeScore = false, expectsAuditUrl = true } = opts;
+  const { businessName = '', channel = 'email', findingsUsed = [], includeScore = false } = opts;
   const issues = [];
   const text = body || '';
 
@@ -198,11 +196,10 @@ function assessOutreachQuality(body, opts = {}) {
   const explainsBenefit = findingsUsed.length === 0 || (hasEvidence && words >= 15 && BENEFIT_PATTERN.test(text));
   if (findingsUsed.length > 0 && !explainsBenefit) issues.push('Does not explain why the findings matter before linking to the tool.');
 
-  // 6. Includes the audit URL — skipped for a no-real-website lead, where
-  // the message correctly never mentions the audit tool at all (there's
-  // nothing to audit).
-  const includesAuditUrl = !expectsAuditUrl || text.includes(AUDIT_URL_HOST);
-  if (expectsAuditUrl && !includesAuditUrl) issues.push('Does not include the audit tool link.');
+  // 6. Includes the Bookrightly link — every message (no-website or
+  // has-findings) always points at PRODUCT_URL now.
+  const includesAuditUrl = text.includes(PRODUCT_URL_HOST);
+  if (!includesAuditUrl) issues.push('Does not include the Bookrightly link.');
 
   // 7/8. CTA quality — points at trying the tool, not an immediate hard
   // sell (book a call / build a website / quote), and not the old

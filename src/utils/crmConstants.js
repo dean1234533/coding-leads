@@ -102,30 +102,26 @@ export const ISSUE_DETAILS = {
 // Variables: {{business}} {{contact}} {{website}} {{industry}} {{myname}}
 // Plus computed fallback-safe variables built from the above (see
 // buildTemplateVars() below, used by CrmComposer.jsx / CrmBulkSendModal.jsx):
-//   {{audit_link}} — the free Growth Audit tool link. This is the primary
-//     CTA across every outreach template — "here's a free tool, check it
-//     yourself" — not a claim about specific findings, since a static
-//     template can't safely reference real per-lead audit data (that's what
-//     the Growth Audit Outreach generator on the lead page is for).
-//   {{signature}} — the full sign-off block (name, dean-da-dev, email, site).
+//   {{bookrightly_link}} — bookrightly.co.uk. The primary CTA across every
+//     outreach template — "here's what it could look like for you" — not a
+//     claim about specific findings, since a static template can't safely
+//     reference real per-lead audit data (that's what the Growth Audit
+//     Outreach generator on the lead page is for).
+//   {{signature}} — the full sign-off block (name, Bookrightly, email, site).
 export const DEFAULT_TEMPLATES = [
   {
     name: 'General Outreach',
     category: 'Outreach',
-    subject: 'A free website check for {{business}}',
+    subject: 'A quick idea for {{business}}',
     body: `Hi {{greeting}},
 
-I'm Dean, a web developer, and I've just built a free tool that lets businesses check their website for SEO, performance, mobile and conversion issues.
+I'm Dean — a web developer and founder of Bookrightly.
 
-I thought you might find it useful for {{business}}.
+I came across {{business}} and thought Bookrightly might be useful for you. It gives small businesses their own professional website and online booking system in one place, so customers can find out about you, view your services, and book online (and pay a deposit) without everything having to go through calls or messages.
 
-You can run your website through it here — completely free:
+You can have a look here: {{bookrightly_link}}
 
-{{audit_link}}
-
-It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
-
-No obligation — I just thought it might be useful.
+Would you be interested?
 
 {{signature}}`,
   },
@@ -188,11 +184,13 @@ If you'd be interested in a no-obligation chat about whether it could work for {
     subject: 'Getting {{business}} online',
     body: `Hi {{greeting}},
 
-I'm Dean, a web developer, and I noticed {{business}} doesn't currently have a website — which means anyone searching Google or asking for a recommendation has no way to find or check you out online.
+I'm Dean — a web developer and founder of Bookrightly. I noticed {{business}} doesn't currently have a website, so I thought I'd reach out.
 
-I've also just built a free tool that checks a website for SEO, performance, mobile and conversion issues, so once you're ready to get one built it's an easy way to keep it in good shape.
+Bookrightly gives small businesses their own professional website and online booking system in one place — so customers can find out about you, view your services, book online and pay a deposit, without everything having to go through calls or messages.
 
-Happy to put a few quick ideas together for what a site could look like for {{business}}, completely free and no obligation.
+You can have a look here: {{bookrightly_link}}
+
+Would you be interested?
 
 {{signature}}`,
   },
@@ -202,51 +200,45 @@ Happy to put a few quick ideas together for what a site could look like for {{bu
     subject: 'Noticed an issue on {{website}}',
     body: `Hi {{greeting}},
 
-I'm Dean, a web developer, and I tried visiting {{business}}'s website — unfortunately it didn't load properly on my end.
+I'm Dean — a web developer and founder of Bookrightly. I tried visiting {{business}}'s website — unfortunately it didn't load properly on my end.
 
-Anyone finding you through Google or a recommendation could be hitting the same problem and leaving within seconds, which can mean missed enquiries without you even realising it.
+Anyone finding you through Google or a recommendation could be hitting the same problem and leaving within seconds, which can mean missed enquiries without you even realising it. Bookrightly gives small businesses a reliable website and online booking system in one place, so this doesn't happen.
 
-I've also just built a free tool that checks a website for SEO, performance, mobile and conversion issues — worth running once it's back up:
+You can have a look here: {{bookrightly_link}}
 
-{{audit_link}}
-
-Happy to take a look at what's causing the issue too, completely free and no obligation.
+Would you be interested?
 
 {{signature}}`,
   },
   {
     name: 'Slow Website',
     category: 'Issue-based',
-    subject: '{{website}} is loading slowly — quick fix ideas',
+    subject: '{{website}} is loading slowly',
     body: `Hi {{greeting}},
 
-I'm Dean, a web developer, and I ran a quick check on {{business}}'s website — it's loading slower than it should, which affects both visitor experience and where it ranks in Google.
+I'm Dean — a web developer and founder of Bookrightly. I had a quick look at {{business}}'s website — it's loading slower than it should, which affects both visitor experience and where it ranks in Google.
 
-I've just built a free tool that checks a website for SEO, performance, mobile and conversion issues in more detail. You can run it here — completely free:
+Bookrightly gives small businesses a fast, professional website with online booking built in, so it's one less thing to worry about.
 
-{{audit_link}}
+You can have a look here: {{bookrightly_link}}
 
-It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
-
-No obligation — I just thought it might be useful.
+Would you be interested?
 
 {{signature}}`,
   },
   {
     name: 'Outdated Website',
     category: 'Issue-based',
-    subject: 'A free website check for {{business}}',
+    subject: 'A quick idea for {{business}}',
     body: `Hi {{greeting}},
 
-I'm Dean, a web developer, and I had a look at {{business}}'s website — it could use a modern refresh, which can quietly cost enquiries even when the work itself is great.
+I'm Dean — a web developer and founder of Bookrightly. I had a look at {{business}}'s website — it could use a modern refresh, which can quietly cost enquiries even when the work itself is great.
 
-I've also just built a free tool that checks a website for SEO, performance, mobile and conversion issues. You can run it here — completely free:
+Bookrightly gives small businesses their own professional website and online booking system in one place.
 
-{{audit_link}}
+You can have a look here: {{bookrightly_link}}
 
-It gives you a breakdown of what's working, what could be improved and what I'd prioritise fixing.
-
-No obligation — I just thought it might be useful.
+Would you be interested?
 
 {{signature}}`,
   },
@@ -256,13 +248,13 @@ No obligation — I just thought it might be useful.
     subject: 'Add online booking to {{business}}',
     body: `Hi {{greeting}},
 
-I'm Dean, a web developer, and I had a look at {{business}}'s website — there isn't currently a way for customers to book online, which likely means missed bookings from people browsing outside your opening hours.
+I'm Dean — a web developer and founder of Bookrightly. I had a look at {{business}}'s website — there isn't currently a way for customers to book online, which likely means missed bookings from people browsing outside your opening hours.
 
-I've also just built a free tool that checks a website for SEO, performance, mobile and conversion issues. You can run it here — completely free:
+Bookrightly gives small businesses their own website with online booking (and deposit payments) built in, so customers can book any time.
 
-{{audit_link}}
+You can have a look here: {{bookrightly_link}}
 
-No obligation — I just thought it might be useful.
+Would you be interested?
 
 {{signature}}`,
   },
@@ -272,14 +264,14 @@ No obligation — I just thought it might be useful.
     subject: 'Following up — {{business}}',
     body: `Hi {{contact}},
 
-Just following up on this — if you want to see what the free audit tool picks up on {{business}}'s website, you can run it here:
+Just following up on this — still happy to show you what Bookrightly could look like for {{business}} if that's of interest, no obligation at all.
 
-{{audit_link}}
+{{bookrightly_link}}
 
 No pressure at all — thought it might be useful.
 
 {{myname}}
-dean-da-dev.co.uk`,
+Founder, Bookrightly`,
   },
   {
     name: 'Quote Follow Up',
@@ -316,36 +308,6 @@ Thank you again.
 Hope things are going well with {{business}}'s new site.
 
 If you know anyone else who could use a similar website — another local business owner, a friend, a supplier you work with — I'd really appreciate the introduction. Referrals like that mean a lot to a small business like mine.
-
-{{signature}}`,
-  },
-  {
-    name: 'Two-Path Offer',
-    category: 'Bookrightly',
-    subject: 'A free website check for {{business}}',
-    body: `Hi {{greeting}},
-
-I'm Dean, a web developer, and I've just built a free tool that lets businesses check their website for SEO, performance, mobile and conversion issues. You can run {{business}} through it here — completely free:
-
-{{audit_link}}
-
-If it turns up things worth fixing, there are two ways I can help: I build custom websites through Dean Da Dev from £249, or if a full rebuild is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a booking platform live in about ten minutes, from £10–20/month with a 90-day free trial.
-
-No obligation either way — let me know if either sounds like a fit.
-
-{{signature}}`,
-  },
-  {
-    name: 'Two-Path Offer (No Website)',
-    category: 'Bookrightly',
-    subject: 'A quick idea for {{business}}',
-    body: `Hi {{greeting}},
-
-I'm Dean, a web developer, and I noticed {{business}} doesn't currently have a website — which means anyone searching Google or asking for a recommendation has no way to find or check you out online.
-
-There are two ways I can help: I build custom websites through Dean Da Dev from £249, or if a full site is more than you need right now, I also run Bookrightly (https://bookrightly.co.uk) — a professional booking page live in about ten minutes, from £10–20/month with a 90-day free trial.
-
-No obligation either way — let me know if either sounds like a fit.
 
 {{signature}}`,
   },
@@ -423,15 +385,15 @@ If you'd like me to create a booking page for your business, just reply "book" a
     category: 'Instagram',
     channels: ['Instagram', 'WhatsApp', 'Facebook'],
     subject: 'Instagram DM (not sent by email — send as a direct message)',
-    body: `Hi, I'm {{myname}} from dean-da-dev.co.uk 👋
+    body: `Hi, I'm Dean — a web developer and founder of Bookrightly 👋
 
-I came across {{business}} and had a quick look at the website.
+I came across {{business}} and had a quick look at your page.
 
-I've also just built a free tool that checks a website for SEO, performance, mobile and conversion issues — you can run {{business}} through it here, completely free:
+Bookrightly gives small businesses their own professional website and online booking system in one place — so customers can book without everything going through DMs.
 
-{{audit_link}}
+You can have a look here: {{bookrightly_link}}
 
-If you're interested, I'd also be happy to put together 3 quick ideas specifically for {{business}} — no obligation.
+Would you be interested?
 
 — {{myname}}`,
   },
@@ -448,7 +410,7 @@ If you're interested, I'd also be happy to put together 3 quick ideas specifical
 
 Most customers are probably coming through Instagram/Facebook, which is great for showing your work, but people still have to message or search around for pricing and availability.
 
-I build simple booking pages for local businesses that let clients:
+I've built Bookrightly — a simple booking page for local businesses that lets clients:
 
   • See services + prices
   • Choose a time
@@ -457,7 +419,9 @@ I build simple booking pages for local businesses that let clients:
 
 The goal isn't to replace your Instagram — it's to turn more profile visitors into confirmed appointments.
 
-I can mock up a version using your current branding so you can see what it would look like, completely free.
+You can have a look here: {{bookrightly_link}}
+
+Would you be interested?
 
 — {{myname}}`,
   },
@@ -466,16 +430,10 @@ I can mock up a version using your current branding so you can see what it would
     category: 'WhatsApp',
     channels: ['WhatsApp', 'Facebook'],
     subject: 'WhatsApp message (not sent by email — opens a pre-filled WhatsApp chat instead)',
-    // Rewritten after real feedback: the old version opened with an
-    // unprompted critique of their site ("an easy win or two") — fine in an
-    // email with a full signature/subject line for context, but reads as
-    // rude out of nowhere on a personal channel like WhatsApp. Also never
-    // said who Dean actually is or gave any way to verify him, which kills
-    // trust and conversion on a channel with no email signature to lean on.
-    // Leads with identity + a link instead of a critique. Signs off with
-    // the name, not the link again — it's already in the first line, no
-    // need to repeat it.
-    body: `Hi, I'm Dean — a web developer at dean-da-dev.co.uk. I've just built a free tool that checks a website for SEO, performance, mobile and conversion issues — you can run {{business}} through it here, completely free: {{audit_link}}
+    // Leads with identity + a link, no unprompted critique of their site —
+    // reads as rude out of nowhere on a personal channel like WhatsApp with
+    // no signature/subject line for context to soften it.
+    body: `Hi, I'm Dean — a web developer and founder of Bookrightly. I came across {{business}} and thought it might be useful — Bookrightly gives small businesses their own professional website and online booking system in one place: {{bookrightly_link}}
 
 No pressure either way — just thought it might be useful.
 
@@ -486,12 +444,13 @@ No pressure either way — just thought it might be useful.
     category: 'WhatsApp',
     channels: ['WhatsApp', 'Facebook'],
     subject: 'WhatsApp message (not sent by email — opens a pre-filled WhatsApp chat instead)',
-    // Distinct from "Quick Intro" above (which leans on {{issue_highlight}}
-    // — a specific problem found on an existing site) since "no website at
-    // all" isn't a website issue to reference, it's a different pitch
-    // entirely — this one exists for real, not just to have every scenario
-    // covered.
-    body: `Hi, I'm Dean — a web developer/designer at dean-da-dev.co.uk (that's got my work on it if you want to have a look). I noticed {{business}} doesn't have a website up yet — happy to put a few quick ideas together for what one could look like, no pressure either way.
+    // Distinct from "Quick Intro" above (a specific problem found on an
+    // existing site) since "no website at all" isn't a website issue to
+    // reference, it's a different pitch entirely — this one exists for
+    // real, not just to have every scenario covered.
+    body: `Hi, I'm Dean — a web developer and founder of Bookrightly. I noticed {{business}} doesn't have a website up yet — Bookrightly gives small businesses their own professional website and online booking system in one place, happy to show you what it could look like, no pressure either way.
+
+{{bookrightly_link}}
 
 — Dean`,
   },
@@ -501,7 +460,7 @@ No pressure either way — just thought it might be useful.
     subject: 'SMS (not sent by email — opens a pre-filled text message instead)',
     // Kept deliberately short — SMS has no formatting and reads worse the
     // longer it gets, unlike email/WhatsApp where a few paragraphs are normal.
-    body: `Hi, it's {{myname}} — I help local businesses like {{business}} with their website/bookings. Noticed a quick win on yours. Worth a 5 min chat? No pressure either way.`,
+    body: `Hi, it's Dean, founder of Bookrightly — websites + online booking for local businesses. Worth a quick look for {{business}}? {{bookrightly_link}}`,
   },
 ];
 
@@ -558,8 +517,6 @@ const TEMPLATE_RELEVANCE_ORDER = [
   'Outdated Website',
   'Missing Booking System',
   'No Website',
-  'Two-Path Offer',
-  'Two-Path Offer (No Website)',
   'Bookrightly Platform Pitch',
   'Bookrightly Subscription Pitch',
   'Instagram DM — Free Ideas',
@@ -622,12 +579,12 @@ export function applyTemplateVars(text, vars) {
 /**
  * Builds the full variable set used to render a template for a lead.
  */
-const MY_WEBSITE = 'https://www.dean-da-dev.co.uk';
-const MY_EMAIL = 'dean@dean-da-dev.co.uk';
-// Mirrors functions/growthAuditConfig.js's AUDIT_TOOL_URL — kept as its own
+const MY_WEBSITE = 'https://bookrightly.co.uk';
+const MY_EMAIL = 'info@bookrightly.co.uk';
+// Mirrors functions/growthAuditConfig.js's PRODUCT_URL — kept as its own
 // constant here too since this template library is a separate (manual,
 // non-AI) outreach surface that isn't bundled with functions/.
-const AUDIT_TOOL_URL = 'https://app.dean-da-dev.co.uk/';
+const BOOKRIGHTLY_URL = 'https://bookrightly.co.uk/';
 
 export function buildTemplateVars(lead, { myName } = {}) {
   const contactTrimmed = lead?.contactName?.trim() ?? '';
@@ -644,8 +601,8 @@ export function buildTemplateVars(lead, { myName } = {}) {
     website: lead?.website ?? '',
     industry: lead?.industry ?? '',
     tool_pitch: `\n\n${pickRelevantTools(lead).map((t) => `  • ${t.name} — https://www.dean-da-dev.co.uk/${t.slug}`).join('\n')}`,
-    audit_link: AUDIT_TOOL_URL,
+    bookrightly_link: BOOKRIGHTLY_URL,
     myname: myName ?? '',
-    signature: myName ? `Kind regards,\n\n${myName}\ndean-da-dev\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}` : '',
+    signature: myName ? `Thanks,\n\n${myName}\nFounder, Bookrightly\n📧 ${MY_EMAIL}\n🌐 ${MY_WEBSITE}` : '',
   };
 }

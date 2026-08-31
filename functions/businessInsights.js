@@ -171,7 +171,7 @@ async function generateRecommendations(stats, keys) {
 }
 
 function buildAdAdvicePrompt(stats) {
-  return `You are a marketing advisor for a solo UK web developer (Dean, dean-da-dev.co.uk — builds websites/apps for local businesses, runs a booking-platform product called Bookrightly, has an Instagram business account @deandadev123, and has a set of free browser-based tools on his site like an image compressor, QR code generator, and website cost calculator). He wants advice on Facebook/Instagram (Meta) ads AND organic Instagram growth to find more local-business clients.
+  return `You are a marketing advisor for Dean, a UK web developer and founder of Bookrightly (bookrightly.co.uk) — a website and online booking platform for small businesses. He has an Instagram business account @deandadev123, and a set of free browser-based tools on his personal site like an image compressor, QR code generator, and website cost calculator. He wants advice on Facebook/Instagram (Meta) ads AND organic Instagram growth to find more local-business clients for Bookrightly.
 
 IMPORTANT CONTEXT: his audience is local BUSINESS OWNERS deciding whether to hire a developer or try a new tool — not general consumers buying a product. Timing and content advice should reflect that (e.g. business owners often browse during work hours/lunch breaks, not just evenings like consumer retail audiences).
 

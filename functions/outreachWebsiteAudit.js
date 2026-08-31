@@ -50,7 +50,7 @@ function __setAxiosGetForTests(fn) {
 const FETCH_TIMEOUT_MS = 8_000;
 const MAX_RESPONSE_BYTES = 2_000_000; // 2MB — a real HTML document is almost always well under this; anything bigger is either not a normal page or not worth downloading in full for a lightweight check
 const MAX_REDIRECTS = 3;
-const USER_AGENT = 'Mozilla/5.0 (compatible; OutreachWebsiteCheck/1.0; +https://dean-da-dev.co.uk)';
+const USER_AGENT = 'Mozilla/5.0 (compatible; OutreachWebsiteCheck/1.0; +https://bookrightly.co.uk)';
 
 // ── Safe fetching (SSRF protection) ─────────────────────────────────────
 

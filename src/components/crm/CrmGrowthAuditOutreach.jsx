@@ -62,7 +62,6 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
   );
 
   const [channel, setChannel] = useState(saved?.channel ?? 'email');
-  const [includePortfolio, setIncludePortfolio] = useState(false);
   const [includeScore, setIncludeScore] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState(null);
@@ -132,7 +131,6 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
         mode,
         myName: MY_NAME,
         findings: audit?.findings,
-        includePortfolio: includePortfolio && channel === 'email',
         includeScore,
       });
       const withChannel = { ...data, channel };
@@ -302,10 +300,6 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
 
           <div className="mt-2 flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-1.5 text-xs text-gray-400">
-              <input type="checkbox" checked={includePortfolio} disabled={channel !== 'email'} onChange={(e) => setIncludePortfolio(e.target.checked)} />
-              Include portfolio {channel !== 'email' && '(email only)'}
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-gray-400">
               <input type="checkbox" checked={includeScore} onChange={(e) => setIncludeScore(e.target.checked)} />
               Include audit score
             </label>
@@ -383,10 +377,10 @@ export default function CrmGrowthAuditOutreach({ lead, onUpdate }) {
                   {copied ? 'Copied!' : 'Copy Message'}
                 </button>
                 <button onClick={handleCopyLink} disabled={!message.auditUrl} className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-semibold text-gray-200 hover:bg-gray-700 disabled:opacity-50">
-                  {linkCopied ? 'Copied!' : 'Copy Audit Link'}
+                  {linkCopied ? 'Copied!' : 'Copy Link'}
                 </button>
                 <button onClick={handleOpenAudit} disabled={!message.auditUrl} className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-semibold text-gray-200 hover:bg-gray-700 disabled:opacity-50">
-                  Open Audit
+                  Open Bookrightly
                 </button>
               </div>
               {channel !== 'email' && channel !== 'linkedin' && (

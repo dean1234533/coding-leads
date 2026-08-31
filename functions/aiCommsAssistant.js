@@ -37,9 +37,9 @@ const TONE_GUIDANCE = {
 // there's no "which business is this for" lookup needed.
 const BUSINESS_PROFILE = {
   name: 'Dean',
-  business: 'dean-da-dev',
-  website: 'dean-da-dev.co.uk',
-  services: 'Website design & development, app/MVP development, booking systems, ecommerce, website redesigns, SEO fixes, and website audits',
+  business: 'Bookrightly',
+  website: 'bookrightly.co.uk',
+  services: 'Bookrightly — gives small businesses their own professional website and online booking system in one place, so customers can find out about the business, view services, and book online (and pay a deposit) without everything going through calls or messages',
 };
 
 function buildPrompt({ purpose, tone, channel, customerName, customerMessage, businessContext, previousConversation, extraContext }) {
@@ -57,7 +57,7 @@ PREVIOUS CONVERSATION (most recent last): ${previousConversation || '(none — t
 ${extraContext ? `ADDITIONAL CONTEXT: ${extraContext}` : ''}
 
 TWO THINGS THIS MESSAGE MUST ANSWER, IN PLAIN WORDS, EARLY ON — NOT IMPLIED, STATED:
-1. WHO IS THIS: "I'm ${BUSINESS_PROFILE.name}, I build websites/apps for local businesses" (or similar, in your own words) — not just the company name dropped in passing. A stranger reading this has no idea who's emailing them or why until you say so plainly.
+1. WHO IS THIS: "I'm ${BUSINESS_PROFILE.name}, founder of ${BUSINESS_PROFILE.business}" (or similar, in your own words) — not just the company name dropped in passing. A stranger reading this has no idea who's emailing them or why until you say so plainly.
 2. WHAT'S THE OFFER: a concrete, specific thing you're proposing — e.g. "I'd like to take a quick look and send over a couple of ideas, free, no obligation" or "I can fix that for you" — never a vague abstraction like "enhance your online presence" or "create a more comprehensive experience". If you can't name something concrete because you don't know enough about them yet, the concrete offer IS "let me take a proper look and send you something specific" — that's still concrete, unlike padding the message with vague praise instead.
 
 GREETING: Start with "Hi" (or "Hi [name]" if you have one) — never "Dear [Business Name]," which reads like a corporate form letter, not a person.
@@ -66,21 +66,23 @@ IF "WHAT WE KNOW ABOUT THIS SPECIFIC BUSINESS" IS EMPTY: don't invent specifics,
 
 BANNED — do not use any of these, they're the exact phrases that make a message read as AI-written rather than human: "I hope this email finds you well", "In today's digital age", "I've reviewed/noticed the potential for enhancement", "essential ... elements", "comprehensive and engaging [experience/solution]", "assist in creating", "leverage", "synergy", corporate transition words ("Furthermore", "Additionally", "Moreover"), exclamation marks, and generic compliments that could apply to any business ("great work you're doing", "impressive business", "striking design").
 
-EXAMPLE OF THE STANDARD TO HIT (cold outreach, business context = a tattoo studio chain with three locations and an online style-browsing feature on their site):
+EXAMPLE OF THE STANDARD TO HIT (cold outreach, business context = a tattoo studio chain with three locations, no online booking):
 "Hi Urban Ink team,
 
-I am Dean, an independent web developer who builds websites and booking systems for local businesses.
+I'm Dean, a web developer and founder of Bookrightly.
 
-I came across your website and was impressed by how you've showcased your artists across your Southend, Brentwood and Romford studios, as well as how easy it is for clients to browse different tattoo styles. While looking through the site, I noticed a few opportunities to make the booking journey even smoother and help convert more visitors into enquiries.
+I came across your website and was impressed by how you've showcased your artists across your Southend, Brentwood and Romford studios. While looking through the site, I noticed there's no way to book an appointment online directly — everything has to go through calls or messages.
 
-I'd like to put together a free homepage redesign and booking flow concept for Urban Ink, with no obligation. The aim is simply to show how a few design and usability improvements could help increase enquiries and make the booking experience even better.
+Bookrightly gives small businesses their own professional website and online booking system in one place, so clients can book (and pay a deposit) any time. I'd be happy to show you what it could look like for Urban Ink, no obligation.
 
-If you're open to seeing a few ideas, let me know and I'll send them over for you to review.
+You can have a look here: ${BUSINESS_PROFILE.website}
 
-Regards,
+Would you be interested?
+
+Thanks,
 Dean
-${BUSINESS_PROFILE.website}"
-Notice what makes this work: it names real specifics pulled from the business (three named locations, the style-browsing feature) instead of generic praise, states who Dean is and the offer in the first two lines, closes with a low-pressure ask, and ends with the website on its own line under the name. Match this level of specificity and structure — but only using the actual details given for THIS lead, never inventing details like these.
+Founder, Bookrightly"
+Notice what makes this work: it names real specifics pulled from the business (three named locations, the missing booking flow) instead of generic praise, states who Dean is and the offer in the first two lines, closes with a low-pressure question, and includes the website. Match this level of specificity and structure — but only using the actual details given for THIS lead, never inventing details like these.
 
 OTHER RULES
 - ALWAYS include "${BUSINESS_PROFILE.website}" somewhere in the message — on its own line directly under the sign-off name is the default place for it, unless the channel guidance above says otherwise (e.g. a channel with a fixed profile link where repeating the URL in-body would be redundant). Every message needs it; never send one without it.

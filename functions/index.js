@@ -37,9 +37,9 @@ const { auditWebsite } = require('./websiteAudit');
 const { analyzeWebsiteForOutreach, toGrowthAuditShapedResult } = require('./outreachWebsiteAudit');
 const { selectTopFindings } = require('./findingSelector');
 const { assessOutreachQuality } = require('./outreachQuality');
-const { generateGrowthAuditOutreach, hasNoRealWebsite } = require('./growthAuditOutreachWriter');
+const { generateGrowthAuditOutreach } = require('./growthAuditOutreachWriter');
 const { generateRedditPost } = require('./redditPostWriter');
-const { buildAuditToolUrl } = require('./growthAuditConfig');
+const { PRODUCT_URL } = require('./growthAuditConfig');
 const { isLookupCacheFresh, sortBusinessLeads, unavailableLead } = require('./businessScannerUtils');
 const { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow, notifyNewHotLeads } = require('./pushNotifications');
 const { generateCommsMessage, approveApproval, rejectApproval, markApprovalSent } = require('./aiCommsAssistant');
@@ -1869,7 +1869,7 @@ exports.generateGrowthAuditOutreachNow = onCall(
     const {
       leadId, leadCollection, channel, mode, myName,
       businessName: directBusinessName, contactName: directContactName, industry: directIndustry,
-      findings: directFindings, includePortfolio, includeScore,
+      findings: directFindings, includeScore,
     } = request.data ?? {};
 
     let businessName = directBusinessName;
@@ -1901,17 +1901,10 @@ exports.generateGrowthAuditOutreachNow = onCall(
       ? mode
       : (hasEnough ? 'initial' : 'soft');
 
-    // A lead whose "website" is actually just an Instagram/Facebook page has
-    // nothing an audit tool can check — the message correctly never mentions
-    // Growth Audit or a link for this lead (see growthAuditOutreachWriter.js),
-    // so the quality gate below must not fail it for "missing the audit link".
-    const isNoWebsiteLead = hasNoRealWebsite(findings);
-
     const result = await generateGrowthAuditOutreach(
       {
         businessName, contactName, industry, channel, myName: myName || 'Dean', findings, mode: resolvedMode,
-        includePortfolio: !!includePortfolio, includeScore: !!includeScore, overallScore,
-        website, leadId, leadCollection,
+        includeScore: !!includeScore, overallScore,
       },
       growthAuditOutreachKeys(),
     );
@@ -1921,16 +1914,15 @@ exports.generateGrowthAuditOutreachNow = onCall(
       businessName, channel: channel || 'email',
       findingsUsed: resolvedMode === 'initial' ? findings : [],
       includeScore: !!includeScore,
-      expectsAuditUrl: !isNoWebsiteLead,
     });
 
-    // Lightweight outreach-funnel tracking (outreach -> audit click -> audit
-    // -> signup -> website added -> monitoring is the eventual goal; this is
-    // just the first step of it, using the same plain-Firestore-doc pattern
-    // as the rest of the app rather than a new analytics system). Best
-    // effort — never blocks returning the message to the user.
+    // Lightweight outreach-funnel tracking (outreach -> link click -> signup
+    // -> website added -> monitoring is the eventual goal; this is just the
+    // first step of it, using the same plain-Firestore-doc pattern as the
+    // rest of the app rather than a new analytics system). Best effort —
+    // never blocks returning the message to the user.
     db.collection('outreachEvents').add({
-      type: 'auditLinkGenerated',
+      type: 'productLinkGenerated',
       channel: channel || 'email',
       leadId: leadId ?? null,
       leadCollection: leadCollection ?? null,
@@ -1945,7 +1937,7 @@ exports.generateGrowthAuditOutreachNow = onCall(
       mode: resolvedMode,
       findingsUsed: findings,
       quality,
-      auditUrl: buildAuditToolUrl(channel, { website, leadId, leadCollection }),
+      auditUrl: PRODUCT_URL,
       notEnoughFindings: !hasEnough && resolvedMode !== 'followup1' && resolvedMode !== 'followup2',
     };
   }

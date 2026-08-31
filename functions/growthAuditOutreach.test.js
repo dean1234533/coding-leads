@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { selectTopFindings } from './findingSelector.js';
 import { assessOutreachQuality, CHANNEL_WORD_LIMITS } from './outreachQuality.js';
-import { buildInitialPrompt, buildFollowUpPrompt, buildSoftPrompt, CTA_VARIATIONS, SERVICE_MENTION_EXAMPLES, NO_WEBSITE_FINDING_ID, hasNoRealWebsite } from './growthAuditOutreachWriter.js';
-import { AUDIT_TOOL_URL, PORTFOLIO_URL, buildAuditToolUrl } from './growthAuditConfig.js';
+import { buildInitialPrompt, buildFollowUpPrompt, buildSoftPrompt, CTA_VARIATIONS, NO_WEBSITE_FINDING_ID, hasNoRealWebsite } from './growthAuditOutreachWriter.js';
+import { PRODUCT_URL } from './growthAuditConfig.js';
 
 function makeRec(overrides = {}) {
   return {
@@ -194,30 +194,20 @@ describe('selectTopFindings — clear conversion problem', () => {
   });
 });
 
-// ── Audit tool URL / portfolio config ───────────────────────────────────
+// ── Product URL config ───────────────────────────────────────────────────
 describe('growthAuditConfig', () => {
-  it('AUDIT_TOOL_URL points at the real Growth Audit homepage, not the API endpoint', () => {
-    expect(AUDIT_TOOL_URL).toBe('https://app.dean-da-dev.co.uk/');
-  });
-
-  it('always returns the bare URL, with no tracking query string, regardless of what is passed', () => {
-    expect(buildAuditToolUrl('whatsapp')).toBe('https://app.dean-da-dev.co.uk/');
-    expect(buildAuditToolUrl(undefined)).toBe('https://app.dean-da-dev.co.uk/');
-    expect(buildAuditToolUrl('email', { website: 'https://example.com', leadId: 'lead-1', leadCollection: 'crmLeads' })).toBe('https://app.dean-da-dev.co.uk/');
-  });
-
-  it('PORTFOLIO_URL is a single configured value', () => {
-    expect(PORTFOLIO_URL).toBe('https://www.dean-da-dev.co.uk/portfolio');
+  it('PRODUCT_URL points at the real Bookrightly homepage', () => {
+    expect(PRODUCT_URL).toBe('https://bookrightly.co.uk/');
   });
 });
 
 // ── Quality gate ─────────────────────────────────────────────────────────
 describe('assessOutreachQuality', () => {
   const finding = makeRec({ evidence: 'Homepage LCP measured at 3.9 seconds' });
-  const link = buildAuditToolUrl('email');
+  const link = PRODUCT_URL;
 
-  it('passes a short, personal, evidence-based message that introduces Dean and points to the audit tool', () => {
-    const body = `Hi Bright Smiles Dental team, I'm Dean, a web developer and designer, and I came across your website. I noticed your homepage is taking a while to load — measured at 3.9 seconds — which can be frustrating for visitors on slower connections. I built a free website audit tool that checks for things like this. Run your free audit here: ${link}`;
+  it('passes a short, personal, evidence-based message that introduces Dean and Bookrightly', () => {
+    const body = `Hi Bright Smiles Dental team, I'm Dean — a web developer and founder of Bookrightly. I noticed your homepage is taking a while to load — measured at 3.9 seconds — which can be frustrating for visitors on slower connections. Bookrightly gives small businesses a fast, professional website with online booking built in. Have a look here: ${link}`;
     const result = assessOutreachQuality(body, { businessName: 'Bright Smiles Dental', channel: 'email', findingsUsed: [finding] });
     expect(result.passed).toBe(true);
     expect(result.checks.personalisation).toBe(true);
@@ -247,7 +237,7 @@ describe('assessOutreachQuality', () => {
     expect(result.checks.naturalTone).toBe(false);
   });
 
-  it('fails on the old "send you the audit" pattern — that CTA is now obsolete', () => {
+  it('fails on the old "send you the audit" pattern — that CTA is obsolete', () => {
     const body = "Hi Test Ltd, I ran a quick audit on your site. I can send you the audit if you'd like — just let me know.";
     const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [] });
     expect(result.passed).toBe(false);
@@ -255,7 +245,7 @@ describe('assessOutreachQuality', () => {
   });
 
   it('fails on generic AI-hype language', () => {
-    const body = `Hi Test Ltd, I built a revolutionary AI-powered website audit tool. Try it here: ${link}`;
+    const body = `Hi Test Ltd, I built a revolutionary AI-powered platform. Try it here: ${link}`;
     const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [] });
     expect(result.passed).toBe(false);
     expect(result.checks.naturalTone).toBe(false);
@@ -268,7 +258,7 @@ describe('assessOutreachQuality', () => {
     expect(result.checks.ctaQuality).toBe(false);
   });
 
-  it('fails when the audit tool link is missing entirely', () => {
+  it('fails when the Bookrightly link is missing entirely', () => {
     const body = 'Hi Test Ltd, I had a look at your site and noticed a few things worth fixing.';
     const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [] });
     expect(result.passed).toBe(false);
@@ -296,8 +286,8 @@ describe('assessOutreachQuality', () => {
     expect(result.checks.noFabricatedSource).toBe(false);
   });
 
-  it('passes a message that honestly attributes findings to a quick/lightweight check, not Growth Audit', () => {
-    const body = `Hi Test Ltd, I'm Dean, a web developer and designer, and I came across your website. I ran a quick audit tool I built and noticed your homepage is taking a while to load — measured at 3.9 seconds. Run your free audit here: ${link}`;
+  it('passes a message that honestly attributes findings to a personal look, not Growth Audit', () => {
+    const body = `Hi Test Ltd, I'm Dean — a web developer and founder of Bookrightly. I had a look at your website and noticed it's taking a while to load — measured at 3.9 seconds. Have a look at Bookrightly here: ${link}`;
     const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [finding] });
     expect(result.checks.noFabricatedSource).toBe(true);
   });
@@ -308,15 +298,15 @@ describe('assessOutreachQuality', () => {
     expect(result.checks.brevity).toBe(false);
   });
 
-  it('fails when a numeric audit score is included but was not explicitly opted into', () => {
-    const body = `Hi Test Ltd, your website scored 71/100 on our audit. ${link}`;
+  it('fails when a numeric score is included but was not explicitly opted into', () => {
+    const body = `Hi Test Ltd, your website scored 71/100 on our review. ${link}`;
     const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [], includeScore: false });
     expect(result.passed).toBe(false);
     expect(result.checks.notAuditDump).toBe(false);
   });
 
   it('allows a numeric score when includeScore is explicitly true', () => {
-    const body = `Hi Test Ltd, I'm Dean. Your site scored 71/100 on the audit tool I built. Run your free audit here: ${link}`;
+    const body = `Hi Test Ltd, I'm Dean. Your site scored 71/100. Have a look at Bookrightly here: ${link}`;
     const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [], includeScore: true });
     expect(result.checks.notAuditDump).toBe(true);
   });
@@ -329,7 +319,7 @@ describe('assessOutreachQuality', () => {
   });
 
   it('blocks a draft without evidence or personalisation', () => {
-    const body = `Hi, hope things are going well at the shop — here's a free audit tool if useful: ${link}`;
+    const body = `Hi, hope things are going well at the shop — here's Bookrightly if useful: ${link}`;
     const result = assessOutreachQuality(body, { businessName: 'Corner Shop', channel: 'email', findingsUsed: [finding] });
     expect(result.checks.personalisation).toBe(false);
     expect(result.score).toBeLessThan(100);
@@ -339,10 +329,10 @@ describe('assessOutreachQuality', () => {
 
 // ── Prompt construction ──────────────────────────────────────────────────
 describe('growthAuditOutreachWriter — prompt construction', () => {
-  it('introduces Dean by first name near the beginning, before the "local businesses" framing', () => {
+  it('introduces Dean and Bookrightly by first name near the beginning, before the "local businesses" framing', () => {
     const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
     const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean Burt', findings });
-    expect(prompt).toContain('I\'m Dean, a web developer and designer, and I came across your website while looking at local businesses');
+    expect(prompt).toContain('I\'m Dean — a web developer and founder of Bookrightly.');
     expect(prompt).toContain('Do NOT start with "I was looking at local businesses in the area..." on its own');
   });
 
@@ -380,7 +370,7 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
   it('instructs the model to translate technical jargon into plain English', () => {
     const findings = [{ id: 'a', category: 'performance', title: 'x', evidence: 'x', measurementType: 'measured' }];
     const prompt = buildInitialPrompt({ businessName: 'Test Ltd', channel: 'email', myName: 'Dean', findings });
-    expect(prompt).toContain('state one specific observation in plain English');
+    expect(prompt).toContain('state one specific finding in plain English');
     expect(prompt).toContain('Never lead with jargon such as LCP, DOM, schema, viewport, or WCAG');
   });
 
@@ -428,22 +418,14 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
     const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
     const withoutScore = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
     const withScore = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings, includeScore: true, overallScore: 71 });
-    expect(withoutScore).toContain('Do NOT mention any numeric audit score in this message');
-    expect(withScore).toContain('overall audit score is 71/100');
+    expect(withoutScore).toContain('Do NOT mention any numeric score in this message');
+    expect(withScore).toContain('overall score is 71/100');
   });
 
-  it('only includes the portfolio block when explicitly opted in on email', () => {
-    const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
-    const withPortfolio = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings, includePortfolio: true });
-    const withoutPortfolio = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
-    expect(withPortfolio).toContain(PORTFOLIO_URL);
-    expect(withoutPortfolio).not.toContain(PORTFOLIO_URL);
-  });
-
-  it('uses a professional email signature with Dean\'s full identity', () => {
+  it('uses a "Thanks, Dean, Founder, Bookrightly" email signature', () => {
     const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
     const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean Burt', findings });
-    expect(prompt).toContain('Dean Burt\nWeb Developer & Designer\ndean-da-dev.co.uk\ndean@dean-da-dev.co.uk');
+    expect(prompt).toContain('Thanks,\n\nDean\nFounder, Bookrightly');
   });
 
   it('uses just a first-name sign-off for non-email channels', () => {
@@ -460,29 +442,13 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
     expect(prompt).toContain('Do not produce a bullet-point feature list');
   });
 
-  it('bans the old "send you the audit" CTA and immediate web-dev hard-sell, in favour of the audit tool link', () => {
+  it('the CTA points at the exact Bookrightly product URL, with real variation examples', () => {
     const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
     const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
-    expect(prompt).toContain('Do not say "I can send you the audit"');
-    expect(prompt).toContain('Do not ask "do you want me to build you a website"');
-  });
-
-  it('the CTA points at the exact audit tool URL with a "run it yourself" framing, with real variation examples', () => {
-    const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
-    const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
-    const link = buildAuditToolUrl('email');
-    expect(prompt).toContain(link);
-    expect(prompt).toContain('Run your free audit here');
+    expect(prompt).toContain(PRODUCT_URL);
+    expect(prompt).toContain('You can have a look here');
     for (const cta of CTA_VARIATIONS) {
-      expect(prompt).toContain(cta.replace('{link}', link));
-    }
-  });
-
-  it('includes a soft, non-hard-sell service mention after the CTA', () => {
-    const findings = [{ id: 'a', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
-    const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
-    for (const example of SERVICE_MENTION_EXAMPLES) {
-      expect(prompt).toContain(example);
+      expect(prompt).toContain(cta.replace('{link}', PRODUCT_URL));
     }
   });
 
@@ -492,25 +458,25 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
     expect(prompt.toLowerCase()).toContain('no "ai-powered"');
   });
 
-  it('follow-up 1 points back at the audit tool link with the new low-pressure wording, never "sending the audit"', () => {
+  it('follow-up 1 points back at Bookrightly with low-pressure wording', () => {
     const prompt1 = buildFollowUpPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', stage: 1 });
-    const link = buildAuditToolUrl('email');
-    expect(prompt1).toContain(link);
-    expect(prompt1).toContain('just following up on my message about your website');
-    expect(prompt1).toContain('No pressure at all');
+    expect(prompt1).toContain(PRODUCT_URL);
+    expect(prompt1).toContain('just following up on my earlier message');
+    expect(prompt1).toContain('no obligation at all');
   });
 
   it('follow-up 2 is explicitly the final, lowest-pressure message', () => {
     const prompt = buildFollowUpPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', stage: 2 });
     expect(prompt.toLowerCase()).toContain('final');
-    expect(prompt).toContain("It's completely free to run your website through the audit");
+    expect(prompt).toContain(PRODUCT_URL);
+    expect(prompt).toContain('no pressure either way');
   });
 
-  it('soft-mode prompt explicitly forbids manufacturing problems for a healthy site, still introduces Dean, and still includes the tool link', () => {
+  it('soft-mode prompt explicitly forbids manufacturing problems for a healthy site, still introduces Dean/Bookrightly, and still includes the product link', () => {
     const prompt = buildSoftPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings: [] });
     expect(prompt.toLowerCase()).toContain('do not manufacture problems');
-    expect(prompt).toContain('Introduce yourself as Dean, a web developer and designer');
-    expect(prompt).toContain(buildAuditToolUrl('email'));
+    expect(prompt).toContain('Introduce yourself as Dean, a web developer and the founder of Bookrightly');
+    expect(prompt).toContain(PRODUCT_URL);
   });
 
   it('business-type impact hint only appears when the industry is recognised, and never overrides real findings', () => {
@@ -523,10 +489,12 @@ describe('growthAuditOutreachWriter — prompt construction', () => {
 });
 
 // ── No-real-website leads (Instagram/Facebook as "website") ────────────────
-// Regression: a lead whose only "website" is a social media page has
-// nothing an audit tool can check — the standard prompt was pitching
-// "run your free audit tool" regardless, which read as broken/careless
-// once the message reached someone with no real site at all.
+// A lead whose only "website" is a social media page needs a different
+// opening observation ("you don't have a website" rather than a technical
+// finding on one), but is otherwise the PRIMARY use case for Bookrightly —
+// unlike the old Growth Audit pitch (which had nothing to offer someone
+// with no site to audit), Bookrightly explicitly builds them one, so the
+// product link and pitch still apply in full.
 describe('growthAuditOutreachWriter — no-real-website leads (identity.socialOnly)', () => {
   const socialFinding = {
     id: NO_WEBSITE_FINDING_ID, category: 'conversion', severity: 'critical', confidence: 'high',
@@ -542,79 +510,56 @@ describe('growthAuditOutreachWriter — no-real-website leads (identity.socialOn
     expect(hasNoRealWebsite(undefined)).toBe(false);
   });
 
-  it('buildInitialPrompt never instructs the model to offer/mention Growth Audit or link to it when the lead has no real website', () => {
+  it('never claims an automated tool produced the finding, for a no-website lead', () => {
     const prompt = buildInitialPrompt({ businessName: 'Cheers Bar Lounge', channel: 'whatsapp', myName: 'Dean', findings: [socialFinding] });
-    // The identity block's "you also built Growth Audit... offering it
-    // afterwards" framing must not leak in — that would directly contradict
-    // the "never mention it" instruction below.
-    expect(prompt).not.toContain('You also built Growth Audit');
-    expect(prompt).not.toContain('offering Growth Audit afterwards');
-    expect(prompt).not.toContain(AUDIT_TOOL_URL);
-    expect(prompt).not.toContain('Run your free audit here');
-    // The negative instruction itself is expected to name what's banned.
-    expect(prompt).toContain('must NEVER mention Growth Audit');
+    expect(prompt.toLowerCase()).not.toContain('growth audit');
+    expect(prompt).toContain('NOT writing this message as a report generated by any tool');
   });
 
-  it('buildInitialPrompt pivots to a concrete, no-obligation website offer instead', () => {
+  it('still points a no-website lead at Bookrightly — that is the primary use case, not something to avoid', () => {
     const prompt = buildInitialPrompt({ businessName: 'Cheers Bar Lounge', channel: 'email', myName: 'Dean', findings: [socialFinding] });
-    expect(prompt).toContain('free homepage concept');
-    expect(prompt).toContain('no obligation');
+    expect(prompt).toContain(PRODUCT_URL);
     expect(prompt).toContain(socialFinding.outreachText);
+    expect(prompt).toContain("don't currently have their own website");
   });
 
-  it('buildInitialPrompt explicitly instructs never claiming to have checked/audited the (nonexistent) website', () => {
-    const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings: [socialFinding] });
-    expect(prompt).toContain('Never say or imply you checked/audited/ran their website');
-  });
-
-  it('takes priority even when mixed with other, unrelated findings', () => {
+  it('takes priority over other findings — opens on the no-website observation, not a technical finding, when both are present', () => {
     const otherFinding = { id: 'seo.missingTitle', category: 'seo', title: 'No page title', evidence: 'x', measurementType: 'measured' };
     const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings: [otherFinding, socialFinding] });
-    expect(prompt).not.toContain(AUDIT_TOOL_URL);
-    expect(prompt).not.toContain('Run your free audit here');
-    expect(prompt).toContain('free homepage concept');
+    expect(prompt).toContain(socialFinding.outreachText);
+    expect(prompt).not.toContain('REAL FINDINGS AVAILABLE');
   });
 
-  it('follow-ups also avoid linking to the audit tool and reference the earlier free-concept offer instead', () => {
+  it('follow-ups for a no-website lead reference Bookrightly and the website/booking setup', () => {
     const followUp1 = buildFollowUpPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', stage: 1, findings: [socialFinding] });
     const followUp2 = buildFollowUpPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', stage: 2, findings: [socialFinding] });
     for (const prompt of [followUp1, followUp2]) {
-      expect(prompt).not.toContain(AUDIT_TOOL_URL);
-      expect(prompt).toContain('free homepage concept');
-      expect(prompt).toContain('Never mention Growth Audit');
+      expect(prompt).toContain(PRODUCT_URL);
+      expect(prompt.toLowerCase()).not.toContain('growth audit');
     }
+    expect(followUp1).toContain('setting them up with a website and online booking through Bookrightly');
   });
 
   it('uses a tighter, combined structure for short channels (WhatsApp) than for email, given the much smaller word budget', () => {
     const emailPrompt = buildInitialPrompt({ businessName: 'Cheers Bar Lounge', channel: 'email', myName: 'Dean', findings: [socialFinding] });
     const waPrompt = buildInitialPrompt({ businessName: 'Cheers Bar Lounge', channel: 'whatsapp', myName: 'Dean', findings: [socialFinding] });
     expect(emailPrompt).toContain('3. OBSERVATION');
-    expect(emailPrompt).toContain('4. WHY IT MATTERS');
+    expect(emailPrompt).toContain('4. WHAT BOOKRIGHTLY IS');
     expect(waPrompt).not.toContain('3. OBSERVATION');
-    expect(waPrompt).toContain('ONE sentence combining');
     expect(waPrompt).toContain('tight word limit');
-    expect(waPrompt).toContain('free homepage concept');
+    expect(waPrompt).toContain(PRODUCT_URL);
   });
 
-  it('a normal lead (no social-only finding) is completely unaffected — still gets the standard audit-tool pitch', () => {
+  it('a normal lead (no social-only finding) gets the standard findings-based pitch', () => {
     const findings = [{ id: 'seo.missingTitle', category: 'seo', title: 'x', evidence: 'x', measurementType: 'measured' }];
     const prompt = buildInitialPrompt({ businessName: 'T', channel: 'email', myName: 'Dean', findings });
-    expect(prompt).toContain(buildAuditToolUrl('email'));
-    expect(prompt).toContain('Run your free audit here');
+    expect(prompt).toContain(PRODUCT_URL);
+    expect(prompt).toContain('REAL FINDINGS AVAILABLE');
   });
 
-  it('assessOutreachQuality does not fail a no-website message for lacking the audit link when expectsAuditUrl is false', () => {
-    const body = `Hi Cheers Bar Lounge team, I'm Dean, a web developer and designer. I noticed your Instagram page is currently the only place people can find Cheers Bar Lounge online, rather than a real website of your own. Having a website makes it easier for customers to find and contact you, and shows up in a Google search the way a social page doesn't. I'd like to put together a free homepage concept for you, no obligation. Let me know if you're interested and I'll send it over.\n\nKind regards,\nDean`;
-    const result = assessOutreachQuality(body, { businessName: 'Cheers Bar Lounge', channel: 'email', findingsUsed: [socialFinding], expectsAuditUrl: false });
+  it('assessOutreachQuality requires the Bookrightly link for a no-website lead just like any other lead', () => {
+    const body = `Hi Cheers Bar Lounge team, I'm Dean — a web developer and founder of Bookrightly. I noticed you don't currently have your own website. Bookrightly gives small businesses their own professional website and online booking system in one place. You can have a look here: ${PRODUCT_URL}. Would you be interested?`;
+    const result = assessOutreachQuality(body, { businessName: 'Cheers Bar Lounge', channel: 'email', findingsUsed: [socialFinding] });
     expect(result.checks.includesAuditUrl).toBe(true);
-    expect(result.issues).not.toContain('Does not include the audit tool link.');
-  });
-
-  it('assessOutreachQuality still fails a normal-lead message for lacking the audit link when expectsAuditUrl defaults true', () => {
-    const finding = { id: 'seo.missingTitle', category: 'seo', title: 'x', evidence: 'x', outreachText: 'no page title was set', measurementType: 'measured' };
-    const body = 'Hi Test Ltd team, I noticed your homepage has no page title set, which search engines rely on heavily.';
-    const result = assessOutreachQuality(body, { businessName: 'Test Ltd', channel: 'email', findingsUsed: [finding] });
-    expect(result.checks.includesAuditUrl).toBe(false);
-    expect(result.issues).toContain('Does not include the audit tool link.');
   });
 });

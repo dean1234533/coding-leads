@@ -4,7 +4,7 @@ import { collection, addDoc, query, where, getDocs, updateDoc, doc, serverTimest
 import { app, db } from '../../firebase';
 import CrmComposer from './CrmComposer';
 
-const SELF_DOMAIN = 'dean-da-dev.co.uk';
+const SELF_DOMAIN = 'bookrightly.co.uk';
 
 function formatDate(value) {
   if (!value) return '';

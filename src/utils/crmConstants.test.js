@@ -52,9 +52,9 @@ describe('buildTemplateVars', () => {
     expect(vars.greeting).toBe('there');
   });
 
-  it('includes the free audit tool link', () => {
+  it('includes the Bookrightly link', () => {
     const vars = buildTemplateVars({ businessName: 'Acme' });
-    expect(vars.audit_link).toContain('https://app.dean-da-dev.co.uk');
+    expect(vars.bookrightly_link).toContain('https://bookrightly.co.uk');
   });
 
   it('builds a full signature only when a name is given', () => {

@@ -7,7 +7,7 @@ import { recordIssuesSent } from '../../utils/issueAnalytics';
 import { formatRecommendedTime, getOutreachTiming, nextRecommendedOutreachTime, toDateTimeLocal } from '../../utils/outreachTiming';
 
 const MY_NAME = 'Dean Burt';
-const SIGNATURE = `<p>Kind regards,</p><p>Dean Burt<br>dean-da-dev<br>📧 dean@dean-da-dev.co.uk<br>🌐 https://www.dean-da-dev.co.uk</p>`;
+const SIGNATURE = `<p>Thanks,</p><p>Dean<br>Founder, Bookrightly<br>📧 info@bookrightly.co.uk<br>🌐 https://bookrightly.co.uk</p>`;
 
 const TOOLBAR = [
   { cmd: 'bold', label: 'B', className: 'font-bold' },
