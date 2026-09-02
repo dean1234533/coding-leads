@@ -120,50 +120,58 @@ function CrmPhoneOutreach({ lead }) {
   if (!whatsappNumber && !smsNumber && !facebookPage) return null;
 
   const vars = buildTemplateVars(lead, { myName: MY_NAME });
-  const selectClasses = "rounded border border-gray-700 bg-gray-800/50 px-1.5 py-0.5 text-xs font-medium focus:outline-none";
+  // Regression: an unconstrained <select> can grow wide enough on a narrow
+  // mobile screen to squeeze its sibling link down to almost nothing, which
+  // wraps that link's text across several lines and blows out the whole
+  // row's height (confirmed live — the link and select ended up fighting
+  // for space instead of each other's screen real estate). Capping the
+  // select's width keeps that from happening; each channel gets its own
+  // row (rather than all three competing for space inline) so it reads
+  // cleanly at any width instead of just wrapping wherever it runs out.
+  const selectClasses = "min-w-0 max-w-[9.5rem] flex-shrink truncate rounded border border-gray-700 bg-gray-800/50 px-1.5 py-0.5 text-xs font-medium focus:outline-none";
 
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-3 rounded-lg border border-gray-800 bg-gray-900/60 p-3">
+    <div className="mt-1 flex flex-col gap-2 rounded-lg border border-gray-800 bg-gray-900/60 p-3">
       {whatsapp && whatsappNumber && (
-        <span className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <a
             href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(applyTemplateVars(whatsapp.body, vars))}`}
             target="_blank" rel="noopener noreferrer"
-            className="text-xs font-medium text-emerald-400 hover:text-emerald-300"
+            className="whitespace-nowrap text-xs font-medium text-emerald-400 hover:text-emerald-300"
           >
             Message on WhatsApp {lead.whatsappUrl ? '(number found on their site) ' : ''}→
           </a>
           <select value={whatsapp.id} onChange={(e) => setWhatsappId(e.target.value)} className={`${selectClasses} text-emerald-400 focus:border-emerald-500`}>
             {whatsappOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-        </span>
+        </div>
       )}
       {sms && smsNumber && (
-        <span className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <a
             href={`sms:${smsNumber}&body=${encodeURIComponent(applyTemplateVars(sms.body, vars))}`}
-            className="text-xs font-medium text-blue-400 hover:text-blue-300"
+            className="whitespace-nowrap text-xs font-medium text-blue-400 hover:text-blue-300"
           >
             Send Text →
           </a>
           <select value={sms.id} onChange={(e) => setSmsId(e.target.value)} className={`${selectClasses} text-blue-400 focus:border-blue-500`}>
             {smsOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-        </span>
+        </div>
       )}
       {facebook && facebookPage && (
-        <span className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <a
             href={`https://m.me/${facebookPage}?text=${encodeURIComponent(applyTemplateVars(facebook.body, vars))}`}
             target="_blank" rel="noopener noreferrer"
-            className="text-xs font-medium text-indigo-400 hover:text-indigo-300"
+            className="whitespace-nowrap text-xs font-medium text-indigo-400 hover:text-indigo-300"
           >
             Message on Facebook →
           </a>
           <select value={facebook.id} onChange={(e) => setFacebookId(e.target.value)} className={`${selectClasses} text-indigo-400 focus:border-indigo-500`}>
             {facebookOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-        </span>
+        </div>
       )}
     </div>
   );
