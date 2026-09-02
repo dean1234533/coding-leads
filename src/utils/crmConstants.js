@@ -447,10 +447,67 @@ No pressure either way — just thought it might be useful.
     // Distinct from "Quick Intro" above (a specific problem found on an
     // existing site) since "no website at all" isn't a website issue to
     // reference, it's a different pitch entirely — this one exists for
-    // real, not just to have every scenario covered.
-    body: `Hi, I'm Dean — a web developer and founder of Bookrightly. I noticed {{business}} doesn't have a website up yet — Bookrightly gives small businesses their own professional website and online booking system in one place, happy to show you what it could look like, no pressure either way.
+    // real, not just to have every scenario covered. Spells out pricing
+    // and the feature list rather than staying vague, since a concrete
+    // £/month figure and a "one extra booking pays for it" framing converts
+    // better on a channel where there's no separate landing page to lean on.
+    body: `Hi, I'm Dean 👋 I came across {{business}} and noticed you don't currently have your own website, so I thought I'd reach out.
 
-{{bookrightly_link}}
+I run Bookrightly ({{bookrightly_link}}), which gives small businesses their own professional website + online booking system in one place.
+
+For just £10–£15/month you get:
+
+✓ Your own professional website
+✓ 24/7 online bookings
+✓ Card payments & deposits
+✓ Appointment reminders
+✓ Client management
+✓ Google Calendar sync
+✓ No setup fee
+
+So instead of potential clients having to message or call, they can learn about you, check availability and book straight away.
+
+Even one extra booking could cover the monthly cost.
+
+I'd be happy to show you what Bookrightly could look like for {{business}} — no obligation at all.
+
+Would you be interested in having a look?
+
+— Dean
+Founder, Bookrightly`,
+  },
+  {
+    name: 'WhatsApp — Previously Contacted (Rebrand)',
+    category: 'WhatsApp',
+    channels: ['WhatsApp', 'Facebook'],
+    subject: 'WhatsApp message (not sent by email — opens a pre-filled WhatsApp chat instead)',
+    // For a lead already contacted before the Bookrightly rebrand (under
+    // the old dean-da-dev identity, pitching a one-off custom-built
+    // website) — Bookrightly is a genuinely different offer (a subscription
+    // website + booking system, not a one-off build), so this explicitly
+    // names the earlier contact and frames it as a different option rather
+    // than reading as a repeat follow-up on the same pitch.
+    body: `Hi, it's Dean 👋 I actually reached out a while back through Dean-da-Dev about a website for {{business}}.
+
+Since then, I've built something that I think could be a much better fit — Bookrightly ({{bookrightly_link}}).
+
+Instead of paying hundreds for a website, Bookrightly gives you your own professional website + booking system for just £10–£15/month.
+
+You get:
+
+✓ 24/7 online bookings
+✓ Card payments & deposits
+✓ Appointment reminders
+✓ Client management
+✓ Google Calendar sync
+✓ Your own professional website
+✓ No setup fee
+
+Even one extra booking could cover the monthly cost.
+
+Thought it was worth reaching out again because this is a completely different option from what I contacted you about before.
+
+Would you be interested in having a look?
 
 — Dean`,
   },
