@@ -16,7 +16,6 @@ const { requireOwner } = require('./authGuard');
 const { withErrorAlert } = require('./errorAlert');
 const { notifyOwner } = require('./pushNotifications');
 const { incrementCommsStat } = require('./aiCommsAssistant');
-const { sendSms } = require('./zernioSms');
 
 // Mirrors slugify() in src/utils/crmConstants.js — same deterministic-ID
 // purpose (one doc per issue name in issueAnalytics), duplicated rather than
@@ -36,11 +35,6 @@ const REPLY_AI_KEYS = () => ({
 });
 
 const CRM_GMAIL_SECRETS = [...new Set([...OAUTH_SECRETS, 'GMAIL_REFRESH_TOKEN'])];
-// Only the follow-up functions need Zernio (for the SMS nudge alongside the
-// email) — kept as its own list rather than folded into CRM_GMAIL_SECRETS
-// so the ~10 other functions sharing that array don't all pick up an IAM
-// binding to a secret they never use.
-const FOLLOW_UP_SECRETS = [...CRM_GMAIL_SECRETS, 'ZERNIO_API_KEY'];
 
 // Ground-truth way to tell "Dean sent this himself" apart from "an
 // automation sent this" for the sent-count dashboard tile — a Firestore
@@ -590,11 +584,6 @@ Thank you for your time, and I hope to hear from you.
 
 {{signature}}`;
 
-// Kept to ~1-2 SMS segments (160/segment) — this is a nudge alongside the
-// email above, not a re-pitch, so it doesn't re-explain what Bookrightly is
-// in the same detail as the email/first-contact copy does.
-const FOLLOW_UP_SMS_BODY = "Hi, it's Dean — just following up on my email. I run Bookrightly, a website + booking system for small businesses. Free to look: bookrightly.co.uk — Dean";
-
 function renderFollowUpTemplate(lead) {
   const vars = {
     business: lead.businessName ?? '',
@@ -678,21 +667,6 @@ async function runAutoFollowUp({ skipEnabledCheck = false } = {}) {
       });
       await labelAsAutoSent(gmail, res.data.id);
 
-      // Best-effort SMS nudge alongside the email, on the same schedule —
-      // never blocks or fails the email follow-up above (sendSms already
-      // swallows its own errors and returns null rather than throwing).
-      // Idempotency key is per-lead-per-day, not per-stage, since a retry
-      // within the same run is the actual risk this guards against, not a
-      // genuine second follow-up landing on the same day.
-      if (lead.phone) {
-        const smsResult = await sendSms({
-          to: lead.phone,
-          text: FOLLOW_UP_SMS_BODY,
-          idempotencyKey: `followup:${doc.id}:${sentDate.toISOString().slice(0, 10)}`,
-        });
-        if (smsResult) console.log(`[autoFollowUp] SMS sent to "${lead.businessName}" (${lead.phone}).`);
-      }
-
       await doc.ref.update({
         gmailThreadId: res.data.threadId,
         ...nextFollowUpPatch(lead, sentDate),
@@ -708,7 +682,7 @@ async function runAutoFollowUp({ skipEnabledCheck = false } = {}) {
 }
 
 const scheduledAutoFollowUp = onSchedule(
-  { schedule: '35 9 * * 2-4', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: FOLLOW_UP_SECRETS },
+  { schedule: '35 9 * * 2-4', timeZone: 'Europe/London', timeoutSeconds: 300, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
   withErrorAlert('scheduledAutoFollowUp', () => runAutoFollowUp())
 );
 
@@ -717,7 +691,7 @@ const scheduledAutoFollowUp = onSchedule(
 // instead of only ever finding out it's broken (or that there's nothing due)
 // by waiting for the next 9am run.
 const sendAutoFollowUpNow = onCall(
-  { cors: true, timeoutSeconds: 120, memory: '256MiB', secrets: FOLLOW_UP_SECRETS },
+  { cors: true, timeoutSeconds: 120, memory: '256MiB', secrets: CRM_GMAIL_SECRETS },
   async (request) => { requireOwner(request); return runAutoFollowUp({ skipEnabledCheck: true }); }
 );
 
