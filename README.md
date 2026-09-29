@@ -1,267 +1,134 @@
-# Client Outreach Dashboard
+# Client Acquisition Engine
 
-A React + Firebase dashboard that automates cold outreach for local businesses.  
-Submit a company name, website, and owner name — the app finds their email via Hunter.io  
-and saves a personalized Gmail draft to your account. No email is ever sent automatically.
+**An AI-powered lead generation and outreach CRM for a web development business. It finds local businesses with weak websites, audits them, writes personalised outreach, runs follow-ups, and books discovery calls.**
 
----
+[![Booking page](https://img.shields.io/badge/live-booking_page-0ea5e9?style=flat-square)](https://coding-leads.vercel.app/book)
+![React](https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=flat-square&logo=firebase&logoColor=black)
+![Gmail API](https://img.shields.io/badge/Gmail_API-EA4335?style=flat-square&logo=gmail&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white)
+![PWA](https://img.shields.io/badge/PWA-5A0FC8?style=flat-square&logo=pwa&logoColor=white)
 
-## Tech Stack
-
-| Layer     | Technology                                      |
-|-----------|-------------------------------------------------|
-| Frontend  | React 18, Vite, Tailwind CSS, Firebase SDK v10  |
-| Backend   | Firebase Cloud Functions v2 (Node 18)           |
-| Database  | Cloud Firestore (real-time lead tracking)       |
-| Email     | Gmail API via OAuth2 (draft creation only)      |
-| Lead Data | Hunter.io Email Finder API (free tier)          |
-
----
-
-## Project Structure
-
-```
-.
-├── src/
-│   ├── components/
-│   │   └── LeadTable.jsx       # Real-time lead history table
-│   ├── pages/
-│   │   └── LeadDashboard.jsx   # Main dashboard page
-│   ├── firebase.js             # Firebase app initialization
-│   ├── main.jsx                # React entry point
-│   └── index.css               # Tailwind directives
-├── functions/
-│   ├── index.js                # createOutreachDraft callable function
-│   ├── leadService.js          # Hunter.io email lookup
-│   ├── gmailService.js         # Gmail API draft creation
-│   └── package.json            # Function dependencies
-├── .env.example                # Frontend environment variable template
-├── package.json                # Frontend dependencies
-└── README.md
-```
+The public **discovery-call booking page** is live at
+[coding-leads.vercel.app/book](https://coding-leads.vercel.app/book). The rest
+of the app is a private, sign-in-only dashboard.
 
 ---
 
-## Prerequisites
+## Screenshots
 
-- **Node.js 18+**
-- **Firebase CLI** — `npm install -g firebase-tools`
-- A **Firebase project** on the **Blaze plan** (required for external HTTP calls in Functions)
-- A **Google account** with Gmail (drafts are saved here)
+<!-- Add images to docs/screenshots/ and uncomment. -->
+<!--
+| Lead dashboard | Outreach CRM | Booking page |
+|---|---|---|
+| ![](docs/screenshots/dashboard.png) | ![](docs/screenshots/crm.png) | ![](docs/screenshots/booking.png) |
+-->
+
+_Screenshots coming soon._
 
 ---
 
-## Part 1 — Enable the Gmail API
+## Features
 
-### 1a. Enable the API in Google Cloud
+### Lead discovery
+- **Business scanner.** Searches for local businesses by area and category,
+  looks up contact details, and runs scheduled auto-scans.
+- **Coding leads scout.** Keyword-driven lead scanning with RSS scouting, CSV
+  import, and analytics.
+- **Backlink prospect scanner** and local-intent analysis
+- **Email finding** with Hunter.io and Apollo (both optional)
 
-1. Go to [console.cloud.google.com](https://console.cloud.google.com)
-2. Select the same Google Cloud project linked to your Firebase project
-3. Navigate to **APIs & Services → Library**
-4. Search for **Gmail API** and click **Enable**
+### Website audits
+- An automated technical and design **website audit** for every lead
+- **Growth audit outreach.** Picks the most persuasive audit findings and
+  writes a tailored email around them.
 
-### 1b. Create OAuth 2.0 Credentials
+### AI outreach and CRM
+- **Multi-provider AI router** with automatic failover across Anthropic,
+  OpenAI, Gemini, Groq, and Cohere
+- **Outreach CRM.** Full Gmail integration through OAuth, with inbox threads,
+  drafts, sending, labels, and sent stats.
+- **AI reply classifier** that sorts replies into interested, not interested,
+  and similar categories
+- **Scheduled sends, auto follow-ups, and daily follow-up digests**
+- **Workflow engine** with an approval queue, so nothing is sent without review
+  unless you opt in
+- Quality checks on outreach copy, plus call scripts
 
-1. Go to **APIs & Services → Credentials**
-2. Click **Create Credentials → OAuth client ID**
-3. Set **Application type** to **Desktop app** (name it anything, e.g. "Outreach Draft Creator")
-4. Click **Create** — save the **Client ID** and **Client Secret** shown on screen
+### Booking
+- A public booking page with live availability, booking settings, and Google
+  Calendar integration
+- A portfolio contact-form endpoint used by
+  [dean-da-dev.co.uk](https://www.dean-da-dev.co.uk/)
 
-### 1c. Configure the OAuth Consent Screen
+### App
+- An installable PWA with push notifications, update prompts, and error alerts
+- Sign-in gated dashboard, with Gmail refresh tokens encrypted at rest
 
-1. Go to **APIs & Services → OAuth consent screen**
-2. Set User Type to **External**, click Create
-3. Fill in the required fields (App name, support email)
-4. Under **Scopes**, click **Add or Remove Scopes** and add:
-   ```
-   https://www.googleapis.com/auth/gmail.compose
-   ```
-5. Under **Test users**, add your Gmail address
-6. Save and continue
+---
 
-### 1d. Get a Refresh Token (one-time setup)
+## Tech stack
 
-Run this script locally after replacing the two placeholders:
+| Layer | Technology |
+|---|---|
+| Frontend | React, Vite, Tailwind CSS, React Router, vite-plugin-pwa |
+| Backend | Firebase Cloud Functions v2 (callables and scheduled jobs), Firestore, Auth |
+| Email | Gmail API (OAuth2) |
+| AI | Anthropic, OpenAI, Google Gemini, Groq, and Cohere, with failover |
+| Data | Hunter.io, Apollo, and Google Calendar |
+| Hosting | Vercel (frontend) and Firebase (functions) |
+| Testing | Vitest |
 
-```js
-// get-token.js — run once, then delete
-const { google } = require('googleapis');
-const http       = require('http');
-const url        = require('url');
+---
 
-const CLIENT_ID     = 'PASTE_YOUR_CLIENT_ID';
-const CLIENT_SECRET = 'PASTE_YOUR_CLIENT_SECRET';
-const REDIRECT_URI  = 'http://localhost:3333';
-const SCOPE         = 'https://www.googleapis.com/auth/gmail.compose';
-
-const oauth2 = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
-
-const authUrl = oauth2.generateAuthUrl({
-  access_type: 'offline',
-  prompt:      'consent',  // force refresh token to be returned
-  scope:       SCOPE,
-});
-
-console.log('\nOpen this URL in your browser:\n', authUrl, '\n');
-
-http.createServer(async (req, res) => {
-  const code = new url.URL(req.url, REDIRECT_URI).searchParams.get('code');
-  if (!code) return;
-  const { tokens } = await oauth2.getToken(code);
-  console.log('\n✅ Refresh token:', tokens.refresh_token);
-  res.end('Done! Copy the token from your terminal, then close this tab.');
-  process.exit(0);
-}).listen(3333, () => console.log('Waiting for OAuth callback on http://localhost:3333 ...'));
-```
+## Getting started
 
 ```bash
-node -e "require('googleapis')" 2>/dev/null || npm install googleapis
-node get-token.js
-```
-
-Copy the **refresh token** printed in the terminal — you'll use it in Part 2.
-
----
-
-## Part 2 — Set Firebase Environment Variables
-
-All secrets are stored in **Firebase Secret Manager** — they are never in source code.
-
-```bash
-# AI / Lead API
-firebase functions:secrets:set HUNTER_KEY
-
-# Gmail OAuth2
-firebase functions:secrets:set GMAIL_CLIENT_ID
-firebase functions:secrets:set GMAIL_CLIENT_SECRET
-firebase functions:secrets:set GMAIL_REFRESH_TOKEN
-```
-
-When prompted, paste the value for each key and press Enter.
-
-> **Where to get each key:**
-> | Secret                | Source |
-> |-----------------------|--------|
-> | `HUNTER_KEY`          | [hunter.io](https://hunter.io) → Dashboard → API (free tier: 25 searches/mo) |
-> | `GMAIL_CLIENT_ID`     | Step 1b above |
-> | `GMAIL_CLIENT_SECRET` | Step 1b above |
-> | `GMAIL_REFRESH_TOKEN` | Step 1d above |
-
-To verify a stored secret:
-```bash
-firebase functions:secrets:access HUNTER_KEY
-```
-
----
-
-## Part 3 — Configure the Frontend
-
-```bash
-cp .env.example .env.local
-```
-
-Open `.env.local` and fill in your Firebase project values from  
-**Firebase Console → Project Settings → Your apps → SDK setup and configuration**:
-
-```env
-VITE_FIREBASE_API_KEY=AIza...
-VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your-project-id
-VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
-VITE_FIREBASE_APP_ID=1:123:web:abc
-```
-
----
-
-## Part 4 — Install & Run
-
-```bash
-# Install frontend dependencies
+git clone https://github.com/dean1234533/coding-leads.git
+cd coding-leads
 npm install
-
-# Install function dependencies
 cd functions && npm install && cd ..
-
-# Run locally (hot reload)
+cp .env.example .env.local     # add your VITE_FIREBASE_* config
 npm run dev
 ```
 
-### Deploy to Firebase
+You'll need a Firebase project on the **Blaze** plan, at least one AI provider
+key, and Gmail OAuth credentials. Store every key in Firebase Secret Manager
+with `firebase functions:secrets:set <NAME>`.
+
+📘 **Full setup guide:** [`SETUP.md`](SETUP.md) covers Gmail OAuth, API keys,
+secrets, emulators, and the CRM Gmail connection.
 
 ```bash
-# Deploy Cloud Functions
-firebase deploy --only functions
-
-# Build and deploy frontend to Firebase Hosting (optional)
-npm run build
-firebase deploy --only hosting
+firebase deploy --only functions   # deploy Cloud Functions
+npm test                           # run tests
 ```
 
 ---
 
-## Firestore Security Rules
-
-Paste these in **Firebase Console → Firestore → Rules** before deploying:
+## Project structure
 
 ```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /leads/{leadId} {
-      // Restrict to authenticated users in production
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-```
-
-For local emulator development you can temporarily use `allow read, write: if true;`.
-
----
-
-## Local Development with Emulators
-
-```bash
-# Terminal 1
-firebase emulators:start --only functions,firestore
-
-# Terminal 2
-npm run dev
-```
-
-Add the following to `src/firebase.js` to route requests to the local emulators in dev mode:
-
-```js
-import { connectFirestoreEmulator }  from 'firebase/firestore';
-import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
-
-if (import.meta.env.DEV) {
-  connectFirestoreEmulator(db, 'localhost', 8080);
-  connectFunctionsEmulator(getFunctions(app), 'localhost', 5001);
-}
+src/
+  pages/        LeadDashboard, OutreachCrmPage, BookingPage
+  components/   leads table/detail, CSV import, keyword manager, RSS scout, calendar, call scripts
+functions/
+  index.js              callable + scheduled function exports
+  aiRouter.js           multi-provider AI failover
+  websiteAudit.js       technical + design audits
+  growthAuditOutreach*  finding selection + outreach writing
+  crmGmailService.js    Gmail CRM integration
+  workflowEngine.js     automated workflows with approvals
+  calendarService.js    booking availability
 ```
 
 ---
 
-## How It Works
+## Author
 
-```
-User submits form
-      │
-      ▼
-createOutreachDraft (Cloud Function)
-      │
-      ├─ 1. Validate inputs
-      ├─ 2. Write lead to Firestore (status: "pending")
-      ├─ 3. Hunter.io → find owner email by domain + first name
-      ├─ 4. Populate static 3-sentence email template
-      ├─ 5. Gmail API → create draft (NEVER sends)
-      └─ 6. Update Firestore (status: "draft_created")
-                │
-                ▼
-         LeadTable updates via onSnapshot (real-time)
-```
+Built by **Dean Da Dev**, a UK full-stack developer building web apps, websites,
+and AI tools.
 
-The Gmail draft appears in your **Drafts** folder immediately.  
-Open it, review, add/confirm the recipient, and send manually when ready.
+🌐 [dean-da-dev.co.uk](https://www.dean-da-dev.co.uk/) · 💼 [More projects](https://www.dean-da-dev.co.uk/portfolio) · 🐙 [GitHub](https://github.com/dean1234533)
