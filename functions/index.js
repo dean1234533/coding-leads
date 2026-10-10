@@ -1565,9 +1565,14 @@ exports.confirmBooking = onCall(
     secrets:        ['CALENDAR_CLIENT_ID', 'CALENDAR_CLIENT_SECRET', 'CALENDAR_REFRESH_TOKEN', 'GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN', 'TOKEN_ENCRYPTION_KEY', 'APP_URL'],
   },
   async (request) => {
-    const { slotStart, slotEnd, clientName, clientEmail, clientNote } = request.data ?? {};
+    const { slotStart, slotEnd, clientName, clientEmail, clientPhone, clientNote } = request.data ?? {};
 
-    if (!slotStart || !slotEnd || !clientName || !clientEmail) {
+    // Phone is required — a booking confirmed with no way to call/text the
+    // client (only email) left Dean with a real appointment he had no fast
+    // way to actually reach. Enforced server-side too, not just by the
+    // frontend form's `required` attribute, since a direct callable
+    // invocation could otherwise skip it entirely.
+    if (!slotStart || !slotEnd || !clientName || !clientEmail || !clientPhone) {
       throw new HttpsError('invalid-argument', 'Missing required booking fields.');
     }
 
@@ -1580,7 +1585,7 @@ exports.confirmBooking = onCall(
 
     await createCalendarEvent({
       summary:       `${title} — ${clientName}`,
-      description:   `Client: ${clientName}\nEmail: ${clientEmail}${clientNote ? `\nNote: ${clientNote}` : ''}`,
+      description:   `Client: ${clientName}\nEmail: ${clientEmail}\nPhone: ${clientPhone}${clientNote ? `\nNote: ${clientNote}` : ''}`,
       startTime:     slotStart,
       endTime:       slotEnd,
       attendeeEmail: clientEmail,
@@ -1596,16 +1601,18 @@ exports.confirmBooking = onCall(
     // on whatever device Dean has on him. Neither failing blocks the
     // booking itself, but failures are now logged instead of swallowed
     // silently, so a broken notification path is actually debuggable.
+    // Phone is in the push body itself (not just the calendar event) so
+    // it's usable straight from the notification, no app open needed.
     await notifyOwner(
       '📅 New booking confirmed!',
-      `${clientName} booked ${timeStr}${clientNote ? ` — "${clientNote}"` : ''}`,
+      `${clientName} (${clientPhone}) booked ${timeStr}${clientNote ? ` — "${clientNote}"` : ''}`,
       '/tools',
     ).catch((err) => console.error('[confirmBooking] push notification failed:', err.message));
 
     await sendEmail({
       to:      'deanburt1308@gmail.com',
       subject: `📅 NEW BOOKING: ${clientName} — ${timeStr}`,
-      body:    `You have a new booking!\n\nName:  ${clientName}\nEmail: ${clientEmail}\nTime:  ${timeStr}${clientNote ? `\nNote:  ${clientNote}` : ''}\n\nIt's been added to your Google Calendar.`,
+      body:    `You have a new booking!\n\nName:  ${clientName}\nEmail: ${clientEmail}\nPhone: ${clientPhone}\nTime:  ${timeStr}${clientNote ? `\nNote:  ${clientNote}` : ''}\n\nIt's been added to your Google Calendar.`,
     }).catch((err) => console.error('[confirmBooking] notification email failed:', err.message));
 
     return { success: true, confirmedTime: timeStr };

@@ -29,6 +29,7 @@ export default function BookingPage() {
   const [selected,     setSelected]     = useState(null);
   const [name,         setName]         = useState('');
   const [email,        setEmail]        = useState('');
+  const [phone,        setPhone]        = useState('');
   const [note,         setNote]         = useState('');
   const [submitting,   setSubmitting]   = useState(false);
   const [confirmed,    setConfirmed]    = useState(null);
@@ -51,7 +52,7 @@ export default function BookingPage() {
 
   async function handleConfirm(e) {
     e.preventDefault();
-    if (!selected || !name.trim() || !email.trim()) return;
+    if (!selected || !name.trim() || !email.trim() || !phone.trim()) return;
     setSubmitting(true);
     try {
       const res = await httpsCallable(getFunctions(app), 'confirmBooking')({
@@ -59,6 +60,7 @@ export default function BookingPage() {
         slotEnd:     selected.end,
         clientName:  name.trim(),
         clientEmail: email.trim(),
+        clientPhone: phone.trim(),
         clientNote:  note.trim(),
       });
       setConfirmed(res.data.confirmedTime);
@@ -242,6 +244,15 @@ export default function BookingPage() {
                           required type="email" value={email}
                           onChange={e => setEmail(e.target.value)}
                           placeholder="jane@business.com"
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>Phone Number</label>
+                        <input
+                          required type="tel" value={phone}
+                          onChange={e => setPhone(e.target.value)}
+                          placeholder="07712 345678"
                           style={inputStyle}
                         />
                       </div>
