@@ -41,7 +41,7 @@ const { generateGrowthAuditOutreach } = require('./growthAuditOutreachWriter');
 const { generateRedditPost } = require('./redditPostWriter');
 const { PRODUCT_URL } = require('./growthAuditConfig');
 const { isLookupCacheFresh, sortBusinessLeads, unavailableLead } = require('./businessScannerUtils');
-const { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow, notifyNewHotLeads } = require('./pushNotifications');
+const { savePushToken, sendFollowUpDigest, sendFollowUpDigestNow, notifyNewHotLeads, notifyOwner } = require('./pushNotifications');
 const { generateCommsMessage, approveApproval, rejectApproval, markApprovalSent } = require('./aiCommsAssistant');
 const { scheduledWorkflowEngine, runWorkflowsNow, saveWorkflow } = require('./workflowEngine');
 const { getBusinessInsights } = require('./businessInsights');
@@ -1562,7 +1562,7 @@ exports.confirmBooking = onCall(
     cors:           true,
     timeoutSeconds: 30,
     memory:         '256MiB',
-    secrets:        ['CALENDAR_CLIENT_ID', 'CALENDAR_CLIENT_SECRET', 'CALENDAR_REFRESH_TOKEN', 'GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN', 'TOKEN_ENCRYPTION_KEY'],
+    secrets:        ['CALENDAR_CLIENT_ID', 'CALENDAR_CLIENT_SECRET', 'CALENDAR_REFRESH_TOKEN', 'GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN', 'TOKEN_ENCRYPTION_KEY', 'APP_URL'],
   },
   async (request) => {
     const { slotStart, slotEnd, clientName, clientEmail, clientNote } = request.data ?? {};
@@ -1587,12 +1587,26 @@ exports.confirmBooking = onCall(
       attendeeName:  clientName,
     });
 
-    // Notify Dean
+    // Notify Dean on two channels, not just one — a real person booking a
+    // call is the single highest-value, most time-sensitive event this app
+    // produces, and a plain email with the same subject style as every
+    // other automated digest (notifyHighScoreLeads, follow-up emails, etc.)
+    // was getting lost in the inbox. Push is the primary "can't miss it"
+    // channel; the email stays as a fallback for whenever push isn't set up
+    // on whatever device Dean has on him. Neither failing blocks the
+    // booking itself, but failures are now logged instead of swallowed
+    // silently, so a broken notification path is actually debuggable.
+    await notifyOwner(
+      '📅 New booking confirmed!',
+      `${clientName} booked ${timeStr}${clientNote ? ` — "${clientNote}"` : ''}`,
+      '/tools',
+    ).catch((err) => console.error('[confirmBooking] push notification failed:', err.message));
+
     await sendEmail({
       to:      'deanburt1308@gmail.com',
-      subject: `New booking: ${clientName} — ${timeStr}`,
+      subject: `📅 NEW BOOKING: ${clientName} — ${timeStr}`,
       body:    `You have a new booking!\n\nName:  ${clientName}\nEmail: ${clientEmail}\nTime:  ${timeStr}${clientNote ? `\nNote:  ${clientNote}` : ''}\n\nIt's been added to your Google Calendar.`,
-    }).catch(() => {}); // don't fail the booking if the notification errors
+    }).catch((err) => console.error('[confirmBooking] notification email failed:', err.message));
 
     return { success: true, confirmedTime: timeStr };
   }
